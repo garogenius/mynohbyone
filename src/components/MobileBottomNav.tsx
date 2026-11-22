@@ -1,4 +1,4 @@
-import { Home, Laptop, MessageSquare, Settings } from "lucide-react";
+import { Home, Laptop, ListChecks, MessageSquare, Settings } from "lucide-react";
 
 import type { NavRoute } from "../types/api";
 
@@ -9,6 +9,7 @@ const MOBILE_TABS: {
 }[] = [
   { id: "home", label: "Home", icon: Home },
   { id: "assistant", label: "Assistant", icon: MessageSquare },
+  { id: "tasks", label: "Tasks", icon: ListChecks },
   { id: "devices", label: "Devices", icon: Laptop },
   { id: "settings", label: "Settings", icon: Settings },
 ];

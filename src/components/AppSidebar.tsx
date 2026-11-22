@@ -26,7 +26,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: "home", label: "Home", icon: Home },
   { id: "assistant", label: "Assistant", icon: MessageSquare },
-  { id: "tasks", label: "Tasks", icon: ListChecks, phase: "P4" },
+  { id: "tasks", label: "Tasks", icon: ListChecks },
   { id: "meetings", label: "Meetings", icon: CalendarClock, phase: "P8" },
   { id: "integrations", label: "Integrations", icon: Plug, phase: "P7" },
   { id: "files", label: "Files", icon: FolderOpen, phase: "P6" },

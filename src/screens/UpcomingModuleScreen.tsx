@@ -3,15 +3,9 @@ import { Layers } from "lucide-react";
 import type { NavRoute } from "../types/api";
 
 const PHASE_DETAILS: Record<
-  Exclude<NavRoute, "home" | "assistant" | "devices" | "settings">,
+  Exclude<NavRoute, "home" | "assistant" | "tasks" | "devices" | "settings">,
   { phase: string; title: string; scope: string }
 > = {
-  tasks: {
-    phase: "Phase 4",
-    title: "Task Orchestration & Approval Centre",
-    scope:
-      "Structured multi-step execution plans, risk classification, scoped user approvals, and pause/cancel controls.",
-  },
   meetings: {
     phase: "Phase 8",
     title: "Meeting Intelligence & Interview Prep",
@@ -41,7 +35,7 @@ const PHASE_DETAILS: Record<
 export function UpcomingModuleScreen({
   route,
 }: {
-  route: Exclude<NavRoute, "home" | "assistant" | "devices" | "settings">;
+  route: Exclude<NavRoute, "home" | "assistant" | "tasks" | "devices" | "settings">;
 }) {
   const info = PHASE_DETAILS[route];
 

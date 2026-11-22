@@ -13,6 +13,7 @@ import { DeviceOnboardingScreen } from "./screens/DeviceOnboardingScreen";
 import { DevicesScreen } from "./screens/DevicesScreen";
 import { HomeScreen } from "./screens/HomeScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
+import { TasksScreen } from "./screens/TasksScreen";
 import { UpcomingModuleScreen } from "./screens/UpcomingModuleScreen";
 import { useAppStore } from "./store/useAppStore";
 
@@ -130,10 +131,12 @@ export function App() {
             >
               {activeRoute === "home" && <HomeScreen />}
               {activeRoute === "assistant" && <AssistantScreen />}
+              {activeRoute === "tasks" && <TasksScreen />}
               {activeRoute === "devices" && <DevicesScreen />}
               {activeRoute === "settings" && <SettingsScreen />}
               {activeRoute !== "home" &&
                 activeRoute !== "assistant" &&
+                activeRoute !== "tasks" &&
                 activeRoute !== "devices" &&
                 activeRoute !== "settings" && <UpcomingModuleScreen route={activeRoute} />}
             </motion.div>

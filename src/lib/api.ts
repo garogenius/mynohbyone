@@ -3,6 +3,7 @@ import type {
   ApiErrorDetail,
   ApiErrorResponse,
   ApiSuccessResponse,
+  Approval,
   AuthTokensPayload,
   Conversation,
   Device,
@@ -10,8 +11,11 @@ import type {
   HealthData,
   InterpretationResult,
   Message,
+  Permission,
   SendMessageResponseData,
   SpeechSynthesisResult,
+  Task,
+  TaskEvent,
   TranscriptionResult,
   User,
   VoiceSettings,
@@ -371,6 +375,87 @@ export const apiClient = {
     return request<{ speech: SpeechSynthesisResult }>("/voice/speech", {
       method: "POST",
       body: JSON.stringify(payload),
+    });
+  },
+
+  // Phase 4: Tasks, Permissions & Approvals
+  createTask(payload: {
+    instruction: string;
+    deviceId?: string | null;
+    conversationId?: string | null;
+    source?: string;
+  }) {
+    return request<{ task: Task }>("/tasks", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  listTasks(params: { page?: number; limit?: number; status?: string } = {}) {
+    const qs = new URLSearchParams();
+    if (params.page) qs.set("page", String(params.page));
+    if (params.limit) qs.set("limit", String(params.limit));
+    if (params.status) qs.set("status", params.status);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return request<{
+      tasks: Task[];
+      pagination: { page: number; limit: number; total: number };
+    }>(`/tasks${suffix}`, { method: "GET" });
+  },
+
+  getTask(taskId: string) {
+    return request<{ task: Task; events: TaskEvent[] }>(`/tasks/${taskId}`, { method: "GET" });
+  },
+
+  pauseTask(taskId: string) {
+    return request<{ task: Task }>(`/tasks/${taskId}/pause`, { method: "POST" });
+  },
+
+  resumeTask(taskId: string) {
+    return request<{ task: Task }>(`/tasks/${taskId}/resume`, { method: "POST" });
+  },
+
+  cancelTask(taskId: string) {
+    return request<{ task: Task }>(`/tasks/${taskId}/cancel`, { method: "POST" });
+  },
+
+  listPermissions() {
+    return request<{ permissions: Permission[] }>("/permissions", { method: "GET" });
+  },
+
+  grantPermission(payload: {
+    deviceId?: string | null;
+    resource: string;
+    actions: string[];
+    expiresAt?: string | null;
+  }) {
+    return request<{ permission: Permission }>("/permissions", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  revokePermission(permissionId: string) {
+    return request<{ permission: Permission }>(`/permissions/${permissionId}`, {
+      method: "DELETE",
+    });
+  },
+
+  listPendingApprovals() {
+    return request<{ approvals: Approval[] }>("/approvals/pending", { method: "GET" });
+  },
+
+  approveAction(approvalId: string, actionFingerprint?: string) {
+    return request<{ approval: Approval; task: Task }>(`/approvals/${approvalId}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ actionFingerprint }),
+    });
+  },
+
+  rejectAction(approvalId: string, reason?: string) {
+    return request<{ approval: Approval; task: Task }>(`/approvals/${approvalId}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
     });
   },
 };

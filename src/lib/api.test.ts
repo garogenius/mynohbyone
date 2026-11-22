@@ -121,6 +121,41 @@ describe("Nohby ONE Frontend -> Backend E2E Integration (Phase 0, 1 & 2)", () =>
     });
     expect(txRes.data.transcription.text).toBe("Hey Nohby, check my tasks");
 
+    // Phase 4: Permissions, high-risk task creation, scoped approval, pause/resume/cancel
+    const permRes = await apiClient.grantPermission({
+      deviceId,
+      resource: "browser",
+      actions: ["open", "search"],
+    });
+    expect(permRes.data.permission.active).toBe(true);
+
+    const taskRes = await apiClient.createTask({
+      instruction: "Send email to team@example.com with weekly status",
+      deviceId,
+    });
+    const taskId = taskRes.data.task.id;
+    expect(taskRes.data.task.status).toBe("awaiting_approval");
+    expect(taskRes.data.task.approvals.length).toBe(1);
+
+    const pendingApps = await apiClient.listPendingApprovals();
+    expect(pendingApps.data.approvals.some((a) => a.taskId === taskId)).toBe(true);
+
+    const app = taskRes.data.task.approvals[0];
+    const approved = await apiClient.approveAction(app.id, app.actionFingerprint);
+    expect(approved.data.task.status).toBe("queued");
+
+    const paused = await apiClient.pauseTask(taskId);
+    expect(paused.data.task.status).toBe("paused");
+
+    const resumed = await apiClient.resumeTask(taskId);
+    expect(resumed.data.task.status).toBe("queued");
+
+    const cancelled = await apiClient.cancelTask(taskId);
+    expect(cancelled.data.task.status).toBe("cancelled");
+
+    const permRevoked = await apiClient.revokePermission(permRes.data.permission.id);
+    expect(permRevoked.data.permission.active).toBe(false);
+
     // Revoke device & logout
     const revoked = await apiClient.revokeDevice(deviceId);
     expect(revoked.data.device.status).toBe("revoked");

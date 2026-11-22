@@ -14,8 +14,8 @@ const ROADMAP = [
   { phase: "Phase 0 & 1", title: "Foundation, Identity & Device Management", status: "live" },
   { phase: "Phase 2", title: "Conversation Engine, AI Orchestration & WebSocket Streaming", status: "live" },
   { phase: "Phase 3", title: "Voice Interaction, STT/TTS & Configurable Wake Word", status: "live" },
-  { phase: "Phase 4", title: "Task Orchestration, Permissions & Approvals", status: "next" },
-  { phase: "Phase 5", title: "Local Browser & Desktop Automation", status: "planned" },
+  { phase: "Phase 4", title: "Task Orchestration, Permissions & Scoped Approvals", status: "live" },
+  { phase: "Phase 5", title: "Local Browser & Desktop Automation", status: "next" },
 ];
 
 export function HomeScreen() {

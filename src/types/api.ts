@@ -160,6 +160,75 @@ export interface SpeechSynthesisResult {
   language: string;
 }
 
+export interface TaskStep {
+  id: string;
+  taskId: string;
+  sequenceNumber: number;
+  toolName: string;
+  action: string;
+  inputData: Record<string, unknown>;
+  outputData: Record<string, unknown> | null;
+  status: string;
+  requiresApproval: boolean;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface TaskEvent {
+  id: string;
+  taskId: string;
+  eventType: string;
+  eventData: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface Approval {
+  id: string;
+  userId: string;
+  taskId: string;
+  taskStepId: string;
+  actionFingerprint: string;
+  actionDetails: Record<string, unknown>;
+  status: "pending" | "approved" | "rejected" | "expired" | string;
+  expiresAt: string;
+  decidedAt: string | null;
+  createdAt: string;
+}
+
+export interface Permission {
+  id: string;
+  userId: string;
+  deviceId: string | null;
+  resource: string;
+  actions: string[];
+  constraints: Record<string, unknown>;
+  grantedAt: string;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  active: boolean;
+}
+
+export interface Task {
+  id: string;
+  userId: string;
+  deviceId: string | null;
+  conversationId: string | null;
+  instruction: string;
+  taskType: string;
+  status: string;
+  riskLevel: "low" | "medium" | "high" | string;
+  executionPlan: Record<string, unknown>[];
+  result: Record<string, unknown> | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  steps: TaskStep[];
+  approvals: Approval[];
+}
+
 export type NavRoute =
   | "home"
   | "assistant"
