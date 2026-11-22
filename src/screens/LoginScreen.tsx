@@ -8,19 +8,31 @@ import { useAppStore } from "../store/useAppStore";
 
 const EDITORIAL_SLIDES = [
   {
+    image: "/nohby-studio.jpg",
+    alt: "Nohby ONE architectural glass and brushed titanium sculpture",
     eyebrow: "LOCAL-FIRST ARCHITECTURE",
     headline: "Intelligence in the cloud. Control on your machine.",
     body: "Nohby ONE plans and reasons with precision, while every desktop action runs locally under your explicit authority.",
+    panX: ["-2%", "2%"],
+    panY: ["-1%", "1.5%"],
   },
   {
+    image: "/nohby-studio-2.jpg",
+    alt: "Precision interlocking sapphire and titanium rings",
     eyebrow: "SCOPED APPROVAL ENGINE",
     headline: "Nothing sensitive executes without your sign-off.",
     body: "Review exact parameters, recipients, and risk levels before an email is sent, a file is modified, or a post goes live.",
+    panX: ["2%", "-2%"],
+    panY: ["1.5%", "-1.5%"],
   },
   {
+    image: "/nohby-studio-3.jpg",
+    alt: "Frosted obsidian acoustic soundwave glass ribbons",
     eyebrow: "TRANSPARENT VOICE & AGENTS",
     headline: "Natural voice control with zero covert activity.",
     body: "Configurable wake words, visible microphone telemetry, and instant per-device session revocation built into the core.",
+    panX: ["-1.5%", "1.5%"],
+    panY: ["2%", "-1%"],
   },
 ];
 
@@ -45,7 +57,7 @@ export function LoginScreen({
   useEffect(() => {
     const timer = window.setInterval(() => {
       setSlideIndex((prev) => (prev + 1) % EDITORIAL_SLIDES.length);
-    }, 6500);
+    }, 6000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -62,16 +74,30 @@ export function LoginScreen({
 
   return (
     <div className="grid min-h-screen w-full bg-[#0B0C0E] lg:grid-cols-12">
-      {/* Left: Full-bleed architectural studio showcase (Desktop lg+) */}
-      <section className="editorial-dark-panel relative hidden overflow-hidden border-r border-white/[0.08] bg-[#090A0C] lg:col-span-6 lg:flex lg:flex-col lg:justify-between xl:col-span-7">
-        <motion.img
-          src="/nohby-studio.jpg"
-          alt="Nohby ONE architectural glass and brushed titanium sculpture"
-          initial={{ scale: 1.02 }}
-          animate={{ scale: [1.02, 1.09, 1.02] }}
-          transition={{ duration: 28, repeat: Infinity, ease: "easeInOut" }}
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-85"
-        />
+      {/* Left: Full-bleed sliding architectural studio showcase (Desktop lg+) */}
+      <section className="editorial-dark-panel relative hidden overflow-hidden border-r border-white/[0.08] bg-[#08142E] lg:col-span-6 lg:flex lg:flex-col lg:justify-between xl:col-span-7">
+        <AnimatePresence mode="sync">
+          <motion.img
+            key={currentSlide.image}
+            src={currentSlide.image}
+            alt={currentSlide.alt}
+            initial={{ opacity: 0, scale: 1.12, x: currentSlide.panX[0], y: currentSlide.panY[0] }}
+            animate={{
+              opacity: 0.9,
+              scale: 1.03,
+              x: currentSlide.panX[1],
+              y: currentSlide.panY[1],
+            }}
+            exit={{ opacity: 0, scale: 1.0, transition: { duration: 0.9, ease: "easeInOut" } }}
+            transition={{
+              opacity: { duration: 0.9, ease: "easeInOut" },
+              scale: { duration: 6.5, ease: "linear" },
+              x: { duration: 6.5, ease: "linear" },
+              y: { duration: 6.5, ease: "linear" },
+            }}
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center will-change-transform"
+          />
+        </AnimatePresence>
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-[#08142E]/95 via-[#0046B8]/45 to-[#08142E]/80 mix-blend-multiply" />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#08142E]/95 via-[#08142E]/35 to-[#0066FF]/20" />
 
@@ -125,12 +151,19 @@ export function LoginScreen({
 
       {/* Right: Distraction-free Sign In form */}
       <section className="flex min-h-screen flex-col justify-between lg:col-span-6 xl:col-span-5">
-        <div className="editorial-dark-panel relative h-36 w-full overflow-hidden border-b border-white/[0.08] sm:h-44 lg:hidden">
-          <img
-            src="/nohby-studio.jpg"
-            alt=""
-            className="h-full w-full object-cover object-center opacity-75"
-          />
+        <div className="editorial-dark-panel relative h-36 w-full overflow-hidden border-b border-white/[0.08] bg-[#08142E] sm:h-44 lg:hidden">
+          <AnimatePresence mode="sync">
+            <motion.img
+              key={currentSlide.image}
+              src={currentSlide.image}
+              alt=""
+              initial={{ opacity: 0, scale: 1.1 }}
+              animate={{ opacity: 0.85, scale: 1.02 }}
+              exit={{ opacity: 0 }}
+              transition={{ opacity: { duration: 0.8 }, scale: { duration: 6, ease: "linear" } }}
+              className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center"
+            />
+          </AnimatePresence>
           <div className="absolute inset-0 bg-gradient-to-t from-[#08142E]/95 via-[#0046B8]/45 to-[#0066FF]/20" />
           <div className="absolute right-5 bottom-4 left-5 flex items-center justify-between">
             <BrandMark variant="logo" size="sm" forceDark />
