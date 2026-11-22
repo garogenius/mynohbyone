@@ -129,6 +129,37 @@ export interface SendMessageResponseData {
   interpretation: InterpretationResult;
 }
 
+export interface VoiceSettings {
+  voiceEnabled: boolean;
+  wakeWordEnabled: boolean;
+  wakeWordPhrase: string;
+  sttStrategy: "local" | "cloud";
+  ttsStrategy: "local" | "cloud";
+  ttsVoice: string;
+  ttsRate: number;
+  autoSpeakResponses: boolean;
+  inputLanguage: string;
+}
+
+export interface TranscriptionResult {
+  text: string;
+  language: string;
+  provider: string;
+  sizeBytes: number;
+  requiresLocalEngine?: boolean;
+}
+
+export interface SpeechSynthesisResult {
+  strategy: "local_tts" | "cloud_audio";
+  provider: string;
+  text?: string;
+  mimeType?: string;
+  audioBase64?: string;
+  voice: string;
+  rate: number;
+  language: string;
+}
+
 export type NavRoute =
   | "home"
   | "assistant"

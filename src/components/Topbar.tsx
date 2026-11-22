@@ -1,17 +1,19 @@
-import { LogOut, Menu, Radio } from "lucide-react";
+import { LogOut, Menu, Mic, MicOff, Radio, Volume2 } from "lucide-react";
 
+import { stopSpeaking } from "../lib/voice";
+import { useAppStore } from "../store/useAppStore";
 import type { Device, HealthData, NavRoute, User } from "../types/api";
 
 const ROUTE_TITLES: Record<NavRoute, { title: string; subtitle: string }> = {
   home: { title: "Overview", subtitle: "Workspace health and local agent readiness" },
-  assistant: { title: "Assistant", subtitle: "Conversations, reasoning, and execution planning" },
+  assistant: { title: "Assistant", subtitle: "Conversations, voice interaction, and execution planning" },
   tasks: { title: "Tasks", subtitle: "Execution plans, progress, and approval controls" },
   meetings: { title: "Meetings", subtitle: "Consent-aware meeting intelligence and summaries" },
   integrations: { title: "Integrations", subtitle: "Connected accounts and API permissions" },
   files: { title: "Files", subtitle: "Authorised local documents and knowledge indexing" },
   memory: { title: "Memory", subtitle: "User-controlled persistent context and preferences" },
   devices: { title: "Devices", subtitle: "Registered desktop agents and session revocation" },
-  settings: { title: "Settings", subtitle: "Account profile, privacy, and security" },
+  settings: { title: "Settings", subtitle: "Account profile, voice, privacy, and security" },
 };
 
 export function Topbar({
@@ -31,6 +33,7 @@ export function Topbar({
   onOpenDevices: () => void;
   onOpenMobileMenu: () => void;
 }) {
+  const { micActive, isSpeaking, setIsSpeaking } = useAppStore();
   const meta = ROUTE_TITLES[activeRoute];
   const healthy = health?.status === "healthy";
 
@@ -54,9 +57,46 @@ export function Topbar({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex items-center gap-2 sm:gap-2.5">
+        {/* Visible microphone & speech indicator (Spec 3.2 & 4.4) */}
         <div
-          className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-[#111318] px-2.5 py-1 text-xs text-zinc-300"
+          className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
+            micActive
+              ? "border-rose-500/40 bg-rose-500/15 text-rose-200"
+              : "border-white/[0.08] bg-[#111318] text-zinc-400"
+          }`}
+        >
+          {micActive ? (
+            <>
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-400" />
+              <Mic className="h-3 w-3 text-rose-300" />
+              <span className="hidden sm:inline">Mic Active</span>
+            </>
+          ) : (
+            <>
+              <MicOff className="h-3 w-3 text-zinc-500" />
+              <span className="hidden md:inline">Mic Off</span>
+            </>
+          )}
+        </div>
+
+        {isSpeaking && (
+          <button
+            type="button"
+            onClick={() => {
+              stopSpeaking();
+              setIsSpeaking(false);
+            }}
+            className="flex items-center gap-1.5 rounded-full border border-indigo-500/40 bg-indigo-500/15 px-2.5 py-1 text-xs font-medium text-indigo-200 transition hover:bg-indigo-500/25"
+            title="Click to stop speaking"
+          >
+            <Volume2 className="h-3 w-3" />
+            <span className="hidden sm:inline">Stop Audio</span>
+          </button>
+        )}
+
+        <div
+          className="hidden items-center gap-2 rounded-full border border-white/[0.08] bg-[#111318] px-2.5 py-1 text-xs text-zinc-300 sm:flex"
           title={healthy ? "Backend API healthy" : "Backend degraded"}
         >
           <span
@@ -64,7 +104,7 @@ export function Topbar({
               healthy ? "bg-emerald-400" : "bg-amber-400"
             }`}
           />
-          <span className="hidden sm:inline">{healthy ? "Connected" : "Degraded"}</span>
+          <span>{healthy ? "Connected" : "Degraded"}</span>
         </div>
 
         <button

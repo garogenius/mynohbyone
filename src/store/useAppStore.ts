@@ -3,7 +3,14 @@ import { create } from "zustand";
 import { ApiError, apiClient } from "../lib/api";
 import { getLocalDeviceIdentity } from "../lib/device";
 import { tokenStorage } from "../lib/storage";
-import type { Device, DevicePlatform, HealthData, NavRoute, User } from "../types/api";
+import type {
+  Device,
+  DevicePlatform,
+  HealthData,
+  NavRoute,
+  User,
+  VoiceSettings,
+} from "../types/api";
 
 export type AppPhase =
   | "booting"
@@ -20,11 +27,16 @@ interface AppState {
   user: User | null;
   devices: Device[];
   currentDeviceId: string | null;
+  voiceSettings: VoiceSettings | null;
+  micActive: boolean;
+  isSpeaking: boolean;
   busy: boolean;
   error: string | null;
   toast: { type: "success" | "error" | "info"; message: string } | null;
 
   setRoute: (route: NavRoute) => void;
+  setMicActive: (active: boolean) => void;
+  setIsSpeaking: (speaking: boolean) => void;
   clearError: () => void;
   showToast: (type: "success" | "error" | "info", message: string) => void;
   clearToast: () => void;
@@ -40,6 +52,9 @@ interface AppState {
     locale?: string;
     preferredLanguage?: string;
   }) => Promise<void>;
+
+  loadVoiceSettings: () => Promise<void>;
+  updateVoiceSettings: (payload: Partial<VoiceSettings>) => Promise<void>;
 
   registerCurrentDevice: (custom?: {
     deviceName?: string;
@@ -60,11 +75,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   user: null,
   devices: [],
   currentDeviceId: tokenStorage.getSession().deviceId,
+  voiceSettings: null,
+  micActive: false,
+  isSpeaking: false,
   busy: false,
   error: null,
   toast: null,
 
   setRoute: (route) => set({ activeRoute: route }),
+  setMicActive: (micActive) => set({ micActive }),
+  setIsSpeaking: (isSpeaking) => set({ isSpeaking }),
   clearError: () => set({ error: null }),
   showToast: (type, message) => {
     set({ toast: { type, message } });
@@ -91,15 +111,16 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const session = tokenStorage.getSession();
     if (!session.accessToken && !session.refreshToken) {
-      set({ phase: "unauthenticated", user: null, devices: [] });
+      set({ phase: "unauthenticated", user: null, devices: [], voiceSettings: null });
       return;
     }
 
     set({ bootMessage: "Restoring authenticated session..." });
     try {
-      const [meRes, devicesRes] = await Promise.all([
+      const [meRes, devicesRes, voiceRes] = await Promise.all([
         apiClient.getMe(),
         apiClient.listDevices(),
+        apiClient.getVoiceSettings().catch(() => null),
       ]);
 
       const activeDevices = devicesRes.data.devices.filter((d) => d.status === "active");
@@ -113,12 +134,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({
         user: meRes.data.user,
         devices: devicesRes.data.devices,
+        voiceSettings: voiceRes?.data.settings ?? null,
         currentDeviceId: matchedDevice ? matchedDevice.id : null,
         phase: matchedDevice ? "ready" : "onboarding_device",
       });
     } catch {
       tokenStorage.clearSession();
-      set({ phase: "unauthenticated", user: null, devices: [] });
+      set({ phase: "unauthenticated", user: null, devices: [], voiceSettings: null });
     }
   },
 
@@ -205,6 +227,29 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().showToast("success", "Account profile updated.");
     } catch (err) {
       const message = err instanceof ApiError ? err.message : "Failed to update profile.";
+      set({ busy: false, error: message });
+      throw err;
+    }
+  },
+
+  loadVoiceSettings: async () => {
+    try {
+      const res = await apiClient.getVoiceSettings();
+      set({ voiceSettings: res.data.settings });
+    } catch {
+      // Non-fatal
+    }
+  },
+
+  updateVoiceSettings: async (payload) => {
+    set({ busy: true, error: null });
+    try {
+      const res = await apiClient.updateVoiceSettings(payload);
+      set({ voiceSettings: res.data.settings, busy: false });
+      get().showToast("success", "Voice preferences saved.");
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : "Failed to save voice settings.";
       set({ busy: false, error: message });
       throw err;
     }

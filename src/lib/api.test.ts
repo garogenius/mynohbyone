@@ -93,6 +93,34 @@ describe("Nohby ONE Frontend -> Backend E2E Integration (Phase 0, 1 & 2)", () =>
     const convDeleted = await apiClient.deleteConversation(convId);
     expect(convDeleted.data.deleted).toBe(true);
 
+    // Phase 3: Voice settings, speech synthesis & audio transcription
+    const voiceDefaults = await apiClient.getVoiceSettings();
+    expect(voiceDefaults.data.settings.wakeWordPhrase).toBe("Hey Nohby");
+
+    const voiceUpdated = await apiClient.updateVoiceSettings({
+      wakeWordEnabled: true,
+      wakeWordPhrase: "Hey Nohby",
+      ttsRate: 1.15,
+      autoSpeakResponses: true,
+    });
+    expect(voiceUpdated.data.settings.wakeWordEnabled).toBe(true);
+    expect(voiceUpdated.data.settings.ttsRate).toBe(1.15);
+
+    const speechRes = await apiClient.synthesizeSpeech({
+      text: "Nohby ONE Phase 3 verified.",
+      rate: 1.1,
+    });
+    expect(["local_tts", "cloud_audio"]).toContain(speechRes.data.speech.strategy);
+
+    const audioBlob = new Blob(["fake-webm-audio-bytes"], { type: "audio/webm" });
+    const txRes = await apiClient.transcribeAudio({
+      file: audioBlob,
+      filename: "test.webm",
+      language: "en-US",
+      transcriptHint: "Hey Nohby, check my tasks",
+    });
+    expect(txRes.data.transcription.text).toBe("Hey Nohby, check my tasks");
+
     // Revoke device & logout
     const revoked = await apiClient.revokeDevice(deviceId);
     expect(revoked.data.device.status).toBe("revoked");

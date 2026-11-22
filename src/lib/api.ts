@@ -11,7 +11,10 @@ import type {
   InterpretationResult,
   Message,
   SendMessageResponseData,
+  SpeechSynthesisResult,
+  TranscriptionResult,
   User,
+  VoiceSettings,
 } from "../types/api";
 
 export const API_BASE_URL = (
@@ -298,6 +301,58 @@ export const apiClient = {
 
   interpretInstruction(payload: { instruction: string; deviceId?: string | null; conversationId?: string | null }) {
     return request<InterpretationResult>("/ai/interpret", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Phase 3: Voice & Speech
+  getVoiceSettings() {
+    return request<{ settings: VoiceSettings }>("/voice/settings", { method: "GET" });
+  },
+
+  updateVoiceSettings(payload: Partial<VoiceSettings>) {
+    return request<{ settings: VoiceSettings }>("/voice/settings", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async transcribeAudio(payload: {
+    file: Blob;
+    filename?: string;
+    language?: string;
+    transcriptHint?: string;
+  }) {
+    const form = new FormData();
+    form.append("file", payload.file, payload.filename || "voice.webm");
+    if (payload.language) form.append("language", payload.language);
+    if (payload.transcriptHint) form.append("transcriptHint", payload.transcriptHint);
+
+    const { accessToken } = tokenStorage.getSession();
+    const response = await fetch(`${API_BASE_URL}/voice/transcriptions`, {
+      method: "POST",
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      body: form,
+    });
+    const json = (await response.json()) as
+      | ApiSuccessResponse<{ transcription: TranscriptionResult }>
+      | ApiErrorResponse;
+    if (!response.ok || !json.success) {
+      const err = json as ApiErrorResponse;
+      throw new ApiError(
+        err.message || "Transcription failed.",
+        err.error?.code || "INTERNAL_ERROR",
+        response.status,
+        err.error?.details || [],
+        err.meta?.requestId || ""
+      );
+    }
+    return json as ApiSuccessResponse<{ transcription: TranscriptionResult }>;
+  },
+
+  synthesizeSpeech(payload: { text: string; voice?: string; rate?: number; language?: string }) {
+    return request<{ speech: SpeechSynthesisResult }>("/voice/speech", {
       method: "POST",
       body: JSON.stringify(payload),
     });
