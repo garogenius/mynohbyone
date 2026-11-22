@@ -394,5 +394,49 @@
   background:
     linear-gradient(90deg, rgba(0, 148, 232, 0.14) 0%, rgba(0, 92, 230, 0.1) 55%, rgba(124, 58, 237, 0.14) 100%) padding-box,
     linear-gradient(90deg, rgba(0, 148, 232, 0.45), rgba(124, 58, 237, 0.4)) border-box;
+  color: #08142e !important;
 }
+
+/* Complete Light Mode surface & text overrides for obsidian-navy dark classes */
+[data-theme="light"] .bg-\[\#0B101B\],
+[data-theme="light"] .bg-\[\#080C14\] {
+  background-color: #ffffff !important;
+}
+
+[data-theme="light"] .bg-\[\#101624\],
+[data-theme="light"] .bg-\[\#101624\]\/80,
+[data-theme="light"] .bg-\[\#101624\]\/90 {
+  background-color: #ffffff !important;
+}
+
+[data-theme="light"] .bg-\[\#141B2D\],
+[data-theme="light"] .bg-\[\#141B2D\]\/80,
+[data-theme="light"] .bg-\[\#151B2B\]\/90,
+[data-theme="light"] .bg-\[\#161E30\],
+[data-theme="light"] .bg-\[\#0C121E\],
+[data-theme="light"] .bg-\[\#101A2E\] {
+  background-color: #f3f6fb !important;
+}
+
+[data-theme="light"] .nohby-bubble-ai,
+[data-theme="light"] .nohby-bubble-ai p,
+[data-theme="light"] .nohby-bubble-ai span {
+  color: #08142e !important;
+}
+
+[data-theme="light"] .text-\[\#00D4FF\] {
+  color: #0077cc !important;
+}
+
+[data-theme="light"] .border-\[\#00D4FF\]\/35,
+[data-theme="light"] .border-\[\#00D4FF\]\/40,
+[data-theme="light"] .border-\[\#00D4FF\]\/50 {
+  border-color: rgba(0, 119, 204, 0.35) !important;
+}
+
+[data-theme="light"] .bg-\[\#00D4FF\]\/10,
+[data-theme="light"] .bg-\[\#00D4FF\]\/15 {
+  background-color: rgba(0, 119, 204, 0.1) !important;
+}
+
 

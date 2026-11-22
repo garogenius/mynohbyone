@@ -212,17 +212,17 @@ export function HomeScreen() {
     tasks.length > 0 ? `${Math.round(((tasks.length - tasks.filter((t) => t.status === "failed").length) / tasks.length) * 100)}%` : "100%";
 
   return (
-    <div className="grid w-full gap-4 lg:grid-cols-12">
+    <div className="grid w-full gap-3 lg:h-[calc(100vh-5.25rem)] lg:grid-cols-12 lg:overflow-hidden">
       {/* ============================================================
-          LEFT / CENTER: ACTIVE SESSION STAGE (Exact Reference Layout)
+          LEFT / CENTER: ACTIVE SESSION STAGE (Zero-Scroll Room)
           ============================================================ */}
-      <section className="nohby-stage flex min-h-[540px] flex-col justify-between p-4 sm:p-5 lg:col-span-8">
+      <section className="nohby-stage flex flex-col justify-between p-3.5 sm:p-4 lg:col-span-8 lg:h-full lg:overflow-hidden">
         {/* Stage Header */}
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5">
-            <h2 className="font-display text-base font-semibold text-white">Active Session</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-display text-sm font-semibold text-white">Active Session</h2>
             {voiceActive && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#00D4FF]/40 bg-[#00D4FF]/10 px-2.5 py-0.5 text-[10px] font-medium text-[#00D4FF]">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#00D4FF]/40 bg-[#00D4FF]/10 px-2 py-0.5 text-[10px] font-medium text-[#00D4FF]">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#00D4FF]" />
                 Listening
               </span>
@@ -232,30 +232,30 @@ export function HomeScreen() {
           <button
             type="button"
             onClick={() => setRoute("meetings")}
-            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/[0.12] bg-[#101624]/80 px-3 text-[11px] font-medium text-zinc-300 transition hover:border-[#00D4FF]/50 hover:text-white"
+            className="inline-flex h-7 items-center gap-1.5 rounded-full border border-white/[0.12] bg-[#101624]/80 px-2.5 text-[11px] font-medium text-zinc-300 transition hover:border-[#00D4FF]/50 hover:text-white"
             title="Open Stealth Hidden Meeting & Interview Listener"
           >
-            <EyeOff className="h-3.5 w-3.5 text-[#00D4FF]" />
-            <span>Stealth Meeting Mode</span>
+            <EyeOff className="h-3 w-3 text-[#00D4FF]" />
+            <span>Stealth Mode</span>
           </button>
         </div>
 
         {/* Centerpiece: Official /vioce-wave.gif Animated Voice Orb */}
-        <div className="my-4 flex flex-col items-center justify-center">
+        <div className="my-1 flex flex-1 items-center justify-center">
           <button
             type="button"
             onClick={toggleVoiceMic}
             aria-label={voiceActive ? "Stop voice listening" : "Start voice listening"}
-            className={`group relative flex h-52 w-52 items-center justify-center rounded-full transition duration-300 sm:h-64 sm:w-64 ${
+            className={`group relative flex h-40 w-40 items-center justify-center rounded-full transition duration-300 xl:h-48 xl:w-48 ${
               voiceActive
-                ? "scale-105 shadow-[0_0_70px_rgba(0,212,255,0.45)]"
-                : "hover:scale-[1.03] shadow-[0_0_48px_rgba(0,102,255,0.28)]"
+                ? "scale-105 shadow-[0_0_60px_rgba(0,212,255,0.45)]"
+                : "hover:scale-[1.03] shadow-[0_0_40px_rgba(0,102,255,0.28)]"
             }`}
           >
             <img
               src="/vioce-wave.gif"
               alt="Nohby ONE Voice Wave"
-              className="h-full w-full rounded-full object-cover mix-blend-screen"
+              className="h-full w-full rounded-full object-cover"
             />
             <span
               className={`pointer-events-none absolute inset-0 rounded-full border transition ${
@@ -267,149 +267,142 @@ export function HomeScreen() {
           </button>
         </div>
 
-        {/* Live Conversation Exchange Bubbles (Real Data from Active Conversation) */}
-        <div className="mx-auto mb-4 grid w-full max-w-2xl gap-3 sm:grid-cols-2">
-          {/* Left: Voice Assistant Bubble */}
+        {/* Live Conversation Exchange Bubbles (Compact) */}
+        <div className="mx-auto mb-2.5 grid w-full max-w-2xl gap-2.5 sm:grid-cols-2">
           <div className="flex flex-col items-start">
-            <span className="mb-1.5 inline-flex items-center gap-1.5 rounded-full border border-[#00D4FF]/35 bg-[#101A2E] px-2.5 py-0.5 text-[11px] font-medium text-zinc-200">
+            <span className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-[#00D4FF]/35 bg-[#101A2E] px-2 py-0.5 text-[10px] font-medium text-zinc-200">
               Voice Assistant
-              <img src="/icon-white.png" alt="" className="h-3.5 w-3.5 rounded-full object-contain" />
+              <img src="/icon-white.png" alt="" className="h-3 w-3 rounded-full object-contain" />
             </span>
-            <div className="nohby-bubble-ai w-full rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-xs leading-relaxed text-zinc-100">
+            <div className="nohby-bubble-ai w-full rounded-xl rounded-tl-sm px-3 py-2 text-[11px] leading-relaxed text-zinc-100">
               {sending ? (
                 <span className="inline-flex items-center gap-1.5 text-[#00D4FF]">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Thinking...
+                  <Loader2 className="h-3 w-3 animate-spin" /> Thinking...
                 </span>
               ) : latestAssistantMsg ? (
-                <p className="line-clamp-3">{latestAssistantMsg.content}</p>
+                <p className="line-clamp-2">{latestAssistantMsg.content}</p>
               ) : (
-                <p>
-                  Hello {user?.profile?.displayName || user?.name}. I&apos;m connected to your
-                  local workspace. Tap the mic or type a command to begin.
+                <p className="line-clamp-2">
+                  Hello {user?.profile?.displayName || user?.name}. Tap the mic or type a command to begin.
                 </p>
               )}
             </div>
           </div>
 
-          {/* Right: User Bubble */}
           <div className="flex flex-col items-end justify-end">
-            <span className="mb-1.5 rounded-full border border-white/[0.12] bg-[#161E30] px-2.5 py-0.5 text-[11px] font-medium text-zinc-300">
+            <span className="mb-1 rounded-full border border-white/[0.12] bg-[#161E30] px-2 py-0.5 text-[10px] font-medium text-zinc-300">
               You
             </span>
-            <div className="w-full rounded-2xl rounded-tr-sm border border-white/[0.1] bg-[#151B2B]/90 px-3.5 py-2.5 text-xs leading-relaxed text-zinc-200">
+            <div className="w-full rounded-xl rounded-tr-sm border border-white/[0.1] bg-[#151B2B]/90 px-3 py-2 text-[11px] leading-relaxed text-zinc-200">
               {interimTranscript ? (
-                <p className="italic text-[#00D4FF]">{interimTranscript}</p>
+                <p className="line-clamp-2 italic text-[#00D4FF]">{interimTranscript}</p>
               ) : latestUserMsg ? (
-                <p className="line-clamp-3">{latestUserMsg.content}</p>
+                <p className="line-clamp-2">{latestUserMsg.content}</p>
               ) : (
-                <p className="text-zinc-400">
-                  Press &ldquo;On&rdquo; to speak or click &ldquo;Input Text&rdquo; to send a prompt.
+                <p className="line-clamp-2 text-zinc-400">
+                  Press &ldquo;On&rdquo; to speak or click &ldquo;Input Text&rdquo; below.
                 </p>
               )}
             </div>
           </div>
         </div>
 
-        {/* Optional Inline Text Input when toggled from Dock */}
+        {/* Optional Inline Text Input */}
         {showTextInput && (
           <form
             onSubmit={(e) => {
               e.preventDefault();
               sendToActiveSession(textDraft, "text");
             }}
-            className="mx-auto mb-3 flex w-full max-w-lg items-center gap-2"
+            className="mx-auto mb-2 flex w-full max-w-lg items-center gap-2"
           >
             <input
               type="text"
               value={textDraft}
               onChange={(e) => setTextDraft(e.target.value)}
-              placeholder="Type a message or command to Nohby ONE..."
+              placeholder="Type a message or command..."
               autoFocus
-              className="studio-input h-9 flex-1 rounded-full px-4 text-xs"
+              className="studio-input h-8 flex-1 rounded-full px-3.5 text-xs"
             />
             <button
               type="submit"
               disabled={sending || !textDraft.trim()}
-              className="btn-ivory inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-xs"
+              className="btn-ivory inline-flex h-8 items-center gap-1 rounded-full px-3.5 text-xs"
             >
-              {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+              {sending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
               Send
             </button>
           </form>
         )}
 
-        {/* Voice Control Dock (Exact 4-button floating pill from reference) */}
+        {/* Compact Voice Control Dock */}
         <div className="flex flex-col items-center">
-          <p className="mb-2 text-[11px] font-medium text-zinc-400">Voice Control Dock</p>
-          <div className="nohby-dock inline-flex flex-wrap items-center justify-center gap-4 rounded-full px-5 py-2.5 sm:gap-6 sm:px-7">
-            {/* 1. Mic Toggle (On/Off) */}
+          <p className="mb-1 text-[10px] font-medium text-zinc-400">Voice Control Dock</p>
+          <div className="nohby-dock inline-flex flex-wrap items-center justify-center gap-4 rounded-full px-5 py-2 sm:gap-6">
             <button
               type="button"
               onClick={toggleVoiceMic}
-              className="flex flex-col items-center gap-1 text-[10px] font-medium text-zinc-300 transition hover:text-white"
+              className="flex flex-col items-center gap-0.5 text-[10px] font-medium text-zinc-300 transition hover:text-white"
             >
               <span
-                className={`relative flex h-8 w-14 items-center rounded-full px-1 transition ${
+                className={`relative flex h-7 w-12 items-center rounded-full px-1 transition ${
                   voiceActive
                     ? "bg-gradient-to-r from-[#00B4FF] to-[#00E5FF]"
-                    : "bg-[#1A2438] border border-white/[0.15]"
+                    : "border border-white/[0.15] bg-[#1A2438]"
                 }`}
               >
-                <Mic className={`h-3.5 w-3.5 ${voiceActive ? "text-[#08142E]" : "text-zinc-400"}`} />
+                <Mic className={`h-3 w-3 ${voiceActive ? "text-[#08142E]" : "text-zinc-400"}`} />
                 <span
-                  className={`ml-auto h-6 w-6 rounded-full bg-white shadow transition ${
-                    voiceActive ? "translate-x-0" : "-translate-x-5 opacity-70"
+                  className={`ml-auto h-5 w-5 rounded-full bg-white shadow transition ${
+                    voiceActive ? "translate-x-0" : "-translate-x-4 opacity-75"
                   }`}
                 />
               </span>
               <span>{voiceActive ? "On" : "Off"}</span>
             </button>
 
-            {/* 2. Stop / Interrupt */}
             <button
               type="button"
               onClick={handleStopInterrupt}
-              className="flex flex-col items-center gap-1 text-[10px] font-medium text-zinc-300 transition hover:text-white"
+              className="flex flex-col items-center gap-0.5 text-[10px] font-medium text-zinc-300 transition hover:text-white"
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-fuchsia-600 text-white shadow-[0_0_16px_rgba(244,63,94,0.45)] transition hover:scale-105">
-                <Square className="h-3.5 w-3.5 fill-current" />
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-fuchsia-600 text-white shadow-[0_0_12px_rgba(244,63,94,0.45)] transition hover:scale-105">
+                <Square className="h-3 w-3 fill-current" />
               </span>
               <span>Stop/Interrupt</span>
             </button>
 
-            {/* 3. Input Text */}
             <button
               type="button"
               onClick={() => setShowTextInput((v) => !v)}
-              className="flex flex-col items-center gap-1 text-[10px] font-medium text-zinc-300 transition hover:text-white"
+              className="flex flex-col items-center gap-0.5 text-[10px] font-medium text-zinc-300 transition hover:text-white"
             >
               <span
-                className={`flex h-8 w-8 items-center justify-center rounded-full border transition ${
+                className={`flex h-7 w-7 items-center justify-center rounded-full border transition ${
                   showTextInput
                     ? "border-[#00D4FF] bg-[#00D4FF]/20 text-[#00D4FF]"
                     : "border-white/[0.14] bg-[#161E30] text-zinc-300 hover:border-[#00D4FF]/50"
                 }`}
               >
-                <Keyboard className="h-4 w-4" />
+                <Keyboard className="h-3.5 w-3.5" />
               </span>
               <span>Input Text</span>
             </button>
 
-            {/* 4. Audio Settings */}
             <button
               type="button"
               onClick={() => setRoute("settings")}
-              className="flex flex-col items-center gap-1 text-[10px] font-medium text-zinc-300 transition hover:text-white"
+              className="flex flex-col items-center gap-0.5 text-[10px] font-medium text-zinc-300 transition hover:text-white"
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.14] bg-[#161E30] text-zinc-300 transition hover:border-[#00D4FF]/50 hover:text-[#00D4FF]">
-                <AudioLines className="h-4 w-4" />
+              <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.14] bg-[#161E30] text-zinc-300 transition hover:border-[#00D4FF]/50 hover:text-[#00D4FF]">
+                <AudioLines className="h-3.5 w-3.5" />
               </span>
               <span>Audio Settings</span>
             </button>
           </div>
 
-          <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-zinc-400">
-            <AudioLines className={`h-3.5 w-3.5 ${voiceActive ? "animate-pulse text-[#00D4FF]" : "text-zinc-500"}`} />
+          <p className="mt-1.5 flex items-center gap-1.5 text-[10px] text-zinc-400">
+            <AudioLines className={`h-3 w-3 ${voiceActive ? "animate-pulse text-[#00D4FF]" : "text-zinc-500"}`} />
             <span>
               {sending
                 ? "processing response..."
@@ -422,59 +415,57 @@ export function HomeScreen() {
       </section>
 
       {/* ============================================================
-          RIGHT COLUMN: 3 STACKED LIVE TELEMETRY & CONTEXT CARDS
+          RIGHT COLUMN: 3 COMPACT STACKED CARDS (Zero Scroll)
           ============================================================ */}
-      <aside className="flex flex-col gap-4 lg:col-span-4">
-        {/* 1. System Performance (Real Live Metrics) */}
-        <div className="nohby-frame p-4">
-          <h3 className="font-display text-sm font-semibold text-white">System Performance</h3>
-          <p className="text-[11px] text-zinc-400">Live micro-metrics</p>
+      <aside className="grid gap-3 lg:col-span-4 lg:h-full lg:grid-rows-[auto_1fr_auto] lg:overflow-hidden">
+        {/* 1. System Performance */}
+        <div className="nohby-frame p-3.5">
+          <div className="flex items-baseline justify-between">
+            <h3 className="font-display text-xs font-semibold text-white">System Performance</h3>
+            <span className="text-[10px] text-zinc-400">Live micro-metrics</span>
+          </div>
 
-          <div className="mt-3.5 space-y-2.5 text-xs">
+          <div className="mt-2.5 space-y-1.5 text-xs">
             <div className="flex items-center justify-between">
-              <span className="text-zinc-400">API Latency:</span>
+              <span className="text-zinc-400">Latency:</span>
               <span className="font-mono font-semibold text-white">
                 {latencyMs !== null ? `${latencyMs}ms` : "—"}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-zinc-400">Task Success:</span>
+              <span className="text-zinc-400">Accuracy:</span>
               <span className="font-mono font-semibold text-emerald-400">{accuracyRate}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-zinc-400">Active Agents:</span>
+              <span className="text-zinc-400">Active Nodes:</span>
               <span className="font-mono font-semibold text-[#00D4FF]">
-                {activeDevicesCount} {activeDevicesCount === 1 ? "device" : "devices"}
+                {activeDevicesCount} ({completedCount} done)
               </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-zinc-400">Completed Tasks:</span>
-              <span className="font-mono font-semibold text-white">{completedCount}</span>
             </div>
           </div>
         </div>
 
-        {/* 2. Active Tasks (Real Live Queue from Backend) */}
-        <div className="nohby-frame flex-1 p-4">
+        {/* 2. Active Tasks */}
+        <div className="nohby-frame flex flex-col overflow-hidden p-3.5">
           <div className="flex items-center justify-between">
-            <h3 className="font-display text-sm font-semibold text-white">Active Tasks</h3>
+            <h3 className="font-display text-xs font-semibold text-white">Active Tasks</h3>
             <button
               type="button"
               onClick={() => setRoute("tasks")}
-              className="text-[11px] font-medium text-[#00D4FF] hover:underline"
+              className="text-[10px] font-medium text-[#00D4FF] hover:underline"
             >
               Manage
             </button>
           </div>
 
-          <div className="mt-3 space-y-2">
+          <div className="mt-2 flex-1 space-y-1.5 overflow-y-auto">
             {tasks.length === 0 ? (
               <button
                 type="button"
                 onClick={() => setRoute("tasks")}
-                className="w-full rounded-xl border border-dashed border-white/[0.12] px-3 py-5 text-center text-xs text-zinc-400 transition hover:border-[#00D4FF]/40 hover:text-white"
+                className="w-full rounded-lg border border-dashed border-white/[0.12] px-3 py-4 text-center text-[11px] text-zinc-400 transition hover:border-[#00D4FF]/40 hover:text-white"
               >
-                No tasks queued yet — click to plan a workflow
+                No tasks queued — plan a task
               </button>
             ) : (
               tasks.slice(0, 3).map((task) => {
@@ -492,14 +483,14 @@ export function HomeScreen() {
                     key={task.id}
                     type="button"
                     onClick={() => setRoute("tasks")}
-                    className={`w-full rounded-xl border px-3 py-2.5 text-left transition ${
+                    className={`w-full rounded-lg border px-2.5 py-2 text-left transition ${
                       isRunning
                         ? "border-[#00D4FF]/50 bg-[#00D4FF]/10"
                         : "border-white/[0.08] bg-[#141B2D]/80 hover:border-[#00D4FF]/35"
                     }`}
                   >
-                    <p className="truncate text-xs font-medium text-white">{task.instruction}</p>
-                    <p className={`mt-0.5 text-[11px] capitalize ${statusColor}`}>
+                    <p className="truncate text-[11px] font-medium text-white">{task.instruction}</p>
+                    <p className={`text-[10px] capitalize ${statusColor}`}>
                       ({task.status.replace("_", " ")})
                     </p>
                   </button>
@@ -509,53 +500,53 @@ export function HomeScreen() {
           </div>
         </div>
 
-        {/* 3. Memory Context (Real Live Tags + Workspace Info) */}
-        <div className="nohby-frame p-4">
+        {/* 3. Memory Context */}
+        <div className="nohby-frame p-3.5">
           <div className="flex items-center justify-between">
-            <h3 className="font-display text-sm font-semibold text-white">Memory Context</h3>
+            <h3 className="font-display text-xs font-semibold text-white">Memory Context</h3>
             <button
               type="button"
               onClick={() => setRoute("memory")}
-              className="text-[11px] font-medium text-[#00D4FF] hover:underline"
+              className="text-[10px] font-medium text-[#00D4FF] hover:underline"
             >
               View all
             </button>
           </div>
 
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
+          <div className="mt-2 flex flex-wrap gap-1">
             {memoryTags.length > 0 ? (
               memoryTags.map((tag) => (
                 <span
                   key={tag}
-                  className="rounded-full border border-white/[0.12] bg-[#161E30] px-2.5 py-0.5 text-[11px] text-zinc-200"
+                  className="rounded-full border border-white/[0.12] bg-[#161E30] px-2 py-0.5 text-[10px] text-zinc-200"
                 >
                   {tag}
                 </span>
               ))
             ) : (
-              <span className="rounded-full border border-white/[0.12] bg-[#161E30] px-2.5 py-0.5 text-[11px] text-zinc-400">
-                No memory tags yet
+              <span className="rounded-full border border-white/[0.12] bg-[#161E30] px-2 py-0.5 text-[10px] text-zinc-400">
+                No tags yet
               </span>
             )}
           </div>
 
-          <div className="mt-3.5 space-y-1.5 text-xs">
+          <div className="mt-2.5 space-y-1 text-[11px]">
             <p className="truncate text-zinc-400">
-              Active Context:{" "}
+              Context:{" "}
               <span className="font-medium text-white">
-                {latestMemory?.title || currentDevice?.deviceName || "Nohby ONE Workspace"}
+                {latestMemory?.title || currentDevice?.deviceName || "Nohby ONE"}
               </span>
             </p>
             <p className="text-zinc-400">
-              Last Sync:{" "}
+              Last sync:{" "}
               <span className="font-medium text-white">
                 {formatTimeAgo(currentDevice?.lastSeenAt || latestMemory?.updatedAt)}
               </span>
             </p>
             <p className="text-zinc-400">
-              Authorized Access:{" "}
+              Access:{" "}
               <span className="font-medium text-emerald-400">
-                {health?.status === "healthy" ? "Verified Owner" : "Checking"}
+                {health?.status === "healthy" ? "Verified" : "Checking"}
               </span>
             </p>
           </div>
