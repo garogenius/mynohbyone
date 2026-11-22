@@ -24,7 +24,6 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: "home", label: "Overview", icon: Home },
-  { id: "assistant", label: "Assistant", icon: MessageSquare },
   { id: "tasks", label: "Tasks", icon: ListChecks },
   { id: "meetings", label: "Meetings", icon: CalendarClock },
   { id: "integrations", label: "Integrations", icon: Plug },
@@ -70,6 +69,21 @@ function SidebarContent({
             <X className="h-4 w-4" />
           </button>
         )}
+      </div>
+
+      {/* Standalone Assistant Launcher */}
+      <div className="px-3 pt-3">
+        <button
+          type="button"
+          onClick={() => {
+            onSelect("assistant");
+            onClose?.();
+          }}
+          className="btn-ivory flex h-9 w-full items-center justify-center gap-2 rounded-lg px-3 text-xs"
+        >
+          <MessageSquare className="h-3.5 w-3.5" />
+          <span>Open Assistant</span>
+        </button>
       </div>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3" aria-label="Main navigation">

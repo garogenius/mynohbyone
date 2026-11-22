@@ -2,9 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
+  ArrowLeft,
   Check,
   Copy,
   History,
+  LayoutDashboard,
   Loader2,
   MessageSquarePlus,
   Mic,
@@ -21,7 +23,9 @@ import {
   X,
 } from "lucide-react";
 
+import { BrandMark } from "../components/BrandMark";
 import { ConfirmationDialog, LoadingState } from "../components/StateViews";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { ApiError, apiClient } from "../lib/api";
 import { RealtimeClient } from "../lib/realtime";
 import {
@@ -53,10 +57,12 @@ function formatTime(iso: string): string {
 
 export function AssistantScreen() {
   const {
+    user,
     currentDeviceId,
     voiceSettings,
     micActive,
     isSpeaking,
+    setRoute,
     setMicActive,
     setIsSpeaking,
     showToast,
@@ -440,20 +446,13 @@ export function AssistantScreen() {
 
   const conversationListPanel = (
     <div className="flex h-full flex-col border-r border-white/[0.08] bg-[#0D0F13]">
-      <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] p-3">
-        <button
-          type="button"
-          onClick={handleCreateConversation}
-          className="btn-ivory flex min-h-[38px] flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs"
-        >
-          <MessageSquarePlus className="h-3.5 w-3.5" />
-          New Chat
-        </button>
+      <div className="flex h-14 items-center justify-between border-b border-white/[0.06] px-4">
+        <BrandMark variant="logo" size="md" />
         {mobileHistoryOpen && (
           <button
             type="button"
             onClick={() => setMobileHistoryOpen(false)}
-            className="rounded-lg p-2 text-zinc-400 hover:bg-white/[0.06] hover:text-white md:hidden"
+            className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/[0.06] hover:text-white md:hidden"
             aria-label="Close conversation list"
           >
             <X className="h-4 w-4" />
@@ -461,15 +460,26 @@ export function AssistantScreen() {
         )}
       </div>
 
-      <div className="p-2.5">
+      <div className="p-3 pb-2">
+        <button
+          type="button"
+          onClick={handleCreateConversation}
+          className="btn-ivory flex h-9 w-full items-center justify-center gap-2 rounded-lg px-3 text-xs"
+        >
+          <MessageSquarePlus className="h-3.5 w-3.5" />
+          New Chat
+        </button>
+      </div>
+
+      <div className="px-3 pb-2">
         <div className="relative">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search conversations..."
-            className="w-full rounded-lg border border-white/[0.08] bg-[#111318] py-1.5 pr-3 pl-8 text-xs text-zinc-200 placeholder-zinc-500 outline-none focus:border-indigo-500"
+            placeholder="Search chats..."
+            className="studio-input h-8 w-full rounded-lg pr-3 pl-8 text-xs"
           />
         </div>
       </div>
@@ -521,13 +531,33 @@ export function AssistantScreen() {
           })
         )}
       </div>
+
+      {/* Bottom standalone utility bar: Back to Dashboard + Theme Switch */}
+      <div className="border-t border-white/[0.06] p-3">
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => setRoute("home")}
+            className="flex h-8 flex-1 items-center gap-2 rounded-lg border border-white/[0.1] bg-[#111318] px-2.5 text-xs font-medium text-zinc-200 transition hover:border-white/[0.2]"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Dashboard</span>
+          </button>
+          <ThemeToggle compact />
+        </div>
+        {user && (
+          <p className="mt-2 truncate px-0.5 text-[11px] text-zinc-500">
+            {user.profile?.displayName || user.name}
+          </p>
+        )}
+      </div>
     </div>
   );
 
   return (
-    <div className="relative flex h-[calc(100vh-8.5rem)] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#111318] md:h-[calc(100vh-6.5rem)]">
-      {/* Desktop & Tablet conversation sidebar */}
-      <div className="hidden w-68 shrink-0 md:block">{conversationListPanel}</div>
+    <div className="relative flex h-screen w-screen overflow-hidden bg-[#0A0B0E] text-zinc-100">
+      {/* Desktop & Tablet standalone sidebar */}
+      <div className="hidden w-64 shrink-0 md:block">{conversationListPanel}</div>
 
       {/* Mobile slide-over conversation drawer */}
       <AnimatePresence>
@@ -553,10 +583,10 @@ export function AssistantScreen() {
         )}
       </AnimatePresence>
 
-      {/* Main conversation workspace */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* Workspace header */}
-        <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-4 py-3">
+      {/* Main full-height standalone chat canvas */}
+      <div className="flex min-w-0 flex-1 flex-col bg-[#111318]">
+        {/* Minimalist floating header */}
+        <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-white/[0.06] px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-2.5">
             <button
               type="button"
@@ -566,21 +596,21 @@ export function AssistantScreen() {
             >
               <History className="h-4 w-4" />
             </button>
-            <h2 className="truncate text-sm font-semibold text-white">
-              {conversations.find((c) => c.id === activeId)?.title || "Assistant"}
-            </h2>
+            <h1 className="font-display truncate text-sm font-semibold text-white">
+              {conversations.find((c) => c.id === activeId)?.title || "Nohby ONE Assistant"}
+            </h1>
           </div>
 
           <div className="flex items-center gap-2 text-[11px]">
             {voiceSettings?.wakeWordEnabled && (
-              <span className="hidden rounded-full border border-indigo-500/25 bg-indigo-500/10 px-2.5 py-0.5 font-mono text-indigo-300 sm:inline">
+              <span className="hidden rounded-full border border-white/[0.1] bg-[#171A21] px-2.5 py-0.5 font-mono text-zinc-400 sm:inline">
                 Wake: &ldquo;{voiceSettings.wakeWordPhrase}&rdquo;
               </span>
             )}
             <span
               className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-medium ${
                 wsStatus === "connected"
-                  ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
+                  ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-500"
                   : "border-white/[0.08] bg-white/[0.03] text-zinc-400"
               }`}
             >
@@ -589,10 +619,20 @@ export function AssistantScreen() {
               ) : (
                 <WifiOff className="h-3 w-3" />
               )}
-              <span>{wsStatus === "connected" ? "Realtime Stream" : "REST Mode"}</span>
+              <span className="hidden sm:inline">
+                {wsStatus === "connected" ? "Live" : "REST"}
+              </span>
             </span>
+            <button
+              type="button"
+              onClick={() => setRoute("home")}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.1] bg-[#171A21] px-2.5 text-xs font-medium text-zinc-200 transition hover:border-white/[0.2]"
+            >
+              <LayoutDashboard className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Dashboard</span>
+            </button>
           </div>
-        </div>
+        </header>
 
         {/* Messages stream */}
         <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">

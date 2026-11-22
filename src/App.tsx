@@ -99,6 +99,15 @@ export function App() {
     );
   }
 
+  if (activeRoute === "assistant") {
+    return (
+      <>
+        <AssistantScreen />
+        <ToastBanner toast={toast} onClose={clearToast} />
+      </>
+    );
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-[#0A0B0E] text-zinc-100">
       <AppSidebar
@@ -130,12 +139,10 @@ export function App() {
               transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
             >
               {activeRoute === "home" && <HomeScreen />}
-              {activeRoute === "assistant" && <AssistantScreen />}
               {activeRoute === "tasks" && <TasksScreen />}
               {activeRoute === "devices" && <DevicesScreen />}
               {activeRoute === "settings" && <SettingsScreen />}
               {activeRoute !== "home" &&
-                activeRoute !== "assistant" &&
                 activeRoute !== "tasks" &&
                 activeRoute !== "devices" &&
                 activeRoute !== "settings" && <UpcomingModuleScreen route={activeRoute} />}
