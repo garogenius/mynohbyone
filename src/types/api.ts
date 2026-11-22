@@ -75,6 +75,60 @@ export interface HealthData {
   };
 }
 
+export interface ProposedStep {
+  step: number;
+  tool: string;
+  description: string;
+  requiresApproval: boolean;
+}
+
+export interface InterpretationResult {
+  intent: string;
+  requiresExecution: boolean;
+  riskLevel: "low" | "medium" | "high" | string;
+  missingInformation: string[];
+  proposedPlan: ProposedStep[];
+}
+
+export interface Conversation {
+  id: string;
+  userId: string;
+  title: string;
+  conversationType: string;
+  status: "active" | "archived" | string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt: string | null;
+  messageCount?: number | null;
+  lastMessagePreview?: string | null;
+}
+
+export interface Message {
+  id: string;
+  conversationId: string;
+  userId: string;
+  role: "user" | "assistant" | "system" | string;
+  content: string;
+  inputType: "text" | "voice" | string;
+  attachments: Record<string, unknown>[];
+  modelProvider: string | null;
+  modelName: string | null;
+  tokenUsage: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface SendMessageResponseData {
+  messageId: string;
+  assistantMessageId: string;
+  conversationId: string;
+  conversationTitle: string;
+  userMessage: Message;
+  assistantMessage: Message;
+  executionRequired: boolean;
+  interpretation: InterpretationResult;
+}
+
 export type NavRoute =
   | "home"
   | "assistant"

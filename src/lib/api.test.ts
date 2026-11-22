@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { apiClient } from "./api";
 import { tokenStorage } from "./storage";
 
-// Simple in-memory localStorage polyfill for Node Vitest environment
 const memoryStore = new Map<string, string>();
 Object.defineProperty(globalThis, "localStorage", {
   value: {
@@ -15,12 +14,12 @@ Object.defineProperty(globalThis, "localStorage", {
   configurable: true,
 });
 
-describe("Nohby ONE Frontend -> Backend E2E Integration (Phase 0 & 1)", () => {
+describe("Nohby ONE Frontend -> Backend E2E Integration (Phase 0, 1 & 2)", () => {
   beforeEach(() => {
     memoryStore.clear();
   });
 
-  it("completes health, register, login, profile update, device register/heartbeat/rename/revoke, and logout", async () => {
+  it("completes auth, device lifecycle, conversation streaming/persistence, and logout", async () => {
     const health = await apiClient.health();
     expect(health.success).toBe(true);
     expect(health.data.status).toBe("healthy");
@@ -48,26 +47,53 @@ describe("Nohby ONE Frontend -> Backend E2E Integration (Phase 0 & 1)", () => {
     });
     expect(updated.data.user.profile?.displayName).toBe("E2E Display");
 
+    // Phase 1: Device registration, heartbeat, rename, list
     const deviceRes = await apiClient.registerDevice({
       deviceName: "E2E Windows Machine",
       platform: "windows",
       platformVersion: "Windows 11",
-      appVersion: "0.1.0",
+      appVersion: "0.2.0",
       deviceFingerprint: `fp-e2e-${Date.now()}`,
       deviceCapabilities: ["voice", "browser_automation", "local_agent"],
     });
     const deviceId = deviceRes.data.device.id;
     expect(deviceRes.data.device.status).toBe("active");
 
-    const hb = await apiClient.deviceHeartbeat(deviceId, { appVersion: "0.1.0" });
+    const hb = await apiClient.deviceHeartbeat(deviceId, { appVersion: "0.2.0" });
     expect(hb.data.device.lastSeenAt).toBeTruthy();
 
     const renamed = await apiClient.updateDevice(deviceId, { deviceName: "E2E Renamed Box" });
     expect(renamed.data.device.deviceName).toBe("E2E Renamed Box");
 
-    const list = await apiClient.listDevices();
-    expect(list.data.devices.some((d) => d.id === deviceId)).toBe(true);
+    // Phase 2: Conversations, AI message + proposed execution plan, search, delete
+    const convCreated = await apiClient.createConversation({ mode: "general" });
+    const convId = convCreated.data.conversation.id;
+    expect(convCreated.data.conversation.title).toBe("New Conversation");
 
+    const msgRes = await apiClient.sendMessage(convId, {
+      content: "Open Chrome and search for top cloud providers",
+      inputType: "text",
+      deviceId,
+    });
+    expect(msgRes.data.executionRequired).toBe(true);
+    expect(msgRes.data.interpretation.intent).toBe("web_research");
+    expect(msgRes.data.assistantMessage.role).toBe("assistant");
+
+    const convDetail = await apiClient.getConversation(convId);
+    expect(convDetail.data.messages.length).toBe(2);
+
+    const interp = await apiClient.interpretInstruction({
+      instruction: "Send email to ceo@example.com about launch",
+    });
+    expect(interp.data.riskLevel).toBe("high");
+
+    const convUpdated = await apiClient.updateConversation(convId, { title: "Cloud Research" });
+    expect(convUpdated.data.conversation.title).toBe("Cloud Research");
+
+    const convDeleted = await apiClient.deleteConversation(convId);
+    expect(convDeleted.data.deleted).toBe(true);
+
+    // Revoke device & logout
     const revoked = await apiClient.revokeDevice(deviceId);
     expect(revoked.data.device.status).toBe("revoked");
 

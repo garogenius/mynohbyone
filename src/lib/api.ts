@@ -4,13 +4,17 @@ import type {
   ApiErrorResponse,
   ApiSuccessResponse,
   AuthTokensPayload,
+  Conversation,
   Device,
   DevicePlatform,
   HealthData,
+  InterpretationResult,
+  Message,
+  SendMessageResponseData,
   User,
 } from "../types/api";
 
-const API_BASE_URL = (
+export const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1"
 ).replace(/\/$/, "");
 
@@ -223,6 +227,77 @@ export const apiClient = {
 
   deviceHeartbeat(deviceId: string, payload: { appVersion?: string } = {}) {
     return request<{ device: Device }>(`/devices/${deviceId}/heartbeat`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Phase 2: Conversations & AI
+  listConversations(params: { page?: number; limit?: number; search?: string } = {}) {
+    const qs = new URLSearchParams();
+    if (params.page) qs.set("page", String(params.page));
+    if (params.limit) qs.set("limit", String(params.limit));
+    if (params.search) qs.set("search", params.search);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return request<{
+      conversations: Conversation[];
+      pagination: { page: number; limit: number; total: number };
+    }>(`/conversations${suffix}`, { method: "GET" });
+  },
+
+  createConversation(payload: { title?: string; mode?: "general" | "assistant" | "research" | "meeting" } = {}) {
+    return request<{ conversation: Conversation }>("/conversations", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  getConversation(conversationId: string) {
+    return request<{ conversation: Conversation; messages: Message[] }>(
+      `/conversations/${conversationId}`,
+      { method: "GET" }
+    );
+  },
+
+  updateConversation(
+    conversationId: string,
+    payload: { title?: string; status?: "active" | "archived" }
+  ) {
+    return request<{ conversation: Conversation }>(`/conversations/${conversationId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteConversation(conversationId: string) {
+    return request<{ deleted: boolean; id: string }>(`/conversations/${conversationId}`, {
+      method: "DELETE",
+    });
+  },
+
+  listMessages(conversationId: string, params: { page?: number; limit?: number } = {}) {
+    const qs = new URLSearchParams();
+    if (params.page) qs.set("page", String(params.page));
+    if (params.limit) qs.set("limit", String(params.limit));
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return request<{
+      messages: Message[];
+      pagination: { page: number; limit: number; total: number };
+    }>(`/conversations/${conversationId}/messages${suffix}`, { method: "GET" });
+  },
+
+  sendMessage(
+    conversationId: string,
+    payload: { content: string; inputType?: "text" | "voice"; deviceId?: string | null }
+  ) {
+    return request<SendMessageResponseData>(`/conversations/${conversationId}/messages`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  interpretInstruction(payload: { instruction: string; deviceId?: string | null; conversationId?: string | null }) {
+    return request<InterpretationResult>("/ai/interpret", {
       method: "POST",
       body: JSON.stringify(payload),
     });

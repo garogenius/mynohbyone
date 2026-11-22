@@ -1,22 +1,19 @@
-import { motion } from "framer-motion";
 import {
   Activity,
   ArrowRight,
   CheckCircle2,
   Cpu,
   Laptop,
+  MessageSquare,
   Server,
-  ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 
-import { AiCoreOrb } from "../components/AiCoreOrb";
 import { useAppStore } from "../store/useAppStore";
 
 const ROADMAP = [
   { phase: "Phase 0 & 1", title: "Foundation, Identity & Device Management", status: "live" },
-  { phase: "Phase 2", title: "Conversation Engine & AI Streaming", status: "next" },
-  { phase: "Phase 3", title: "Voice Interaction & Wake Word", status: "planned" },
+  { phase: "Phase 2", title: "Conversation Engine, AI Orchestration & WebSocket Streaming", status: "live" },
+  { phase: "Phase 3", title: "Voice Interaction, STT/TTS & Wake Word", status: "next" },
   { phase: "Phase 4", title: "Task Orchestration, Permissions & Approvals", status: "planned" },
   { phase: "Phase 5", title: "Local Browser & Desktop Automation", status: "planned" },
 ];
@@ -28,164 +25,126 @@ export function HomeScreen() {
   const activeDevicesCount = devices.filter((d) => d.status === "active").length;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <motion.section
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35 }}
-        className="ai-glass-card relative overflow-hidden rounded-3xl border border-slate-800/80 p-7"
-      >
-        <div className="ai-shimmer-line absolute inset-x-0 top-0 h-px" />
-
-        <div className="flex flex-wrap items-center justify-between gap-6">
-          <div className="flex items-center gap-6">
-            <div className="hidden sm:block">
-              <AiCoreOrb size="md" state="active" />
-            </div>
-            <div className="max-w-xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-300">
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>Phase 0 &amp; 1 Foundation Active</span>
-              </div>
-              <h2 className="mt-3 text-2xl font-bold tracking-tight text-white">
-                Welcome, {user?.profile?.displayName || user?.name}
-              </h2>
-              <p className="mt-1.5 text-sm leading-relaxed text-slate-400">
-                Your Nohby ONE workspace is authenticated and linked to your local desktop agent.
-                All actions remain scoped to authorised devices and verified permissions.
-              </p>
-            </div>
-          </div>
-
-          {currentDevice && (
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              type="button"
-              onClick={() => sendHeartbeat(currentDevice.id)}
-              className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-2.5 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-500/20"
-            >
-              <Activity className="h-4 w-4 text-cyan-400" />
-              Verify Device Heartbeat
-            </motion.button>
-          )}
-        </div>
-      </motion.section>
-
-      <section className="grid gap-4 md:grid-cols-3">
-        {[
-          {
-            label: "Backend Service",
-            icon: Server,
-            iconColor: "text-emerald-400",
-            value: health?.status || "Unknown",
-            badge: `v${health?.version || "0.1.0"}`,
-            sub: (
-              <p className="mt-1 text-xs text-slate-400">
-                PostgreSQL:{" "}
-                <span className="text-emerald-400">{health?.services.database || "ok"}</span>
-              </p>
-            ),
-          },
-          {
-            label: "Registered Devices",
-            icon: Laptop,
-            iconColor: "text-indigo-400",
-            value: `${activeDevicesCount} Active`,
-            badge: `/ ${devices.length} total`,
-            sub: (
-              <button
-                type="button"
-                onClick={() => setRoute("devices")}
-                className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-indigo-400 hover:text-indigo-300"
-              >
-                Manage devices <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            ),
-          },
-          {
-            label: "Current Local Agent",
-            icon: Cpu,
-            iconColor: "text-cyan-400",
-            value: currentDevice ? currentDevice.deviceName : "Not bound",
-            badge: "",
-            sub: (
-              <p className="mt-1 text-xs text-slate-400">
-                {currentDevice
-                  ? `${currentDevice.capabilities.length} declared capabilities`
-                  : "Register this machine to bind"}
-              </p>
-            ),
-          },
-        ].map((card, idx) => {
-          const Icon = card.icon;
-          return (
-            <motion.div
-              key={card.label}
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.32, delay: 0.06 * (idx + 1) }}
-              className="ai-glass-card rounded-2xl border border-slate-800/80 p-5 transition hover:border-indigo-500/30"
-            >
-              <div className="flex items-center justify-between text-xs font-medium text-slate-400">
-                <span>{card.label}</span>
-                <Icon className={`h-4 w-4 ${card.iconColor}`} />
-              </div>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="truncate text-lg font-semibold capitalize text-slate-100">
-                  {card.value}
-                </span>
-                {card.badge && (
-                  <span className="font-mono text-xs text-slate-500">{card.badge}</span>
-                )}
-              </div>
-              {card.sub}
-            </motion.div>
-          );
-        })}
-      </section>
-
-      <motion.section
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.24 }}
-        className="ai-glass-card rounded-2xl border border-slate-800/80 p-6"
-      >
-        <div className="flex items-center justify-between">
+    <div className="mx-auto max-w-6xl space-y-5">
+      <section className="rounded-2xl border border-white/[0.08] bg-[#111318] p-5 sm:p-6">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h3 className="text-sm font-semibold text-slate-100">Implementation Roadmap</h3>
-            <p className="mt-0.5 text-xs text-slate-400">
-              Each phase delivers real backend APIs, desktop integration, and end-to-end tests.
+            <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+              Workspace Overview
+            </p>
+            <h2 className="mt-1 text-xl font-semibold tracking-tight text-white sm:text-2xl">
+              Welcome, {user?.profile?.displayName || user?.name}
+            </h2>
+            <p className="mt-1 max-w-xl text-xs leading-relaxed text-zinc-400 sm:text-sm">
+              Your local desktop agent is authenticated and connected to the Nohby ONE backend.
             </p>
           </div>
-          <ShieldCheck className="h-5 w-5 text-indigo-400" />
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setRoute("assistant")}
+              className="inline-flex min-h-[38px] items-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-indigo-500"
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              Open Assistant
+            </button>
+            {currentDevice && (
+              <button
+                type="button"
+                onClick={() => sendHeartbeat(currentDevice.id)}
+                className="inline-flex min-h-[38px] items-center gap-2 rounded-lg border border-white/[0.1] bg-[#171A21] px-3.5 py-2 text-xs font-medium text-zinc-200 transition hover:bg-white/[0.08]"
+              >
+                <Activity className="h-3.5 w-3.5 text-emerald-400" />
+                Verify Heartbeat
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="rounded-2xl border border-white/[0.08] bg-[#111318] p-5">
+          <div className="flex items-center justify-between text-xs font-medium text-zinc-400">
+            <span>Backend Service</span>
+            <Server className="h-4 w-4 text-emerald-400" />
+          </div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-lg font-semibold capitalize text-white">
+              {health?.status || "Unknown"}
+            </span>
+            <span className="font-mono text-xs text-zinc-500">v{health?.version || "0.1.0"}</span>
+          </div>
+          <p className="mt-1 text-xs text-zinc-500">
+            PostgreSQL: <span className="text-emerald-400">{health?.services.database || "ok"}</span>
+          </p>
         </div>
 
-        <div className="mt-4 divide-y divide-slate-800/70">
+        <div className="rounded-2xl border border-white/[0.08] bg-[#111318] p-5">
+          <div className="flex items-center justify-between text-xs font-medium text-zinc-400">
+            <span>Registered Devices</span>
+            <Laptop className="h-4 w-4 text-indigo-400" />
+          </div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-lg font-semibold text-white">{activeDevicesCount} Active</span>
+            <span className="text-xs text-zinc-500">/ {devices.length} total</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setRoute("devices")}
+            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-indigo-400 hover:text-indigo-300"
+          >
+            Manage devices <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        <div className="rounded-2xl border border-white/[0.08] bg-[#111318] p-5 sm:col-span-2 lg:col-span-1">
+          <div className="flex items-center justify-between text-xs font-medium text-zinc-400">
+            <span>Bound Local Agent</span>
+            <Cpu className="h-4 w-4 text-zinc-300" />
+          </div>
+          <div className="mt-3 truncate text-lg font-semibold text-white">
+            {currentDevice ? currentDevice.deviceName : "Not bound"}
+          </div>
+          <p className="mt-1 text-xs text-zinc-500">
+            {currentDevice
+              ? `${currentDevice.capabilities.length} declared capabilities`
+              : "Register this machine to bind"}
+          </p>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-white/[0.08] bg-[#111318] p-5 sm:p-6">
+        <h3 className="text-sm font-semibold text-white">Delivery Progress</h3>
+        <p className="mt-0.5 text-xs text-zinc-500">
+          Every phase ships real backend APIs, responsive UI integration, and end-to-end tests.
+        </p>
+
+        <div className="mt-4 divide-y divide-white/[0.06]">
           {ROADMAP.map((item) => (
-            <div key={item.phase} className="flex items-center justify-between py-3">
-              <div className="flex items-center gap-3">
+            <div key={item.phase} className="flex items-center justify-between gap-3 py-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <CheckCircle2
-                  className={`h-4 w-4 ${
+                  className={`h-4 w-4 shrink-0 ${
                     item.status === "live"
                       ? "text-emerald-400"
                       : item.status === "next"
                       ? "text-indigo-400"
-                      : "text-slate-600"
+                      : "text-zinc-600"
                   }`}
                 />
-                <div>
-                  <span className="font-mono text-xs text-slate-500">{item.phase}</span>
-                  <p className="text-sm font-medium text-slate-200">{item.title}</p>
+                <div className="min-w-0">
+                  <span className="font-mono text-[11px] text-zinc-500">{item.phase}</span>
+                  <p className="truncate text-sm font-medium text-zinc-200">{item.title}</p>
                 </div>
               </div>
               <span
-                className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
+                className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
                   item.status === "live"
-                    ? "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30"
+                    ? "bg-emerald-500/15 text-emerald-300"
                     : item.status === "next"
-                    ? "bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-500/30"
-                    : "bg-slate-800 text-slate-400"
+                    ? "bg-indigo-500/15 text-indigo-300"
+                    : "bg-white/[0.05] text-zinc-400"
                 }`}
               >
                 {item.status === "live" ? "Live" : item.status === "next" ? "Up Next" : "Planned"}
@@ -193,7 +152,7 @@ export function HomeScreen() {
             </div>
           ))}
         </div>
-      </motion.section>
+      </section>
     </div>
   );
 }
