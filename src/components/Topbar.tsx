@@ -1,26 +1,27 @@
-import { LogOut, Menu, Mic, MicOff, Radio, Volume2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Bell, Laptop, LogOut, Menu, Settings, ShieldAlert } from "lucide-react";
 
-import { ThemeToggle } from "./ThemeToggle";
-import { stopSpeaking } from "../lib/voice";
+import { apiClient } from "../lib/api";
 import { useAppStore } from "../store/useAppStore";
-import type { Device, HealthData, NavRoute, User } from "../types/api";
+import type { Approval, Device, HealthData, NavRoute, User } from "../types/api";
+import { ThemeToggle } from "./ThemeToggle";
 
-const ROUTE_TITLES: Record<NavRoute, { title: string; subtitle: string }> = {
-  home: { title: "Overview", subtitle: "Workspace health and local agent readiness" },
-  assistant: { title: "Assistant", subtitle: "Conversations, voice interaction, and execution planning" },
-  tasks: { title: "Tasks", subtitle: "Execution plans, progress, and approval controls" },
-  meetings: { title: "Meetings", subtitle: "Consent-aware meeting intelligence and summaries" },
-  integrations: { title: "Integrations", subtitle: "Connected accounts and API permissions" },
-  files: { title: "Files", subtitle: "Authorised local documents and knowledge indexing" },
-  memory: { title: "Memory", subtitle: "User-controlled persistent context and preferences" },
-  devices: { title: "Devices", subtitle: "Registered desktop agents and session revocation" },
-  settings: { title: "Settings", subtitle: "Account profile, voice, privacy, and security" },
+const ROUTE_TITLES: Record<NavRoute, string> = {
+  home: "Overview",
+  assistant: "Assistant",
+  tasks: "Tasks",
+  meetings: "Meetings",
+  integrations: "Integrations",
+  files: "Files",
+  memory: "Memory",
+  devices: "Devices",
+  settings: "Settings",
 };
 
 export function Topbar({
   activeRoute,
   user,
-  health,
   currentDevice,
   onLogout,
   onOpenDevices,
@@ -34,9 +35,41 @@ export function Topbar({
   onOpenDevices: () => void;
   onOpenMobileMenu: () => void;
 }) {
-  const { micActive, isSpeaking, setIsSpeaking } = useAppStore();
-  const meta = ROUTE_TITLES[activeRoute];
-  const healthy = health?.status === "healthy";
+  const { setRoute } = useAppStore();
+
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [pendingApprovals, setPendingApprovals] = useState<Approval[]>([]);
+
+  const notifRef = useRef<HTMLDivElement | null>(null);
+  const profileRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    apiClient
+      .listPendingApprovals()
+      .then((res) => setPendingApprovals(res.data.approvals))
+      .catch(() => {});
+  }, [activeRoute]);
+
+  useEffect(() => {
+    const handleOutside = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, []);
+
+  const initials = (user.profile?.displayName || user.name)
+    .split(" ")
+    .map((p) => p[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/[0.08] bg-[#0A0B0E]/90 px-4 backdrop-blur-md sm:px-6">
@@ -45,102 +78,164 @@ export function Topbar({
           type="button"
           onClick={onOpenMobileMenu}
           aria-label="Open navigation menu"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] bg-[#111318] text-zinc-300 transition hover:bg-white/[0.06] lg:hidden"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] bg-[#111318] text-zinc-300 transition hover:bg-white/[0.06] lg:hidden"
         >
           <Menu className="h-4 w-4" />
         </button>
-
-        <div className="min-w-0">
-          <h1 className="truncate text-sm font-semibold tracking-tight text-white">
-            {meta.title}
-          </h1>
-          <p className="hidden truncate text-xs text-zinc-500 sm:block">{meta.subtitle}</p>
-        </div>
+        <h1 className="font-display truncate text-sm font-semibold tracking-tight text-white">
+          {ROUTE_TITLES[activeRoute]}
+        </h1>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-2.5">
-        {/* Visible microphone & speech indicator (Spec 3.2 & 4.4) */}
-        <div
-          className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
-            micActive
-              ? "border-rose-500/40 bg-rose-500/15 text-rose-200"
-              : "border-white/[0.08] bg-[#111318] text-zinc-400"
-          }`}
-        >
-          {micActive ? (
-            <>
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-400" />
-              <Mic className="h-3 w-3 text-rose-300" />
-              <span className="hidden sm:inline">Mic Active</span>
-            </>
-          ) : (
-            <>
-              <MicOff className="h-3 w-3 text-zinc-500" />
-              <span className="hidden md:inline">Mic Off</span>
-            </>
-          )}
-        </div>
+      {/* Clean, focused header: Theme Switch + Notifications Dropdown + Profile Dropdown ONLY */}
+      <div className="flex items-center gap-2">
+        <ThemeToggle compact />
 
-        {isSpeaking && (
+        {/* Notifications dropdown */}
+        <div className="relative" ref={notifRef}>
           <button
             type="button"
             onClick={() => {
-              stopSpeaking();
-              setIsSpeaking(false);
+              setNotifOpen((v) => !v);
+              setProfileOpen(false);
             }}
-            className="flex items-center gap-1.5 rounded-full border border-indigo-500/40 bg-indigo-500/15 px-2.5 py-1 text-xs font-medium text-indigo-200 transition hover:bg-indigo-500/25"
-            title="Click to stop speaking"
+            aria-label="Notifications"
+            className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.1] bg-[#131519] text-zinc-300 transition hover:border-white/[0.22]"
           >
-            <Volume2 className="h-3 w-3" />
-            <span className="hidden sm:inline">Stop Audio</span>
+            <Bell className="h-3.5 w-3.5" />
+            {pendingApprovals.length > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#0066FF] px-1 text-[10px] font-semibold text-white">
+                {pendingApprovals.length}
+              </span>
+            )}
           </button>
-        )}
 
-        <div
-          className="hidden items-center gap-2 rounded-full border border-white/[0.08] bg-[#111318] px-2.5 py-1 text-xs text-zinc-300 sm:flex"
-          title={healthy ? "Backend API healthy" : "Backend degraded"}
-        >
-          <span
-            className={`h-1.5 w-1.5 rounded-full ${
-              healthy ? "bg-emerald-400" : "bg-amber-400"
-            }`}
-          />
-          <span>{healthy ? "Connected" : "Degraded"}</span>
+          <AnimatePresence>
+            {notifOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 4, scale: 0.98 }}
+                transition={{ duration: 0.14 }}
+                className="absolute right-0 z-40 mt-2 w-80 overflow-hidden rounded-xl border border-white/[0.1] bg-[#111318] shadow-xl"
+              >
+                <div className="flex items-center justify-between border-b border-white/[0.07] px-3.5 py-2.5">
+                  <span className="text-xs font-semibold text-white">Notifications</span>
+                  {pendingApprovals.length > 0 && (
+                    <span className="text-[11px] text-zinc-400">
+                      {pendingApprovals.length} pending
+                    </span>
+                  )}
+                </div>
+
+                <div className="max-h-72 overflow-y-auto p-1.5">
+                  {pendingApprovals.length === 0 ? (
+                    <div className="px-3 py-6 text-center text-xs text-zinc-500">
+                      You&apos;re all caught up. No pending alerts.
+                    </div>
+                  ) : (
+                    pendingApprovals.map((app) => (
+                      <button
+                        key={app.id}
+                        type="button"
+                        onClick={() => {
+                          setNotifOpen(false);
+                          setRoute("tasks");
+                        }}
+                        className="flex w-full items-start gap-2.5 rounded-lg p-2.5 text-left transition hover:bg-white/[0.05]"
+                      >
+                        <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-medium text-white">
+                            Approval required: {String(app.actionDetails.tool || "Action")}
+                          </p>
+                          <p className="mt-0.5 line-clamp-2 text-[11px] text-zinc-400">
+                            {String(app.actionDetails.instruction || app.actionDetails.description || "")}
+                          </p>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        <button
-          type="button"
-          onClick={onOpenDevices}
-          className="hidden items-center gap-2 rounded-full border border-white/[0.08] bg-[#111318] px-3 py-1 text-xs text-zinc-300 transition hover:border-white/[0.16] hover:text-white md:flex"
-        >
-          <Radio className="h-3.5 w-3.5 text-indigo-400" />
-          <span className="max-w-[140px] truncate">
-            {currentDevice ? currentDevice.deviceName : "Register Device"}
-          </span>
-        </button>
-
-        <ThemeToggle compact />
-
-        <div className="hidden h-4 w-px bg-white/[0.08] sm:block" />
-
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.1] bg-[#171A21] text-xs font-semibold text-zinc-200">
-            {user.name.slice(0, 2).toUpperCase()}
-          </div>
-          <div className="hidden text-left xl:block">
-            <p className="text-xs font-medium text-zinc-200">
-              {user.profile?.displayName || user.name}
-            </p>
-            <p className="text-[11px] text-zinc-500">{user.email}</p>
-          </div>
+        {/* Profile dropdown */}
+        <div className="relative" ref={profileRef}>
           <button
             type="button"
-            onClick={onLogout}
-            title="Sign out"
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.08] bg-[#111318] text-zinc-400 transition hover:border-rose-500/30 hover:bg-rose-500/10 hover:text-rose-300"
+            onClick={() => {
+              setProfileOpen((v) => !v);
+              setNotifOpen(false);
+            }}
+            aria-label="Account menu"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.12] bg-[#0066FF] text-xs font-semibold text-white transition hover:opacity-90"
           >
-            <LogOut className="h-3.5 w-3.5" />
+            {initials}
           </button>
+
+          <AnimatePresence>
+            {profileOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 4, scale: 0.98 }}
+                transition={{ duration: 0.14 }}
+                className="absolute right-0 z-40 mt-2 w-60 overflow-hidden rounded-xl border border-white/[0.1] bg-[#111318] shadow-xl"
+              >
+                <div className="border-b border-white/[0.07] px-3.5 py-3">
+                  <p className="truncate text-xs font-semibold text-white">
+                    {user.profile?.displayName || user.name}
+                  </p>
+                  <p className="truncate text-[11px] text-zinc-500">{user.email}</p>
+                  {currentDevice && (
+                    <p className="mt-1.5 truncate text-[10px] text-emerald-500">
+                      ● {currentDevice.deviceName}
+                    </p>
+                  )}
+                </div>
+
+                <div className="p-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      onOpenDevices();
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-zinc-300 transition hover:bg-white/[0.05] hover:text-white"
+                  >
+                    <Laptop className="h-3.5 w-3.5 text-zinc-400" />
+                    Registered Devices
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      setRoute("settings");
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-zinc-300 transition hover:bg-white/[0.05] hover:text-white"
+                  >
+                    <Settings className="h-3.5 w-3.5 text-zinc-400" />
+                    Settings &amp; Preferences
+                  </button>
+                  <div className="my-1 h-px bg-white/[0.07]" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      onLogout();
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-rose-500 transition hover:bg-rose-500/10"
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                    Sign Out
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </header>

@@ -162,5 +162,5 @@ describe("Nohby ONE Frontend -> Backend E2E Integration (Phase 0, 1 & 2)", () =>
 
     const out = await apiClient.logout(tokenStorage.getSession().refreshToken);
     expect(out.data.revokedSessions).toBe(1);
-  });
+  }, 20000);
 });

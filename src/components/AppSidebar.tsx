@@ -20,17 +20,16 @@ interface NavItem {
   id: NavRoute;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  phase?: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "home", label: "Home", icon: Home },
+  { id: "home", label: "Overview", icon: Home },
   { id: "assistant", label: "Assistant", icon: MessageSquare },
   { id: "tasks", label: "Tasks", icon: ListChecks },
-  { id: "meetings", label: "Meetings", icon: CalendarClock, phase: "P8" },
-  { id: "integrations", label: "Integrations", icon: Plug, phase: "P7" },
-  { id: "files", label: "Files", icon: FolderOpen, phase: "P6" },
-  { id: "memory", label: "Memory", icon: Brain, phase: "P9" },
+  { id: "meetings", label: "Meetings", icon: CalendarClock },
+  { id: "integrations", label: "Integrations", icon: Plug },
+  { id: "files", label: "Files", icon: FolderOpen },
+  { id: "memory", label: "Memory", icon: Brain },
   { id: "devices", label: "Devices", icon: Laptop },
   { id: "settings", label: "Settings", icon: Settings },
 ];
@@ -48,8 +47,18 @@ function SidebarContent({
 }) {
   return (
     <div className="flex h-full w-60 flex-col border-r border-white/[0.08] bg-[#0D0F13]">
-      <div className="flex h-14 items-center justify-between border-b border-white/[0.06] px-4">
-        <BrandMark variant="logo" size="sm" />
+      <div className="flex h-16 items-center justify-between border-b border-white/[0.06] px-4">
+        <button
+          type="button"
+          onClick={() => {
+            onSelect("home");
+            onClose?.();
+          }}
+          className="flex items-center focus:outline-none"
+          aria-label="NohbyOne Home"
+        >
+          <BrandMark variant="logo" size="lg" />
+        </button>
 
         {onClose && (
           <button
@@ -75,37 +84,30 @@ function SidebarContent({
                 onSelect(item.id);
                 onClose?.();
               }}
-              className={`group flex min-h-[38px] w-full items-center justify-between rounded-lg px-2.5 py-2 text-[13px] font-medium transition ${
+              className={`group flex min-h-[36px] w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition ${
                 isActive
                   ? "bg-white/[0.08] text-white"
                   : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200"
               }`}
             >
-              <span className="flex items-center gap-2.5">
-                <Icon
-                  className={`h-4 w-4 ${
-                    isActive ? "text-[#D6C6A5]" : "text-zinc-500 group-hover:text-zinc-300"
-                  }`}
-                />
-                {item.label}
-              </span>
-              {item.phase && (
-                <span className="rounded bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-zinc-500">
-                  {item.phase}
-                </span>
-              )}
+              <Icon
+                className={`h-4 w-4 ${
+                  isActive ? "text-[#0066FF]" : "text-zinc-500 group-hover:text-zinc-300"
+                }`}
+              />
+              <span>{item.label}</span>
             </button>
           );
         })}
       </nav>
 
       <div className="border-t border-white/[0.06] p-3">
-        <div className="rounded-xl border border-white/[0.07] bg-[#111318] p-3">
+        <div className="rounded-xl border border-white/[0.07] bg-[#111318] px-3 py-2.5">
           <div className="flex items-center gap-2 text-xs font-medium text-zinc-200">
-            <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-            <span>Local-First Agent</span>
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+            <span>Local Agent Ready</span>
           </div>
-          <p className="mt-1 truncate text-[11px] text-zinc-500">
+          <p className="mt-0.5 truncate text-[11px] text-zinc-500">
             {activeDeviceName || "No device bound"}
           </p>
         </div>
@@ -129,7 +131,6 @@ export function AppSidebar({
 }) {
   return (
     <>
-      {/* Desktop persistent rail */}
       <aside className="hidden shrink-0 lg:block">
         <SidebarContent
           activeRoute={activeRoute}
@@ -138,7 +139,6 @@ export function AppSidebar({
         />
       </aside>
 
-      {/* Tablet & Mobile slide-over drawer */}
       <AnimatePresence>
         {mobileOpen && (
           <div className="fixed inset-0 z-50 flex lg:hidden">
@@ -148,7 +148,7 @@ export function AppSidebar({
               exit={{ opacity: 0 }}
               transition={{ duration: 0.18 }}
               onClick={onCloseMobile}
-              className="fixed inset-0 bg-black/65 backdrop-blur-xs"
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
             />
             <motion.div
               initial={{ x: -260 }}
