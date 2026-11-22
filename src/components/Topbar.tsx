@@ -1,10 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bell, Laptop, LogOut, Menu, Settings, ShieldAlert } from "lucide-react";
+import {
+  Bell,
+  Laptop,
+  LogOut,
+  Menu,
+  PanelLeft,
+  PanelLeftOpen,
+  Settings,
+  ShieldAlert,
+} from "lucide-react";
 
 import { apiClient } from "../lib/api";
 import { useAppStore } from "../store/useAppStore";
 import type { Approval, Device, HealthData, NavRoute, User } from "../types/api";
+import type { SidebarMode } from "./AppSidebar";
 import { ThemeToggle } from "./ThemeToggle";
 
 const ROUTE_TITLES: Record<NavRoute, string> = {
@@ -23,6 +33,8 @@ export function Topbar({
   activeRoute,
   user,
   currentDevice,
+  sidebarMode = "expanded",
+  onToggleSidebar,
   onLogout,
   onOpenDevices,
   onOpenMobileMenu,
@@ -31,6 +43,8 @@ export function Topbar({
   user: User;
   health: HealthData | null;
   currentDevice: Device | null;
+  sidebarMode?: SidebarMode;
+  onToggleSidebar?: () => void;
   onLogout: () => void;
   onOpenDevices: () => void;
   onOpenMobileMenu: () => void;
@@ -73,7 +87,7 @@ export function Topbar({
 
   return (
     <header className="relative z-30 flex h-14 shrink-0 items-center justify-between border-b border-white/[0.08] bg-[#0A0B0E] px-4 sm:px-6">
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 items-center gap-2.5">
         <button
           type="button"
           onClick={onOpenMobileMenu}
@@ -82,6 +96,29 @@ export function Topbar({
         >
           <Menu className="h-4 w-4" />
         </button>
+
+        {onToggleSidebar && (
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            title={
+              sidebarMode === "hidden"
+                ? "Show sidebar"
+                : sidebarMode === "collapsed"
+                  ? "Expand sidebar"
+                  : "Hide sidebar"
+            }
+            aria-label="Toggle left sidebar"
+            className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] bg-[#111318] text-zinc-300 transition hover:border-[#00D4FF]/45 hover:text-white lg:flex"
+          >
+            {sidebarMode === "hidden" ? (
+              <PanelLeftOpen className="h-4 w-4 text-[#00D4FF]" />
+            ) : (
+              <PanelLeft className="h-4 w-4" />
+            )}
+          </button>
+        )}
+
         <h1 className="font-display truncate text-sm font-semibold tracking-tight text-white">
           {ROUTE_TITLES[activeRoute]}
         </h1>

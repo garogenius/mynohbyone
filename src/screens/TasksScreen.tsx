@@ -7,6 +7,8 @@ import {
   Cpu,
   ListFilter,
   Loader2,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pause,
   Play,
   Plus,
@@ -146,6 +148,7 @@ export function TasksScreen() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCompleted, setFilterCompleted] = useState(false);
+  const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
 
   const [scheduleLabels, setScheduleLabels] = useState<Record<string, string>>(() => {
     try {
@@ -290,120 +293,144 @@ export function TasksScreen() {
     <div className="flex min-h-[calc(100vh-5.5rem)] w-full flex-col gap-4 lg:h-[calc(100vh-5.25rem)] lg:flex-row lg:overflow-hidden">
       {/* ============================================================
           LEFT SIDEBAR: Scheduled + New task + Active list
-          Matches Screenshot 3 layout
+          Collapsible & Hideable
           ============================================================ */}
-      <aside className="flex w-full shrink-0 flex-col border-b border-white/[0.08] pb-4 lg:h-full lg:w-64 lg:border-b-0 lg:border-r lg:pr-4 lg:pb-0">
-        {/* Top Row: Scheduled | Filter | Search */}
-        <div className="flex items-center justify-between px-2 py-1.5">
-          <h2 className="font-display text-sm font-semibold text-white">Scheduled</h2>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setFilterCompleted((v) => !v)}
-              title={filterCompleted ? "Showing completed only" : "Filter tasks"}
-              className={`flex h-7 w-7 items-center justify-center rounded-lg transition ${
-                filterCompleted
-                  ? "bg-[#00D4FF]/15 text-[#00D4FF]"
-                  : "text-zinc-400 hover:bg-white/[0.06] hover:text-white"
-              }`}
-            >
-              <ListFilter className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setSearchOpen((v) => !v)}
-              title="Search scheduled tasks"
-              className={`flex h-7 w-7 items-center justify-center rounded-lg transition ${
-                searchOpen
-                  ? "bg-[#00D4FF]/15 text-[#00D4FF]"
-                  : "text-zinc-400 hover:bg-white/[0.06] hover:text-white"
-              }`}
-            >
-              <Search className="h-3.5 w-3.5" />
-            </button>
+      {leftSidebarOpen && (
+        <aside className="flex w-full shrink-0 flex-col border-b border-white/[0.08] pb-4 lg:h-full lg:w-64 lg:border-b-0 lg:border-r lg:pr-4 lg:pb-0">
+          {/* Top Row: Scheduled | Filter | Search | Hide */}
+          <div className="flex items-center justify-between px-2 py-1.5">
+            <h2 className="font-display text-sm font-semibold text-white">Scheduled</h2>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setFilterCompleted((v) => !v)}
+                title={filterCompleted ? "Showing completed only" : "Filter tasks"}
+                className={`flex h-7 w-7 items-center justify-center rounded-lg transition ${
+                  filterCompleted
+                    ? "bg-[#00D4FF]/15 text-[#00D4FF]"
+                    : "text-zinc-400 hover:bg-white/[0.06] hover:text-white"
+                }`}
+              >
+                <ListFilter className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setSearchOpen((v) => !v)}
+                title="Search scheduled tasks"
+                className={`flex h-7 w-7 items-center justify-center rounded-lg transition ${
+                  searchOpen
+                    ? "bg-[#00D4FF]/15 text-[#00D4FF]"
+                    : "text-zinc-400 hover:bg-white/[0.06] hover:text-white"
+                }`}
+              >
+                <Search className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setLeftSidebarOpen(false)}
+                title="Hide Scheduled sidebar"
+                aria-label="Hide Scheduled sidebar"
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/[0.06] hover:text-white"
+              >
+                <PanelLeftClose className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
-        </div>
 
-        {searchOpen && (
-          <div className="mt-1 px-2">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search tasks..."
-              autoFocus
-              className="studio-input h-7 w-full rounded-lg px-2.5 text-xs"
-            />
+          {searchOpen && (
+            <div className="mt-1 px-2">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search tasks..."
+                autoFocus
+                className="studio-input h-7 w-full rounded-lg px-2.5 text-xs"
+              />
+            </div>
+          )}
+
+          {/* + New task button */}
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedTask(null);
+              setShowComposerModal(true);
+            }}
+            className="mt-2 flex items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-medium text-white transition hover:bg-white/[0.06]"
+          >
+            <Plus className="h-4 w-4 text-zinc-300" />
+            <span>New task</span>
+          </button>
+
+          {/* Active Section */}
+          <div className="mt-4 flex-1 overflow-y-auto px-1">
+            <p className="px-1.5 text-[11px] font-medium text-zinc-400">
+              {filterCompleted ? "Completed" : "Active"}
+            </p>
+
+            <div className="mt-2 space-y-1">
+              {loading ? (
+                <div className="flex items-center gap-2 px-2 py-4 text-xs text-zinc-400">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-[#00D4FF]" />
+                  Loading...
+                </div>
+              ) : filteredTasks.length === 0 ? (
+                <div className="rounded-xl px-2 py-3 text-left">
+                  <p className="truncate text-xs font-medium text-zinc-300">
+                    No scheduled tasks yet
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-zinc-500">
+                    Pick a template or click + New task
+                  </p>
+                </div>
+              ) : (
+                filteredTasks.map((task) => {
+                  const isSelected = selectedTask?.id === task.id;
+                  const sched =
+                    scheduleLabels[task.id] ||
+                    `${formatShortDate(task.createdAt)} · Tuesdays at 2:00 PM`;
+                  return (
+                    <button
+                      key={task.id}
+                      type="button"
+                      onClick={() => selectTask(task.id)}
+                      className={`w-full rounded-xl px-2.5 py-2 text-left transition ${
+                        isSelected
+                          ? "bg-[#00D4FF]/12 text-white ring-1 ring-[#00D4FF]/40"
+                          : "hover:bg-white/[0.05]"
+                      }`}
+                    >
+                      <p className="truncate text-xs font-medium text-white">
+                        {task.instruction}
+                      </p>
+                      <p className="mt-0.5 truncate text-[11px] text-zinc-400">{sched}</p>
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>
-        )}
-
-        {/* + New task button */}
-        <button
-          type="button"
-          onClick={() => {
-            setSelectedTask(null);
-            setShowComposerModal(true);
-          }}
-          className="mt-2 flex items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-medium text-white transition hover:bg-white/[0.06]"
-        >
-          <Plus className="h-4 w-4 text-zinc-300" />
-          <span>New task</span>
-        </button>
-
-        {/* Active Section */}
-        <div className="mt-4 flex-1 overflow-y-auto px-1">
-          <p className="px-1.5 text-[11px] font-medium text-zinc-400">
-            {filterCompleted ? "Completed" : "Active"}
-          </p>
-
-          <div className="mt-2 space-y-1">
-            {loading ? (
-              <div className="flex items-center gap-2 px-2 py-4 text-xs text-zinc-400">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-[#00D4FF]" />
-                Loading...
-              </div>
-            ) : filteredTasks.length === 0 ? (
-              <div className="rounded-xl px-2 py-3 text-left">
-                <p className="truncate text-xs font-medium text-zinc-300">
-                  No scheduled tasks yet
-                </p>
-                <p className="mt-0.5 text-[11px] text-zinc-500">
-                  Pick a template or click + New task
-                </p>
-              </div>
-            ) : (
-              filteredTasks.map((task) => {
-                const isSelected = selectedTask?.id === task.id;
-                const sched =
-                  scheduleLabels[task.id] ||
-                  `${formatShortDate(task.createdAt)} · Tuesdays at 2:00 PM`;
-                return (
-                  <button
-                    key={task.id}
-                    type="button"
-                    onClick={() => selectTask(task.id)}
-                    className={`w-full rounded-xl px-2.5 py-2 text-left transition ${
-                      isSelected
-                        ? "bg-[#00D4FF]/12 text-white ring-1 ring-[#00D4FF]/40"
-                        : "hover:bg-white/[0.05]"
-                    }`}
-                  >
-                    <p className="truncate text-xs font-medium text-white">
-                      {task.instruction}
-                    </p>
-                    <p className="mt-0.5 truncate text-[11px] text-zinc-400">{sched}</p>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </aside>
+        </aside>
+      )}
 
       {/* ============================================================
           RIGHT MAIN STAGE: "Schedule a task" 6-card gallery OR Selected Task Detail
           ============================================================ */}
       <section className="flex flex-1 flex-col overflow-y-auto px-2 py-4 sm:px-6">
+        {!leftSidebarOpen && (
+          <div className="mb-2 flex items-center">
+            <button
+              type="button"
+              onClick={() => setLeftSidebarOpen(true)}
+              title="Show Scheduled sidebar"
+              className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-white/[0.1] bg-[#141B2D]/80 px-2.5 text-[11px] font-medium text-zinc-300 transition hover:border-[#00D4FF]/50 hover:text-white"
+            >
+              <PanelLeftOpen className="h-3.5 w-3.5 text-[#00D4FF]" />
+              <span>Show Scheduled</span>
+            </button>
+          </div>
+        )}
         {!selectedTask ? (
           <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center py-4">
             {/* Top Calendar Check Icon & Title matching Screenshot 3 */}

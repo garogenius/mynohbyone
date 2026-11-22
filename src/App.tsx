@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, RefreshCw, WifiOff } from "lucide-react";
 
-import { AppSidebar } from "./components/AppSidebar";
+import { AppSidebar, type SidebarMode } from "./components/AppSidebar";
 import { BrandMark } from "./components/BrandMark";
 import { JarvisWakeEngine } from "./components/JarvisWakeEngine";
 import { MobileBottomNav } from "./components/MobileBottomNav";
@@ -39,6 +39,7 @@ export function App() {
   } = useAppStore();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>("expanded");
 
   useEffect(() => {
     bootstrap();
@@ -109,6 +110,8 @@ export function App() {
         activeRoute={activeRoute}
         onSelect={setRoute}
         activeDeviceName={currentDevice?.deviceName || null}
+        sidebarMode={sidebarMode}
+        onChangeSidebarMode={setSidebarMode}
         mobileOpen={mobileMenuOpen}
         onCloseMobile={() => setMobileMenuOpen(false)}
       />
@@ -119,6 +122,10 @@ export function App() {
           user={user}
           health={health}
           currentDevice={currentDevice}
+          sidebarMode={sidebarMode}
+          onToggleSidebar={() =>
+            setSidebarMode((cur) => (cur === "expanded" ? "hidden" : "expanded"))
+          }
           onLogout={logout}
           onOpenDevices={() => setRoute("devices")}
           onOpenMobileMenu={() => setMobileMenuOpen(true)}

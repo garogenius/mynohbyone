@@ -11,6 +11,8 @@ import {
   MessageSquarePlus,
   Mic,
   MicOff,
+  PanelRightClose,
+  PanelRightOpen,
   Pencil,
   Pin,
   PinOff,
@@ -103,6 +105,7 @@ export function AssistantScreen() {
   const [wsConnected, setWsConnected] = useState(false);
 
   const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
+  const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
   const [pendingDelete, setPendingDelete] = useState<Conversation | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
@@ -951,7 +954,13 @@ export function AssistantScreen() {
   );
 
   return (
-    <div className="grid w-full gap-3 lg:h-[calc(100vh-5.25rem)] lg:grid-cols-[minmax(0,1fr)_250px] xl:grid-cols-[minmax(0,1fr)_265px] lg:overflow-hidden">
+    <div
+      className={`grid w-full gap-3 lg:h-[calc(100vh-5.25rem)] lg:overflow-hidden ${
+        rightSidebarOpen
+          ? "lg:grid-cols-[minmax(0,1fr)_250px] xl:grid-cols-[minmax(0,1fr)_265px]"
+          : "lg:grid-cols-1"
+      }`}
+    >
       {/* ============================================================
           LEFT / CENTER: CHATGPT-STYLE CHAT ROOM STAGE
           ============================================================ */}
@@ -997,6 +1006,20 @@ export function AssistantScreen() {
             >
               <MessageSquarePlus className="h-3.5 w-3.5 text-[#00D4FF]" />
               <span className="hidden sm:inline">New Chat</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setRightSidebarOpen((v) => !v)}
+              title={rightSidebarOpen ? "Hide chat history sidebar" : "Show chat history sidebar"}
+              aria-label={rightSidebarOpen ? "Hide chat history sidebar" : "Show chat history sidebar"}
+              className="hidden h-7 items-center gap-1 rounded-lg border border-white/[0.1] bg-[#141B2D]/80 px-2.5 text-[11px] font-medium text-zinc-200 transition hover:border-[#00D4FF]/50 hover:text-white lg:inline-flex"
+            >
+              {rightSidebarOpen ? (
+                <PanelRightClose className="h-3.5 w-3.5 text-[#00D4FF]" />
+              ) : (
+                <PanelRightOpen className="h-3.5 w-3.5 text-[#00D4FF]" />
+              )}
+              <span>{rightSidebarOpen ? "Hide History" : "Show History"}</span>
             </button>
             <button
               type="button"
@@ -1231,9 +1254,11 @@ export function AssistantScreen() {
           RIGHT COLUMN: SMALL-MEDIUM CHAT HISTORY WORKSPACE (250px-265px)
           Matches Active Session's right rail size & aesthetic exactly
           ============================================================ */}
-      <aside className="hidden flex-col gap-2.5 lg:flex lg:h-full lg:overflow-hidden">
-        {renderHistoryRailContent()}
-      </aside>
+      {rightSidebarOpen && (
+        <aside className="hidden flex-col gap-2.5 lg:flex lg:h-full lg:overflow-hidden">
+          {renderHistoryRailContent()}
+        </aside>
+      )}
 
       {/* Mobile / Tablet Slide-Over History Drawer */}
       <AnimatePresence>
