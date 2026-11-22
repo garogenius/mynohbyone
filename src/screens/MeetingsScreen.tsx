@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import {
-  Bell,
   Calendar,
   CheckCircle2,
+  ChevronDown,
   Copy,
   Download,
-  Eye,
-  EyeOff,
   FileText,
   GripHorizontal,
   Headphones,
@@ -16,6 +13,8 @@ import {
   Mic,
   MicOff,
   Minimize2,
+  PanelLeftClose,
+  PanelLeftOpen,
   PictureInPicture2,
   Play,
   Plus,
@@ -23,7 +22,6 @@ import {
   Save,
   Send,
   Shield,
-  Sparkles,
   Square,
   Trash2,
   Volume2,
@@ -46,7 +44,7 @@ import type { MeetingItem } from "../types/api";
 interface ScheduledCalendarMeeting {
   id: string;
   title: string;
-  scheduledAt: string; // ISO or YYYY-MM-DDTHH:mm
+  scheduledAt: string;
   meetingUrl: string;
   provider: "Google Calendar" | "iCloud Calendar" | "Outlook Calendar";
   autoJoinAndRecord: boolean;
@@ -81,8 +79,7 @@ async function syncNativeStealthMode(enabled: boolean): Promise<boolean> {
 }
 
 const WAVE_BARS = [
-  10, 18, 12, 24, 15, 22, 10, 26, 16, 20, 12, 24, 14, 19, 11, 23, 15, 21, 13, 25, 16, 18, 12, 22,
-  14, 20, 10, 16, 12, 18,
+  8, 14, 10, 18, 12, 16, 8, 20, 13, 15, 10, 18, 11, 15, 9, 17, 12, 16, 10, 19, 12, 14, 9, 16,
 ];
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -103,22 +100,47 @@ export function MeetingsScreen() {
   const [selected, setSelected] = useState<MeetingItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
+  const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
+  const [showNewSessionForm, setShowNewSessionForm] = useState(false);
+  const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
 
   const [title, setTitle] = useState("");
   const [meetingType, setMeetingType] = useState<"interview" | "meeting" | "standup" | "client_call">("interview");
-  const [stealthMode, setStealthMode] = useState(true);
-  const [hiddenOverlay, setHiddenOverlay] = useState(false);
 
-  // Floating Stealth Card Modal (In-App + Screen-Share-Invisible OS Desktop Overlay)
-  const [showStealthCard, setShowStealthCard] = useState(true);
+  // Stealth Card Modal: ONLY displays when explicitly enabled by the user (false by default)
+  const [showStealthCard, setShowStealthCard] = useState(false);
   const [stealthCardMinimized, setStealthCardMinimized] = useState(false);
-  const [stealthCardExpanded, setStealthCardExpanded] = useState(false);
   const [externalStealthActive, setExternalStealthActive] = useState(false);
   const stealthPopupRef = useRef<Window | null>(null);
 
-  const [activeTab, setActiveTab] = useState<
-    "transcript" | "keypoints" | "audio" | "calendar" | "actions"
-  >("transcript");
+  // Free 360-degree position & size state for the Stealth Card modal
+  const [cardPos, setCardPos] = useState<{ x: number; y: number }>(() => {
+    if (typeof window === "undefined") return { x: 260, y: 140 };
+    return {
+      x: Math.max(24, Math.round((window.innerWidth - 620) / 2)),
+      y: Math.max(60, Math.round(window.innerHeight - 380)),
+    };
+  });
+  const [cardSize, setCardSize] = useState<{ width: number; height: number }>({
+    width: 620,
+    height: 320,
+  });
+  const dragOriginRef = useRef<{
+    startX: number;
+    startY: number;
+    origX: number;
+    origY: number;
+  } | null>(null);
+  const resizeOriginRef = useRef<{
+    startX: number;
+    startY: number;
+    origW: number;
+    origH: number;
+  } | null>(null);
+
+  const [activeTab, setActiveTab] = useState<"transcript" | "notes" | "audio" | "calendar">(
+    "transcript"
+  );
   const [isListening, setIsListening] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
       return sessionStorage.getItem("nohbyone.meetingMicOn") === "true";
@@ -129,7 +151,7 @@ export function MeetingsScreen() {
   const [manualInput, setManualInput] = useState("");
   const [pushingTasks, setPushingTasks] = useState(false);
 
-  // Meeting Notes, Extracted Key Points & Generated Document state
+  // Meeting Notes & Document Generator
   const [notesByMeeting, setNotesByMeeting] = useState<Record<string, string>>(() => {
     try {
       return JSON.parse(localStorage.getItem(NOTES_STORAGE_KEY) || "{}");
@@ -142,7 +164,7 @@ export function MeetingsScreen() {
   const [generatedDocText, setGeneratedDocText] = useState<string | null>(null);
   const [generatedDocFilename, setGeneratedDocFilename] = useState<string>("");
 
-  // Live Session Audio Recorder & Neural Audio Converter
+  // Live Audio Recording & Neural Audio Export
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [savedAudioClips, setSavedAudioClips] = useState<SavedAudioClip[]>([]);
@@ -151,7 +173,7 @@ export function MeetingsScreen() {
   const recordedChunksRef = useRef<BlobPart[]>([]);
   const recordingTimerRef = useRef<number | null>(null);
 
-  // Calendar Sync & Auto-Join state
+  // Calendar Sync & Auto-Join
   const [calendarConnected, setCalendarConnected] = useState<boolean>(() => {
     return localStorage.getItem("nohbyone.meetings.calendarConnected") === "true";
   });
@@ -265,7 +287,7 @@ export function MeetingsScreen() {
             const clip: SavedAudioClip = {
               id: `rec-${Date.now()}`,
               meetingId: meetingObj.id,
-              title: `${meetingObj.title} — Live Session Recording`,
+              title: `${meetingObj.title} — Session Recording`,
               url,
               mimeType,
               durationSec: dur,
@@ -293,8 +315,6 @@ export function MeetingsScreen() {
       if (res.data.meetings.length > 0 && !selected) {
         const detail = await apiClient.getMeeting(res.data.meetings[0].id);
         setSelected(detail.data.meeting);
-        setStealthMode(detail.data.meeting.stealthMode);
-        syncNativeStealthMode(detail.data.meeting.stealthMode);
       }
     } catch (err) {
       showToast("error", err instanceof ApiError ? err.message : "Failed to load meetings.");
@@ -311,17 +331,6 @@ export function MeetingsScreen() {
       syncNativeStealthMode(false);
     };
   }, [loadMeetings, stopAudioCapture, stopLiveRecording]);
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "h") {
-        e.preventDefault();
-        setHiddenOverlay((v) => !v);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
 
   const sendTranscriptSegment = useCallback(
     async (meetingId: string, text: string, speaker = "Interviewer") => {
@@ -444,7 +453,7 @@ export function MeetingsScreen() {
     }
   }, [activateListeningOnMeeting, isListening, selected]);
 
-  // Calendar Watcher: checks every 15s for upcoming scheduled meetings & auto-joins/records
+  // Calendar Watcher: checks every 12s for upcoming scheduled meetings & auto-joins/records
   useEffect(() => {
     if (scheduledMeetings.length === 0) return;
 
@@ -459,7 +468,6 @@ export function MeetingsScreen() {
         if (Number.isNaN(targetMs)) continue;
 
         const diffMs = targetMs - nowMs;
-        // Within 1 minute of start time or up to 10 minutes past
         if (diffMs <= 60_000 && diffMs >= -600_000 && !item.notified) {
           item.notified = true;
           changed = true;
@@ -512,8 +520,6 @@ export function MeetingsScreen() {
     try {
       const res = await apiClient.getMeeting(id);
       setSelected(res.data.meeting);
-      setStealthMode(res.data.meeting.stealthMode);
-      syncNativeStealthMode(res.data.meeting.stealthMode);
     } catch (err) {
       showToast("error", err instanceof ApiError ? err.message : "Failed to load session.");
     }
@@ -521,7 +527,7 @@ export function MeetingsScreen() {
 
   const handleStartSession = async (e: React.FormEvent) => {
     e.preventDefault();
-    const sessionTitle = title.trim() || "Live Interview / Meeting Session";
+    const sessionTitle = title.trim() || "New Meeting Session";
     setStarting(true);
     stopAudioCapture(true);
     try {
@@ -529,14 +535,13 @@ export function MeetingsScreen() {
         title: sessionTitle,
         meetingType,
         provider: "local_audio",
-        stealthMode,
+        stealthMode: true,
       });
       setTitle("");
+      setShowNewSessionForm(false);
       setSelected(res.data.meeting);
-      setShowStealthCard(true);
-      await syncNativeStealthMode(stealthMode);
       await loadMeetings();
-      showToast("success", "Stealth meeting assistant active.");
+      showToast("success", "Session created.");
     } catch (err) {
       showToast("error", err instanceof ApiError ? err.message : "Failed to start session.");
     } finally {
@@ -544,28 +549,19 @@ export function MeetingsScreen() {
     }
   };
 
-  const handleToggleStealth = async () => {
-    const next = !stealthMode;
-    setStealthMode(next);
+  const handleToggleStealthCard = async () => {
+    const next = !showStealthCard;
+    setShowStealthCard(next);
+    setStealthCardMinimized(false);
     await syncNativeStealthMode(next);
-    if (!selected) return;
-    try {
-      const res = await apiClient.toggleMeetingStealth(selected.id, next);
-      setSelected(res.data.meeting);
-      showToast(
-        "info",
-        next
-          ? "Stealth shield enabled — card is hidden from OS screen sharing."
-          : "Standard window mode enabled."
-      );
-    } catch (err) {
-      showToast("error", err instanceof ApiError ? err.message : "Unable to update stealth mode.");
+    if (selected) {
+      apiClient.toggleMeetingStealth(selected.id, next).catch(() => null);
     }
   };
 
   const toggleBackgroundMic = () => {
     if (!selected) {
-      showToast("info", "Start a session first.");
+      showToast("info", "Select or create a session first.");
       return;
     }
     if (isListening) {
@@ -579,10 +575,11 @@ export function MeetingsScreen() {
     if (!selected) return;
     stopAudioCapture(true);
     stopLiveRecording();
+    setActionsMenuOpen(false);
     try {
       const res = await apiClient.stopMeeting(selected.id);
       setSelected(res.data.meeting);
-      setActiveTab("keypoints");
+      setActiveTab("notes");
       showToast("success", "Session completed and key points extracted.");
       await loadMeetings();
     } catch (err) {
@@ -595,9 +592,9 @@ export function MeetingsScreen() {
     try {
       const res = await apiClient.deleteMeetingTranscript(selected.id, segmentId);
       setSelected(res.data.meeting);
-      showToast("info", "Transcript segment deleted.");
+      showToast("info", "Transcript entry deleted.");
     } catch (err) {
-      showToast("error", err instanceof ApiError ? err.message : "Failed to delete segment.");
+      showToast("error", err instanceof ApiError ? err.message : "Failed to delete entry.");
     }
   };
 
@@ -619,20 +616,21 @@ export function MeetingsScreen() {
 
   const handleDownloadTranscript = () => {
     if (!selected) return;
+    setActionsMenuOpen(false);
     const lines = [
-      `MEETING TRANSCRIPT & CAUGHT Q&A: ${selected.title}`,
+      `MEETING TRANSCRIPT: ${selected.title}`,
       `Date: ${new Date(selected.startedAt).toLocaleString()}`,
       `Type: ${selected.meetingType.toUpperCase()}`,
       "",
       ...(selected.transcripts || []).flatMap((seg, i) => [
         `${i + 1}. [${seg.speaker}] (${new Date(seg.createdAt).toLocaleTimeString()}):`,
-        `   Question / Statement: ${cleanDisplayText(seg.content)}`,
-        ...(seg.aiHint ? [`   My Answer (First-Person): ${cleanDisplayText(seg.aiHint)}`] : []),
+        `   ${cleanDisplayText(seg.content)}`,
+        ...(seg.aiHint ? [`   Suggested Answer: ${cleanFirstPersonAnswer(seg.aiHint)}`] : []),
         "",
       ]),
     ];
     if (currentNotes) {
-      lines.push("SAVED MEETING NOTES:", currentNotes);
+      lines.push("MEETING NOTES:", currentNotes);
     }
     const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
     downloadBlob(blob, `${selected.title.replace(/\s+/g, "-")}-Transcript.txt`);
@@ -642,15 +640,17 @@ export function MeetingsScreen() {
   const handleGenerateDocument = async () => {
     if (!selected || generatingDoc) return;
     setGeneratingDoc(true);
+    setActionsMenuOpen(false);
     try {
       const res = await apiClient.generateMeetingDocument(selected.id, {
         notes: currentNotes,
       });
       setGeneratedDocText(res.data.documentText);
       setGeneratedDocFilename(res.data.filename);
+      setActiveTab("notes");
       const blob = new Blob([res.data.documentText], { type: "text/markdown;charset=utf-8" });
       downloadBlob(blob, res.data.filename);
-      showToast("success", `Key points document saved to Library & downloaded (${res.data.filename}).`);
+      showToast("success", `Document saved to Library & downloaded (${res.data.filename}).`);
     } catch (err) {
       showToast("error", err instanceof ApiError ? err.message : "Failed to generate document.");
     } finally {
@@ -661,6 +661,7 @@ export function MeetingsScreen() {
   const handleConvertMeetingToAudioAndExport = async () => {
     if (!selected || convertingAudio) return;
     setConvertingAudio(true);
+    setActionsMenuOpen(false);
     try {
       const res = await apiClient.exportMeetingAudio(selected.id, {
         notes: currentNotes,
@@ -682,7 +683,7 @@ export function MeetingsScreen() {
         const clip: SavedAudioClip = {
           id: `neural-${Date.now()}`,
           meetingId: selected.id,
-          title: `${selected.title} — Neural Audio Export`,
+          title: `${selected.title} — Audio Brief`,
           url,
           mimeType: mime,
           durationSec: Math.max(8, Math.round(res.data.narrationText.length / 14)),
@@ -692,7 +693,7 @@ export function MeetingsScreen() {
         setSavedAudioClips((prev) => [clip, ...prev]);
         downloadBlob(blob, res.data.filename);
         setActiveTab("audio");
-        showToast("success", `Meeting converted to audio and exported (${res.data.filename}).`);
+        showToast("success", `Audio exported (${res.data.filename}).`);
       } else {
         speakText(res.data.narrationText, {
           language: voiceSettings?.inputLanguage || "en-US",
@@ -725,7 +726,7 @@ export function MeetingsScreen() {
         { type: "text/markdown" }
       );
       await apiClient.uploadFile(summaryFile);
-      showToast("success", "Audio recording metadata & notes saved to Library.");
+      showToast("success", "Audio recording saved to Library.");
     } catch (err) {
       showToast("error", err instanceof ApiError ? err.message : "Failed to save to Library.");
     }
@@ -750,7 +751,7 @@ export function MeetingsScreen() {
       if ("Notification" in window && Notification.permission === "default") {
         Notification.requestPermission().catch(() => {});
       }
-      showToast("success", `${calendarProvider} connected for meeting alerts & auto-join.`);
+      showToast("success", `${calendarProvider} connected.`);
     } catch {
       setCalendarConnected(true);
       localStorage.setItem("nohbyone.meetings.calendarConnected", "true");
@@ -774,17 +775,14 @@ export function MeetingsScreen() {
     localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(next));
     setCalTitle("");
     setCalUrl("");
-    showToast(
-      "success",
-      `Saved "${cleanTitle}" to calendar (${item.autoJoinAndRecord ? "Auto-Join & Record ON" : "Alert Only"}).`
-    );
+    showToast("success", `Saved "${cleanTitle}" to calendar.`);
   };
 
   const handleDeleteCalendarMeeting = (id: string) => {
     const next = scheduledMeetings.filter((m) => m.id !== id);
     setScheduledMeetings(next);
     localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(next));
-    showToast("info", "Scheduled calendar meeting removed.");
+    showToast("info", "Calendar meeting removed.");
   };
 
   const handleTriggerScheduledMeetingNow = async (item: ScheduledCalendarMeeting) => {
@@ -802,7 +800,7 @@ export function MeetingsScreen() {
       setMeetings((prev) => [res.data.meeting, ...prev]);
       setActiveTab("transcript");
       activateListeningOnMeeting(res.data.meeting, item.autoJoinAndRecord);
-      showToast("success", `Joined "${item.title}" — listening, recording & taking notes.`);
+      showToast("success", `Started "${item.title}".`);
     } catch (err) {
       showToast("error", err instanceof ApiError ? err.message : "Failed to start meeting.");
     }
@@ -810,6 +808,7 @@ export function MeetingsScreen() {
 
   const handlePushActionsToTasks = async () => {
     if (!selected || pushingTasks) return;
+    setActionsMenuOpen(false);
     const items = selected.actionItems?.length
       ? selected.actionItems
       : [`Follow up on "${selected.title}" notes`];
@@ -822,7 +821,7 @@ export function MeetingsScreen() {
           source: "meeting_action_items",
         });
       }
-      showToast("success", `Pushed ${Math.min(items.length, 3)} action item(s) to Scheduled Tasks.`);
+      showToast("success", `Added ${Math.min(items.length, 3)} action item(s) to Tasks.`);
     } catch (err) {
       showToast("error", err instanceof ApiError ? err.message : "Failed to push tasks.");
     } finally {
@@ -835,7 +834,7 @@ export function MeetingsScreen() {
       await apiClient.deleteMeeting(id);
       if (selected?.id === id) setSelected(null);
       await loadMeetings();
-      showToast("info", "Meeting session deleted.");
+      showToast("info", "Session deleted.");
     } catch (err) {
       showToast("error", err instanceof ApiError ? err.message : "Delete failed.");
     }
@@ -857,20 +856,20 @@ export function MeetingsScreen() {
 
     if (statusEl) {
       statusEl.textContent = isListening
-        ? "LIVE LISTENING • STEALTH SHIELD ACTIVE (INVISIBLE ON SCREEN SHARE)"
-        : "STANDBY • STEALTH SHIELD ACTIVE";
+        ? "LISTENING • SCREEN-SHARE PROTECTED"
+        : "STANDBY • SCREEN-SHARE PROTECTED";
     }
     if (qEl) {
       qEl.textContent =
         liveCaption ||
         (latestSegment
           ? cleanDisplayText(latestSegment.content)
-          : "Listening for interviewer or meeting question...");
+          : "Waiting for question...");
     }
     if (aEl) {
       aEl.textContent = latestSegment?.aiHint
         ? cleanFirstPersonAnswer(latestSegment.aiHint)
-        : "Your personalized first-person answer ('I...', 'In my experience...') will appear here immediately when a question is caught.";
+        : "Your first-person response will appear here when a question is detected.";
     }
   }, [isListening, latestSegment, liveCaption]);
 
@@ -879,7 +878,7 @@ export function MeetingsScreen() {
   }, [syncExternalStealthCard]);
 
   const toggleExternalStealthCardWindow = async () => {
-    // Enable OS hardware screen-capture protection in Tauri Desktop
+    setActionsMenuOpen(false);
     await syncNativeStealthMode(true);
 
     if (stealthPopupRef.current && !stealthPopupRef.current.closed) {
@@ -905,7 +904,7 @@ export function MeetingsScreen() {
       }
 
       if (!pipWin) {
-        showToast("error", "Allow popups to float the stealth card on your device background.");
+        showToast("error", "Allow popups to open the external stealth card.");
         return;
       }
 
@@ -917,86 +916,73 @@ export function MeetingsScreen() {
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>NohbyAI Stealth Answer Card (Screen-Share Protected)</title>
+  <title>Nohby ONE — Stealth Response Card</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: #080D18;
+      background: #0B0F17;
       color: #F8FAFC;
       font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      padding: 14px;
+      padding: 16px;
       height: 100vh;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
-      gap: 10px;
+      gap: 12px;
     }
-    .shield {
+    .header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: rgba(16, 185, 129, 0.12);
-      border: 1px solid rgba(16, 185, 129, 0.4);
-      color: #34D399;
-      padding: 6px 10px;
-      border-radius: 999px;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
+      font-size: 11px;
+      font-weight: 600;
+      color: #94A3B8;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding-bottom: 8px;
     }
-    .box-q {
-      background: #101829;
+    .section {
+      background: #121824;
       border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 12px;
-      padding: 10px 12px;
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .answer {
+      flex: 1;
+      background: #121824;
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 10px;
+      padding: 14px;
+      overflow-y: auto;
     }
     .label {
       font-size: 10px;
-      font-weight: 700;
+      font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #94A3B8;
-      margin-bottom: 4px;
+      letter-spacing: 0.05em;
+      color: #64748B;
+      margin-bottom: 6px;
     }
     .q-text {
-      font-size: 12px;
+      font-size: 13px;
       color: #E2E8F0;
       line-height: 1.45;
     }
-    .box-a {
-      flex: 1;
-      background: linear-gradient(145deg, rgba(0, 212, 255, 0.12), rgba(124, 58, 237, 0.12));
-      border: 1px solid rgba(0, 212, 255, 0.45);
-      border-radius: 12px;
-      padding: 12px;
-      overflow-y: auto;
-    }
-    .a-label {
-      font-size: 10px;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #00D4FF;
-      margin-bottom: 6px;
-    }
     .a-text {
-      font-size: 13.5px;
-      font-weight: 500;
+      font-size: 14.5px;
       color: #FFFFFF;
-      line-height: 1.55;
+      line-height: 1.6;
     }
   </style>
 </head>
 <body>
-  <div class="shield">
-    <span id="stealth-live-badge">STEALTH SHIELD ACTIVE • INVISIBLE ON SCREEN SHARE</span>
+  <div class="header">
+    <span id="stealth-live-badge">LISTENING • SCREEN-SHARE PROTECTED</span>
   </div>
-  <div class="box-q">
-    <div class="label">Caught Question / Speaker</div>
-    <div class="q-text" id="stealth-caught-q">Listening for question...</div>
+  <div class="section">
+    <div class="label">Question</div>
+    <div class="q-text" id="stealth-caught-q">Waiting for question...</div>
   </div>
-  <div class="box-a">
-    <div class="a-label">Answer As You (First-Person Script — Read Aloud)</div>
+  <div class="answer">
+    <div class="label">Suggested Response (First Person)</div>
     <div class="a-text" id="stealth-first-person-a">Waiting for question...</div>
   </div>
 </body>
@@ -1009,347 +995,437 @@ export function MeetingsScreen() {
       });
 
       syncExternalStealthCard();
-      showToast(
-        "success",
-        "Stealth Answer Card popped out to device background (excluded from tab/window screen share)."
-      );
     } catch {
-      showToast("error", "Unable to open external stealth card window.");
+      showToast("error", "Unable to open external window.");
     }
   };
 
-  if (hiddenOverlay) {
-    return (
-      <div className="fixed inset-0 z-[100] flex items-end justify-end bg-[#080C14] p-4">
-        <div className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-[#101624] px-3 py-1.5 text-[11px] text-zinc-400">
-          <span
-            className={`h-2 w-2 rounded-full ${isListening ? "animate-pulse bg-emerald-400" : "bg-zinc-600"}`}
-          />
-          <span>{isListening ? "Stealth Listening Active" : "Hidden"}</span>
-          <button
-            type="button"
-            onClick={() => setHiddenOverlay(false)}
-            className="ml-2 inline-flex items-center gap-1 rounded-full bg-white/[0.08] px-2.5 py-0.5 text-[10px] font-medium text-white"
-          >
-            <Eye className="h-3 w-3" /> Restore (Ctrl+Shift+H)
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Free 360° pointer dragging handlers for Stealth Card Modal
+  const handleCardPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Don't start drag when clicking buttons inside the header
+    if ((e.target as HTMLElement).closest("button")) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragOriginRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: cardPos.x,
+      origY: cardPos.y,
+    };
+  };
+
+  const handleCardPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragOriginRef.current) return;
+    const dx = e.clientX - dragOriginRef.current.startX;
+    const dy = e.clientY - dragOriginRef.current.startY;
+    const maxW = typeof window !== "undefined" ? window.innerWidth - 120 : 1400;
+    const maxH = typeof window !== "undefined" ? window.innerHeight - 60 : 900;
+    setCardPos({
+      x: Math.max(8, Math.min(maxW, dragOriginRef.current.origX + dx)),
+      y: Math.max(8, Math.min(maxH, dragOriginRef.current.origY + dy)),
+    });
+  };
+
+  const handleCardPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragOriginRef.current) return;
+    dragOriginRef.current = null;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // Ignore
+    }
+  };
+
+  // Corner resize pointer handlers
+  const handleResizePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    resizeOriginRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      origW: cardSize.width,
+      origH: cardSize.height,
+    };
+  };
+
+  const handleResizePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!resizeOriginRef.current) return;
+    const dx = e.clientX - resizeOriginRef.current.startX;
+    const dy = e.clientY - resizeOriginRef.current.startY;
+    setCardSize({
+      width: Math.max(380, Math.min(960, resizeOriginRef.current.origW + dx)),
+      height: Math.max(230, Math.min(720, resizeOriginRef.current.origH + dy)),
+    });
+  };
+
+  const handleResizePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!resizeOriginRef.current) return;
+    resizeOriginRef.current = null;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // Ignore
+    }
+  };
 
   return (
-    <div className="w-full space-y-3.5">
-      {/* Top Bar: Start New Session + Stealth Shield & Pop-Out Floating Card */}
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/[0.08] bg-[#101624] px-3.5 py-2.5">
-        <form onSubmit={handleStartSession} className="flex flex-1 flex-wrap items-center gap-2">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="New meeting or interview title..."
-            className="studio-input h-8 min-w-[180px] flex-1 rounded-lg px-3 text-xs"
-          />
-          <select
-            value={meetingType}
-            onChange={(e) => setMeetingType(e.target.value as typeof meetingType)}
-            className="studio-input h-8 rounded-lg px-2.5 text-xs"
-          >
-            <option value="interview">Interview</option>
-            <option value="meeting">Meeting</option>
-            <option value="standup">Standup</option>
-            <option value="client_call">Client Call</option>
-          </select>
-          <button
-            type="submit"
-            disabled={starting}
-            className="btn-ivory inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs"
-          >
-            {starting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-            New Session
-          </button>
-        </form>
-
-        <div className="flex flex-wrap items-center gap-1.5">
-          <button
-            type="button"
-            onClick={handleToggleStealth}
-            className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-medium transition ${
-              stealthMode
-                ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400"
-                : "border-white/[0.08] bg-white/[0.03] text-zinc-400"
-            }`}
-            title="Hardware screen-capture protection excludes this card from Zoom/Meet/Teams screen share"
-          >
-            <Shield className="h-3.5 w-3.5" />
-            {stealthMode ? "Screen-Share Invisible: ON" : "Stealth Off"}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowStealthCard((v) => !v)}
-            className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-medium transition ${
-              showStealthCard
-                ? "border-[#00D4FF]/45 bg-[#00D4FF]/15 text-[#00D4FF]"
-                : "border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:text-white"
-            }`}
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            {showStealthCard ? "Stealth Answer Card: Visible" : "Show Answer Card"}
-          </button>
-
-          <button
-            type="button"
-            onClick={toggleExternalStealthCardWindow}
-            className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-medium transition ${
-              externalStealthActive
-                ? "border-violet-400/50 bg-violet-500/20 text-violet-300"
-                : "border-white/[0.08] bg-white/[0.03] text-zinc-300 hover:border-[#00D4FF]/40 hover:text-white"
-            }`}
-            title="Float Stealth Answer Card on top of any app on your device background (hidden from tab/window screen share)"
-          >
-            <PictureInPicture2 className="h-3.5 w-3.5 text-[#00D4FF]" />
-            Float on Device Background
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setHiddenOverlay(true)}
-            className="inline-flex h-8 items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 text-[11px] text-zinc-400 hover:text-white"
-            title="Hide workspace UI (Ctrl+Shift+H)"
-          >
-            <EyeOff className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Session Selector Pills */}
-      {meetings.length > 0 && (
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-          {meetings.map((m) => (
-            <div
-              key={m.id}
-              onClick={() => handleSelectMeeting(m.id)}
-              className={`group inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 text-xs transition ${
-                selected?.id === m.id
-                  ? "border-[#00D4FF]/45 bg-[#00D4FF]/12 text-white"
-                  : "border-white/[0.07] bg-[#101624] text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  m.status === "listening" ? "bg-emerald-400" : "bg-zinc-600"
-                }`}
-              />
-              <span className="max-w-[160px] truncate font-medium">{m.title}</span>
+    <div className="flex min-h-[calc(100vh-5.5rem)] w-full flex-col gap-4 lg:h-[calc(100vh-5.25rem)] lg:flex-row lg:overflow-hidden">
+      {/* ============================================================
+          LEFT SIDEBAR: Standard Split-Pane Sessions List
+          (Matches Scheduled Tasks clean layout)
+          ============================================================ */}
+      {leftSidebarOpen && (
+        <aside className="flex w-full shrink-0 flex-col border-b border-white/[0.08] pb-4 lg:h-full lg:w-64 lg:border-b-0 lg:border-r lg:pr-4 lg:pb-0">
+          <div className="flex items-center justify-between px-2 py-1.5">
+            <h2 className="font-display text-sm font-semibold text-white">Meetings</h2>
+            <div className="flex items-center gap-1">
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDelete(m.id);
-                }}
-                className="opacity-0 transition group-hover:opacity-100 hover:text-rose-400"
-                title="Delete meeting"
+                onClick={() => setShowNewSessionForm((v) => !v)}
+                title="New session"
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/[0.06] hover:text-white"
               >
-                <Trash2 className="h-3 w-3" />
+                <Plus className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setLeftSidebarOpen(false)}
+                title="Hide Meetings sidebar"
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/[0.06] hover:text-white"
+              >
+                <PanelLeftClose className="h-3.5 w-3.5" />
               </button>
             </div>
-          ))}
-        </div>
+          </div>
+
+          {/* + New session button */}
+          <button
+            type="button"
+            onClick={() => setShowNewSessionForm((v) => !v)}
+            className="mt-1 flex items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-medium text-white transition hover:bg-white/[0.06]"
+          >
+            <Plus className="h-4 w-4 text-zinc-300" />
+            <span>New session</span>
+          </button>
+
+          {showNewSessionForm && (
+            <form
+              onSubmit={handleStartSession}
+              className="mt-2 space-y-2 rounded-xl border border-white/[0.08] bg-[#101624] p-2.5"
+            >
+              <input
+                type="text"
+                autoFocus
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Session title..."
+                className="studio-input h-8 w-full rounded-lg px-2.5 text-xs"
+              />
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={meetingType}
+                  onChange={(e) => setMeetingType(e.target.value as typeof meetingType)}
+                  className="studio-input h-8 flex-1 rounded-lg px-2 text-xs"
+                >
+                  <option value="interview">Interview</option>
+                  <option value="meeting">Meeting</option>
+                  <option value="standup">Standup</option>
+                  <option value="client_call">Client Call</option>
+                </select>
+                <button
+                  type="submit"
+                  disabled={starting}
+                  className="btn-ivory inline-flex h-8 items-center rounded-lg px-3 text-xs"
+                >
+                  {starting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Start"}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Sessions List */}
+          <div className="mt-3 flex-1 overflow-y-auto px-1">
+            <p className="px-1.5 text-[11px] font-medium text-zinc-400">
+              Sessions ({meetings.length})
+            </p>
+            <div className="mt-1.5 space-y-1">
+              {loading ? (
+                <div className="flex items-center gap-2 px-2 py-4 text-xs text-zinc-400">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-400" />
+                  Loading...
+                </div>
+              ) : meetings.length === 0 ? (
+                <div className="px-2 py-3 text-xs text-zinc-500">No sessions yet</div>
+              ) : (
+                meetings.map((m) => {
+                  const isSelected = selected?.id === m.id;
+                  return (
+                    <div
+                      key={m.id}
+                      onClick={() => handleSelectMeeting(m.id)}
+                      className={`group flex cursor-pointer items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left transition ${
+                        isSelected ? "bg-white/[0.08] text-white" : "text-zinc-300 hover:bg-white/[0.04]"
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-medium text-white">{m.title}</p>
+                        <p className="mt-0.5 truncate text-[11px] text-zinc-500">
+                          {new Date(m.startedAt).toLocaleDateString([], {
+                            month: "short",
+                            day: "numeric",
+                          })}{" "}
+                          · {m.meetingType.replace("_", " ")}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(m.id);
+                        }}
+                        className="rounded p-1 text-zinc-500 opacity-0 transition group-hover:opacity-100 hover:bg-rose-500/15 hover:text-rose-400"
+                        title="Delete session"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </aside>
       )}
 
-      {/* Main Meeting Room Container */}
-      {loading ? (
-        <div className="nohby-frame flex items-center justify-center py-12 text-xs text-zinc-400">
-          <Loader2 className="mr-2 h-4 w-4 animate-spin text-[#00D4FF]" />
-          Loading meeting sessions...
-        </div>
-      ) : !selected ? (
-        <div className="nohby-frame p-6 text-center">
-          <p className="text-sm font-semibold text-white">No Meeting Session Active</p>
-          <p className="mt-1 text-xs text-zinc-400">
-            Create a session above or connect your calendar to auto-join and catch questions in stealth mode.
-          </p>
-        </div>
-      ) : (
-        <div className="nohby-frame space-y-4 p-4 sm:p-5">
-          {/* Header Row */}
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="font-display text-base font-bold text-white">{selected.title}</h2>
-                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-400">
-                  <Shield className="h-3 w-3" />
-                  Invisible on Screen Share
-                </span>
-              </div>
-              <p className="mt-0.5 text-[11px] text-zinc-400">
-                Started{" "}
-                {new Date(selected.startedAt).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}{" "}
-                • Local Private Audio • Personalized First-Person Answers ({user?.name || "You"})
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  isRecordingAudio ? stopLiveRecording() : startLiveRecording(selected)
-                }
-                className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3.5 text-xs font-medium transition ${
-                  isRecordingAudio
-                    ? "border-rose-500/60 bg-rose-500/20 text-rose-300"
-                    : "border-white/[0.12] bg-[#151D2E] text-zinc-200 hover:border-[#00D4FF]/50"
-                }`}
-              >
-                <Radio className={`h-3 w-3 ${isRecordingAudio ? "animate-ping text-rose-400" : "text-[#00D4FF]"}`} />
-                {isRecordingAudio
-                  ? `Stop Recording (${Math.floor(recordingSeconds / 60)}:${String(
-                      recordingSeconds % 60
-                    ).padStart(2, "0")})`
-                  : "Record Audio"}
-              </button>
-
-              <button
-                type="button"
-                disabled={convertingAudio}
-                onClick={handleConvertMeetingToAudioAndExport}
-                className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#00D4FF]/40 bg-[#00D4FF]/15 px-3.5 text-xs font-medium text-[#00D4FF] transition hover:bg-[#00D4FF]/25"
-              >
-                {convertingAudio ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Headphones className="h-3 w-3" />
-                )}
-                Convert to Audio &amp; Export
-              </button>
-
-              <button
-                type="button"
-                disabled={generatingDoc}
-                onClick={handleGenerateDocument}
-                className="inline-flex h-8 items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-3.5 text-xs font-medium text-emerald-300 transition hover:bg-emerald-500/25"
-              >
-                {generatingDoc ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <FileText className="h-3 w-3" />
-                )}
-                Extract Key Points &amp; Generate Doc
-              </button>
-
-              {selected.status !== "completed" && (
-                <button
-                  type="button"
-                  onClick={handleStopAndSummarise}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-full border border-rose-500/35 bg-rose-500/15 px-3.5 text-xs font-medium text-rose-400 transition hover:bg-rose-500/25"
-                >
-                  <Square className="h-3 w-3" /> End &amp; Summarise
-                </button>
-              )}
-
-              <button
-                type="button"
-                disabled={pushingTasks}
-                onClick={handlePushActionsToTasks}
-                className="inline-flex h-8 items-center gap-1.5 rounded-full border border-violet-500/40 bg-violet-500/15 px-3.5 text-xs font-medium text-violet-300 transition hover:bg-violet-500/25"
-              >
-                {pushingTasks && <Loader2 className="h-3 w-3 animate-spin" />}
-                Push Actions to Tasks
-              </button>
-            </div>
-          </div>
-
-          {/* 30-Bar Real-Time Sound Level Waveform Bar */}
-          <div className="flex items-center gap-3.5 rounded-xl border border-white/[0.08] bg-[#101624] px-4 py-3">
+      {/* ============================================================
+          RIGHT MAIN STAGE: Clean Standard Meeting Workspace
+          ============================================================ */}
+      <section className="flex flex-1 flex-col overflow-hidden">
+        {!leftSidebarOpen && (
+          <div className="mb-2 flex items-center">
             <button
               type="button"
-              onClick={toggleBackgroundMic}
-              disabled={selected.status === "completed"}
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white shadow transition ${
-                isListening
-                  ? "bg-gradient-to-br from-rose-500 to-fuchsia-600"
-                  : "bg-gradient-to-br from-[#00D4FF] to-[#0066FF]"
-              }`}
-              title={isListening ? "Stop background listening" : "Start background listening"}
+              onClick={() => setLeftSidebarOpen(true)}
+              className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-white/[0.1] bg-[#141B2D]/80 px-2.5 text-[11px] font-medium text-zinc-300 hover:text-white"
             >
-              {isListening ? (
-                <MicOff className="h-4 w-4" />
-              ) : selected.status === "completed" ? (
-                <Play className="h-4 w-4 fill-current" />
-              ) : (
-                <Mic className="h-4 w-4" />
-              )}
+              <PanelLeftOpen className="h-3.5 w-3.5" />
+              <span>Sessions</span>
             </button>
+          </div>
+        )}
 
-            <div className="min-w-0 flex-1">
-              <div className="mb-1.5 flex items-center justify-between font-mono text-[10px] text-zinc-500">
-                <span className="flex items-center gap-2">
-                  <span>{isListening ? "LIVE CAPTURE" : `${selected.transcriptCount} SEGMENTS`}</span>
-                  {isListening && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-[#00D4FF]/15 px-2 py-0.5 text-[9px] font-semibold text-[#00D4FF]">
-                      <span className="h-1.5 w-1.5 animate-ping rounded-full bg-[#00D4FF]" />
-                      {Math.max(...waveLevels) > 0.45
-                        ? "SOUND: HIGH"
-                        : Math.max(...waveLevels) > 0.22
-                          ? "SOUND: ACTIVE"
-                          : "SOUND: LOW"}
-                    </span>
-                  )}
-                </span>
-                <span>{selected.status.toUpperCase()}</span>
+        {!selected ? (
+          <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-white/[0.08] bg-[#101624] p-8 text-center">
+            <h2 className="font-display text-base font-semibold text-white">
+              Select or start a meeting session
+            </h2>
+            <p className="mt-1 max-w-md text-xs text-zinc-400">
+              Capture live questions, record session audio, save meeting notes, and generate structured documents.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowNewSessionForm(true)}
+              className="btn-ivory mt-4 inline-flex h-8 items-center gap-1.5 rounded-lg px-4 text-xs"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Start New Session
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#101624]">
+            {/* Clean Standard Header Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] px-5 py-3.5">
+              <div className="min-w-0">
+                <h1 className="font-display truncate text-base font-semibold text-white">
+                  {selected.title}
+                </h1>
+                <p className="mt-0.5 text-xs text-zinc-400 capitalize">
+                  {selected.meetingType.replace("_", " ")} ·{" "}
+                  {new Date(selected.startedAt).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}{" "}
+                  · {selected.transcriptCount} segment{selected.transcriptCount === 1 ? "" : "s"}
+                </p>
               </div>
-              <div className="flex h-7 items-center gap-1.5 overflow-hidden">
-                {WAVE_BARS.map((baseH, i) => {
-                  const activeBar = isListening
-                    ? true
-                    : i < Math.min(WAVE_BARS.length, Math.max(6, selected.transcriptCount * 3));
-                  const level = waveLevels[i] ?? 0.16;
-                  const liveHeight = isListening
-                    ? Math.max(5, Math.min(28, Math.round(4 + level * 24)))
-                    : baseH;
-                  const isLoudPeak = isListening && level > 0.42;
-                  return (
-                    <span
-                      key={i}
-                      style={{ height: `${liveHeight}px` }}
-                      className={`w-2 flex-1 rounded-full transition-all duration-75 ${
-                        activeBar
-                          ? isLoudPeak
-                            ? "bg-gradient-to-t from-[#0094E8] to-[#00E5FF] shadow-[0_0_10px_rgba(0,212,255,0.65)]"
-                            : "bg-[#00D4FF]"
-                          : "bg-slate-600/40"
-                      }`}
-                    />
-                  );
-                })}
+
+              {/* Standard Control Bar */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* 1. Microphone Listen + Compact Sound Equalizer */}
+                <div className="flex items-center gap-2 rounded-lg border border-white/[0.1] bg-[#151C2C] px-2.5 py-1">
+                  <button
+                    type="button"
+                    onClick={toggleBackgroundMic}
+                    disabled={selected.status === "completed"}
+                    className={`inline-flex h-6 items-center gap-1.5 rounded-md px-2 text-xs font-medium transition ${
+                      isListening
+                        ? "bg-rose-500/20 text-rose-300"
+                        : "bg-white/[0.08] text-white hover:bg-white/[0.14]"
+                    }`}
+                  >
+                    {isListening ? (
+                      <>
+                        <MicOff className="h-3 w-3" />
+                        <span>Stop</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="h-3 w-3" />
+                        <span>Listen</span>
+                      </>
+                    )}
+                  </button>
+                  <div className="flex h-4 w-24 items-center gap-0.5 overflow-hidden">
+                    {WAVE_BARS.slice(0, 16).map((baseH, i) => {
+                      const level = waveLevels[i] ?? 0.16;
+                      const h = isListening
+                        ? Math.max(3, Math.min(16, Math.round(3 + level * 14)))
+                        : Math.max(3, Math.round(baseH * 0.45));
+                      return (
+                        <span
+                          key={i}
+                          style={{ height: `${h}px` }}
+                          className={`w-1 flex-1 rounded-full transition-all duration-75 ${
+                            isListening ? "bg-[#00D4FF]" : "bg-zinc-600/50"
+                          }`}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. Audio Record Toggle */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    isRecordingAudio ? stopLiveRecording() : startLiveRecording(selected)
+                  }
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition ${
+                    isRecordingAudio
+                      ? "border-rose-500/45 bg-rose-500/15 text-rose-300"
+                      : "border-white/[0.1] bg-[#151C2C] text-zinc-200 hover:text-white"
+                  }`}
+                >
+                  <Radio
+                    className={`h-3 w-3 ${isRecordingAudio ? "animate-pulse text-rose-400" : "text-zinc-400"}`}
+                  />
+                  <span>
+                    {isRecordingAudio
+                      ? `${Math.floor(recordingSeconds / 60)}:${String(
+                          recordingSeconds % 60
+                        ).padStart(2, "0")}`
+                      : "Record"}
+                  </span>
+                </button>
+
+                {/* 3. Stealth Card Toggle (Off by default — only opens modal when enabled) */}
+                <button
+                  type="button"
+                  onClick={handleToggleStealthCard}
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition ${
+                    showStealthCard
+                      ? "border-white/25 bg-white text-zinc-950"
+                      : "border-white/[0.1] bg-[#151C2C] text-zinc-300 hover:text-white"
+                  }`}
+                  title="Enable or hide the movable Stealth Answer Card"
+                >
+                  <Shield className="h-3.5 w-3.5" />
+                  <span>Stealth Card: {showStealthCard ? "On" : "Off"}</span>
+                </button>
+
+                {/* 4. Standard Actions Dropdown Menu */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setActionsMenuOpen((v) => !v)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.1] bg-[#151C2C] px-3 text-xs font-medium text-zinc-200 transition hover:text-white"
+                  >
+                    <span>Actions</span>
+                    <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />
+                  </button>
+
+                  {actionsMenuOpen && (
+                    <div className="dropdown-surface absolute right-0 top-full z-30 mt-1.5 w-60 rounded-xl border border-white/[0.1] p-1.5 shadow-2xl">
+                      <button
+                        type="button"
+                        disabled={generatingDoc}
+                        onClick={handleGenerateDocument}
+                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-zinc-200 hover:bg-white/[0.06]"
+                      >
+                        <FileText className="h-3.5 w-3.5 text-zinc-400" />
+                        <span>Extract Key Points &amp; Generate Doc</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={convertingAudio}
+                        onClick={handleConvertMeetingToAudioAndExport}
+                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-zinc-200 hover:bg-white/[0.06]"
+                      >
+                        <Headphones className="h-3.5 w-3.5 text-zinc-400" />
+                        <span>Convert to Audio &amp; Export</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDownloadTranscript}
+                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-zinc-200 hover:bg-white/[0.06]"
+                      >
+                        <Download className="h-3.5 w-3.5 text-zinc-400" />
+                        <span>Save Transcript (.txt)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={toggleExternalStealthCardWindow}
+                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-zinc-200 hover:bg-white/[0.06]"
+                      >
+                        <PictureInPicture2 className="h-3.5 w-3.5 text-zinc-400" />
+                        <span>
+                          {externalStealthActive
+                            ? "Close External Background Card"
+                            : "Float Card on Device Background"}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pushingTasks}
+                        onClick={handlePushActionsToTasks}
+                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-zinc-200 hover:bg-white/[0.06]"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5 text-zinc-400" />
+                        <span>Send Action Items to Tasks</span>
+                      </button>
+                      {selected.status !== "completed" && (
+                        <button
+                          type="button"
+                          onClick={handleStopAndSummarise}
+                          className="mt-1 flex w-full items-center gap-2 border-t border-white/[0.06] px-2.5 pt-2 pb-1.5 text-left text-xs text-rose-400 hover:bg-rose-500/10"
+                        >
+                          <Square className="h-3.5 w-3.5" />
+                          <span>End &amp; Summarise Session</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Navigation Tabs */}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-1.5">
+            {/* Clean Standard Underline Tabs */}
+            <div className="flex items-center gap-6 border-b border-white/[0.08] px-5">
               {(
                 [
-                  { id: "transcript", label: "Live Transcript & Q&A" },
-                  { id: "keypoints", label: "Key Points, Notes & Doc" },
-                  { id: "audio", label: `Audio & Recordings (${savedAudioClips.length})` },
-                  { id: "calendar", label: `Calendar & Auto-Join (${scheduledMeetings.length})` },
-                  { id: "actions", label: "Action Items" },
+                  { id: "transcript", label: "Transcript & Answers" },
+                  { id: "notes", label: "Notes & Document" },
+                  { id: "audio", label: `Audio (${savedAudioClips.length})` },
+                  { id: "calendar", label: `Calendar (${scheduledMeetings.length})` },
                 ] as const
               ).map((t) => (
                 <button
                   key={t.id}
                   type="button"
                   onClick={() => setActiveTab(t.id)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                  className={`border-b-2 py-2.5 text-xs font-medium transition ${
                     activeTab === t.id
-                      ? "border border-[#00D4FF]/40 bg-[#00D4FF]/15 text-[#00D4FF]"
-                      : "text-zinc-400 hover:text-white"
+                      ? "border-white text-white"
+                      : "border-transparent text-zinc-400 hover:text-zinc-200"
                   }`}
                 >
                   {t.label}
@@ -1357,495 +1433,279 @@ export function MeetingsScreen() {
               ))}
             </div>
 
-            <button
-              type="button"
-              onClick={handleDownloadTranscript}
-              className="inline-flex h-7 items-center gap-1 rounded-lg border border-white/[0.1] bg-[#141B2D] px-2.5 text-[11px] font-medium text-zinc-300 transition hover:border-[#00D4FF]/40 hover:text-white"
-            >
-              <Download className="h-3 w-3 text-[#00D4FF]" />
-              Save Transcript (.txt)
-            </button>
-          </div>
-
-          {/* TAB 1: LIVE TRANSCRIPT & CAUGHT Q&A */}
-          {activeTab === "transcript" && (
-            <div className="space-y-2.5">
-              {selected.status !== "completed" && (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!manualInput.trim()) return;
-                    sendTranscriptSegment(selected.id, manualInput.trim(), "Interviewer");
-                    setManualInput("");
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  <input
-                    type="text"
-                    value={manualInput}
-                    onChange={(e) => setManualInput(e.target.value)}
-                    placeholder="Type or speak any interview/meeting question to get your instant first-person answer..."
-                    className="studio-input h-8 flex-1 rounded-lg px-3 text-xs"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!manualInput.trim()}
-                    className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#00D4FF]/35 bg-[#00D4FF]/10 px-3 text-xs font-medium text-[#00D4FF]"
-                  >
-                    <Send className="h-3 w-3" /> Catch &amp; Answer
-                  </button>
-                </form>
-              )}
-
-              {liveCaption && (
-                <div className="rounded-xl border border-[#00D4FF]/30 bg-[#00D4FF]/10 px-3.5 py-2 text-xs italic text-[#00D4FF]">
-                  Catching live speech: &ldquo;{liveCaption}&rdquo;
-                </div>
-              )}
-
-              {!selected.transcripts || selected.transcripts.length === 0 ? (
-                <div className="rounded-xl border border-white/[0.07] bg-[#101624] px-4 py-8 text-center text-xs text-zinc-500">
-                  Press the blue mic button above to listen silently in the background. Any question asked will be caught and answered in the first person based on your skills and experience.
-                </div>
-              ) : (
-                selected.transcripts.map((seg) => (
-                  <div
-                    key={seg.id}
-                    className="rounded-xl border border-white/[0.07] bg-[#101624] px-4 py-3"
-                  >
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-amber-400">
-                        {seg.speaker} (Caught Question)
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-[11px] text-zinc-500">
-                          {new Date(seg.createdAt).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            second: "2-digit",
-                          })}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteSegment(seg.id)}
-                          className="rounded p-1 text-zinc-500 transition hover:bg-rose-500/15 hover:text-rose-400"
-                          title="Delete this saved transcript entry"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
+            {/* Main Scrollable Content Area */}
+            <div className="flex-1 overflow-y-auto p-5">
+              {/* TAB 1: TRANSCRIPT & ANSWERS */}
+              {activeTab === "transcript" && (
+                <div className="mx-auto max-w-3xl space-y-3">
+                  {liveCaption && (
+                    <div className="rounded-xl border border-white/[0.1] bg-[#151C2C] px-4 py-2.5 text-xs text-zinc-300">
+                      Listening: &ldquo;{liveCaption}&rdquo;
                     </div>
-                    <p className="mt-1 text-xs leading-relaxed text-zinc-200">
-                      {cleanDisplayText(seg.content)}
-                    </p>
-                    {seg.aiHint && (
-                      <div className="mt-2.5 rounded-lg border border-[#00D4FF]/35 bg-gradient-to-r from-[#00D4FF]/10 to-violet-500/10 p-2.5">
-                        <div className="flex items-center justify-between">
-                          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#00D4FF]">
-                            <Sparkles className="h-3 w-3" />
-                            Answer As You (First-Person Script)
-                          </span>
-                          <div className="flex items-center gap-1.5">
+                  )}
+
+                  {!selected.transcripts || selected.transcripts.length === 0 ? (
+                    <div className="rounded-xl border border-white/[0.06] bg-[#131926] px-5 py-10 text-center">
+                      <p className="text-xs font-medium text-zinc-300">No transcript segments yet</p>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        Click Listen above or type a question below. NohbyAI will generate a direct first-person response based on your experience.
+                      </p>
+                    </div>
+                  ) : (
+                    selected.transcripts.map((seg) => (
+                      <div
+                        key={seg.id}
+                        className="rounded-xl border border-white/[0.07] bg-[#131926] p-4"
+                      >
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-medium text-zinc-300">{seg.speaker}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-zinc-500">
+                              {new Date(seg.createdAt).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
                             <button
                               type="button"
-                              onClick={() => {
-                                navigator.clipboard
-                                  .writeText(cleanDisplayText(seg.aiHint))
-                                  .then(() => showToast("info", "Answer copied."))
-                                  .catch(() => null);
-                              }}
-                              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-zinc-300 hover:bg-white/[0.08]"
+                              onClick={() => handleDeleteSegment(seg.id)}
+                              className="rounded p-1 text-zinc-500 hover:bg-rose-500/15 hover:text-rose-400"
+                              title="Delete entry"
                             >
-                              <Copy className="h-2.5 w-2.5" /> Copy
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                speakText(cleanDisplayText(seg.aiHint), {
-                                  language: voiceSettings?.inputLanguage || "en-US",
-                                  voiceType: voiceSettings?.voiceType || "female",
-                                })
-                              }
-                              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-[#00D4FF] hover:bg-white/[0.08]"
-                            >
-                              <Volume2 className="h-2.5 w-2.5" /> Speak
+                              <Trash2 className="h-3 w-3" />
                             </button>
                           </div>
                         </div>
-                        <p className="mt-1 text-xs font-medium leading-relaxed text-white">
-                          {cleanDisplayText(seg.aiHint)}
+
+                        <p className="mt-1.5 text-xs leading-relaxed text-zinc-200">
+                          {cleanDisplayText(seg.content)}
                         </p>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          )}
 
-          {/* TAB 2: KEY POINTS, SAVED MEETING NOTES & DOCUMENT GENERATION */}
-          {activeTab === "keypoints" && (
-            <div className="grid gap-3.5 lg:grid-cols-2">
-              {/* Saved Meeting Notes Editor */}
-              <div className="rounded-xl border border-white/[0.08] bg-[#101624] p-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-display text-xs font-semibold text-white">
-                    Saved Meeting Notes
-                  </h3>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => updateCurrentNotes("")}
-                      className="inline-flex h-7 items-center gap-1 rounded-lg border border-white/[0.08] px-2 text-[10px] text-zinc-400 hover:text-rose-400"
-                    >
-                      <Trash2 className="h-3 w-3" /> Clear
-                    </button>
-                    <button
-                      type="button"
-                      disabled={savingNotes}
-                      onClick={handleSaveNotes}
-                      className="btn-ivory inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-[10px]"
-                    >
-                      {savingNotes ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Save className="h-3 w-3" />
-                      )}
-                      Save Notes
-                    </button>
-                  </div>
-                </div>
-                <textarea
-                  rows={7}
-                  value={currentNotes}
-                  onChange={(e) => updateCurrentNotes(e.target.value)}
-                  placeholder="Write or edit your meeting notes here. NohbyAI also auto-populates key takeaways when you summarise..."
-                  className="studio-input mt-2.5 w-full rounded-lg p-3 text-xs leading-relaxed"
-                />
-              </div>
-
-              {/* Extracted Key Points & One-Click Document Generator */}
-              <div className="rounded-xl border border-white/[0.08] bg-[#101624] p-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-display text-xs font-semibold text-white">
-                    Extracted Key Points &amp; Meeting Document
-                  </h3>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      disabled={generatingDoc}
-                      onClick={handleGenerateDocument}
-                      className="inline-flex h-7 items-center gap-1 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-2.5 text-[10px] font-semibold text-emerald-300 hover:bg-emerald-500/25"
-                    >
-                      {generatingDoc ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <FileText className="h-3 w-3" />
-                      )}
-                      Generate Document &amp; Save to Library
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRoute("files")}
-                      className="inline-flex h-7 items-center gap-1 rounded-lg border border-white/[0.1] px-2 text-[10px] text-zinc-300 hover:text-white"
-                    >
-                      Open Library
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-2.5 max-h-48 space-y-1.5 overflow-y-auto text-xs text-zinc-300">
-                  {generatedDocText ? (
-                    <pre className="whitespace-pre-wrap rounded-lg border border-emerald-500/30 bg-[#0B101C] p-3 font-sans text-[11px] leading-relaxed text-zinc-200">
-                      {generatedDocText}
-                    </pre>
-                  ) : selected.transcripts && selected.transcripts.length > 0 ? (
-                    selected.transcripts.map((seg, i) => (
-                      <div
-                        key={seg.id}
-                        className="rounded-lg border border-white/[0.06] bg-[#141C2E] px-3 py-2"
-                      >
-                        <p className="text-[11px] font-medium text-white">
-                          {i + 1}. {cleanDisplayText(seg.content)}
-                        </p>
                         {seg.aiHint && (
-                          <p className="mt-0.5 text-[11px] text-[#00D4FF]">
-                            → {cleanDisplayText(seg.aiHint)}
-                          </p>
+                          <div className="mt-3 border-t border-white/[0.06] pt-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-medium text-zinc-400">
+                                Suggested Response (First Person)
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard
+                                      .writeText(cleanFirstPersonAnswer(seg.aiHint))
+                                      .then(() => showToast("info", "Copied."))
+                                      .catch(() => null);
+                                  }}
+                                  className="inline-flex items-center gap-1 text-[11px] text-zinc-400 hover:text-white"
+                                >
+                                  <Copy className="h-3 w-3" /> Copy
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    speakText(cleanFirstPersonAnswer(seg.aiHint), {
+                                      language: voiceSettings?.inputLanguage || "en-US",
+                                      voiceType: voiceSettings?.voiceType || "female",
+                                    })
+                                  }
+                                  className="inline-flex items-center gap-1 text-[11px] text-zinc-400 hover:text-white"
+                                >
+                                  <Volume2 className="h-3 w-3" /> Speak
+                                </button>
+                              </div>
+                            </div>
+                            <p className="mt-1 text-xs leading-relaxed text-white">
+                              {cleanFirstPersonAnswer(seg.aiHint)}
+                            </p>
+                          </div>
                         )}
                       </div>
                     ))
-                  ) : (
-                    <p className="py-4 text-xs text-zinc-400">
-                      {selected.summary
-                        ? cleanDisplayText(selected.summary)
-                        : "Click 'Extract Key Points & Generate Doc' to build a dedicated document from this meeting."}
-                    </p>
                   )}
-                </div>
-                {generatedDocFilename && (
-                  <p className="mt-2 text-[10px] text-emerald-400">
-                    Saved to Library as: {generatedDocFilename}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
 
-          {/* TAB 3: AUDIO RECORDINGS & NEURAL AUDIO EXPORT */}
-          {activeTab === "audio" && (
-            <div className="space-y-3 rounded-xl border border-white/[0.08] bg-[#101624] p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h3 className="font-display text-xs font-semibold text-white">
-                    Meeting Audio Recordings &amp; Neural Audio Exports
-                  </h3>
-                  <p className="text-[11px] text-zinc-400">
-                    Record the live meeting session or convert the meeting summary &amp; transcript into studio neural audio (.mp3 / .wav).
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      isRecordingAudio ? stopLiveRecording() : startLiveRecording(selected)
-                    }
-                    className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium ${
-                      isRecordingAudio
-                        ? "border-rose-500/50 bg-rose-500/20 text-rose-300"
-                        : "border-white/[0.12] bg-[#161F33] text-white"
-                    }`}
-                  >
-                    <Radio className="h-3.5 w-3.5 text-rose-400" />
-                    {isRecordingAudio ? "Stop & Save Recording" : "Start Live Audio Recording"}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={convertingAudio}
-                    onClick={handleConvertMeetingToAudioAndExport}
-                    className="btn-ivory inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs"
-                  >
-                    {convertingAudio ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Headphones className="h-3.5 w-3.5" />
-                    )}
-                    Convert Meeting to Audio &amp; Export
-                  </button>
-                </div>
-              </div>
-
-              {savedAudioClips.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-white/[0.1] py-8 text-center text-xs text-zinc-400">
-                  No audio recordings or exports yet. Click &ldquo;Start Live Audio Recording&rdquo; or &ldquo;Convert Meeting to Audio &amp; Export&rdquo; above.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {savedAudioClips.map((clip) => (
-                    <div
-                      key={clip.id}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-[#141C2E] px-3.5 py-2.5"
+                  {selected.status !== "completed" && (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!manualInput.trim()) return;
+                        sendTranscriptSegment(selected.id, manualInput.trim(), "Interviewer");
+                        setManualInput("");
+                      }}
+                      className="flex items-center gap-2 pt-2"
                     >
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-semibold text-white">{clip.title}</p>
-                        <p className="text-[10px] text-zinc-400">
-                          {clip.kind === "live_recording" ? "Live Microphone Recording" : "Studio Neural Audio Brief"}{" "}
-                          • {new Date(clip.createdAt).toLocaleTimeString()}
-                        </p>
-                      </div>
-                      <audio controls src={clip.url} className="h-8 max-w-[240px]" />
-                      <div className="flex items-center gap-1.5">
-                        <a
-                          href={clip.url}
-                          download={`${clip.title.replace(/\s+/g, "-")}.${
-                            clip.mimeType.includes("wav") ? "wav" : clip.mimeType.includes("webm") ? "webm" : "mp3"
-                          }`}
-                          className="inline-flex h-7 items-center gap-1 rounded-lg border border-[#00D4FF]/40 bg-[#00D4FF]/15 px-2.5 text-[10px] font-medium text-[#00D4FF]"
-                        >
-                          <Download className="h-3 w-3" /> Export
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() => handleSaveRecordingToLibrary(clip)}
-                          className="inline-flex h-7 items-center gap-1 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-2.5 text-[10px] font-medium text-emerald-300"
-                        >
-                          <Save className="h-3 w-3" /> Save to Library
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSavedAudioClips((prev) => prev.filter((c) => c.id !== clip.id))
-                          }
-                          className="rounded-lg p-1.5 text-zinc-400 hover:bg-rose-500/15 hover:text-rose-400"
-                          title="Delete audio clip"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 4: CALENDAR CONNECTION, ALERTS & AUTO-JOIN / AUTO-RECORD */}
-          {activeTab === "calendar" && (
-            <div className="grid gap-3.5 lg:grid-cols-2">
-              <div className="rounded-xl border border-white/[0.08] bg-[#101624] p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-[#00D4FF]" />
-                    <h3 className="font-display text-xs font-semibold text-white">
-                      Connect Calendar &amp; Schedule Auto-Join
-                    </h3>
-                  </div>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                      calendarConnected
-                        ? "bg-emerald-500/15 text-emerald-400"
-                        : "bg-zinc-500/15 text-zinc-400"
-                    }`}
-                  >
-                    {calendarConnected ? `${calendarProvider} Connected` : "Not Connected"}
-                  </span>
-                </div>
-
-                <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                  <select
-                    value={calendarProvider}
-                    onChange={(e) =>
-                      setCalendarProvider(e.target.value as typeof calendarProvider)
-                    }
-                    className="studio-input h-8 rounded-lg px-2.5 text-xs"
-                  >
-                    <option value="Google Calendar">Google Calendar</option>
-                    <option value="iCloud Calendar">iCloud Calendar</option>
-                    <option value="Outlook Calendar">Outlook Calendar</option>
-                  </select>
-                  <button
-                    type="button"
-                    onClick={handleConnectCalendar}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#00D4FF]/40 bg-[#00D4FF]/15 px-3 text-xs font-medium text-[#00D4FF]"
-                  >
-                    <Bell className="h-3.5 w-3.5" />
-                    {calendarConnected ? "Re-Sync Calendar" : "Connect Calendar"}
-                  </button>
-                </div>
-
-                <form onSubmit={handleScheduleCalendarMeeting} className="mt-3.5 space-y-2.5">
-                  <div>
-                    <label className="block text-[10px] font-medium text-zinc-400">
-                      Meeting Title
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={calTitle}
-                      onChange={(e) => setCalTitle(e.target.value)}
-                      placeholder="e.g. Senior AI Engineer Technical Interview"
-                      className="studio-input mt-1 h-8 w-full rounded-lg px-3 text-xs"
-                    />
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <div>
-                      <label className="block text-[10px] font-medium text-zinc-400">
-                        Date &amp; Time
-                      </label>
-                      <input
-                        type="datetime-local"
-                        required
-                        value={calDateTime}
-                        onChange={(e) => setCalDateTime(e.target.value)}
-                        className="studio-input mt-1 h-8 w-full rounded-lg px-2.5 text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-medium text-zinc-400">
-                        Meeting Link (Zoom / Meet / Teams)
-                      </label>
                       <input
                         type="text"
-                        value={calUrl}
-                        onChange={(e) => setCalUrl(e.target.value)}
-                        placeholder="https://meet.google.com/..."
-                        className="studio-input mt-1 h-8 w-full rounded-lg px-2.5 text-xs"
+                        value={manualInput}
+                        onChange={(e) => setManualInput(e.target.value)}
+                        placeholder="Add a question or transcript line..."
+                        className="studio-input h-9 flex-1 rounded-lg px-3 text-xs"
                       />
+                      <button
+                        type="submit"
+                        disabled={!manualInput.trim()}
+                        className="btn-ivory inline-flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs"
+                      >
+                        <Send className="h-3.5 w-3.5" /> Add
+                      </button>
+                    </form>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 2: NOTES & DOCUMENT */}
+              {activeTab === "notes" && (
+                <div className="mx-auto max-w-3xl space-y-4">
+                  <div className="rounded-xl border border-white/[0.08] bg-[#131926] p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="text-xs font-semibold text-white">Meeting Notes</h3>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => updateCurrentNotes("")}
+                          className="h-7 rounded-lg border border-white/[0.08] px-2.5 text-[11px] text-zinc-400 hover:text-rose-400"
+                        >
+                          Clear
+                        </button>
+                        <button
+                          type="button"
+                          disabled={savingNotes}
+                          onClick={handleSaveNotes}
+                          className="inline-flex h-7 items-center gap-1 rounded-lg border border-white/[0.12] bg-[#182032] px-3 text-[11px] font-medium text-white"
+                        >
+                          {savingNotes ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Save className="h-3 w-3" />
+                          )}
+                          Save Notes
+                        </button>
+                        <button
+                          type="button"
+                          disabled={generatingDoc}
+                          onClick={handleGenerateDocument}
+                          className="btn-ivory inline-flex h-7 items-center gap-1 rounded-lg px-3 text-[11px]"
+                        >
+                          {generatingDoc ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <FileText className="h-3 w-3" />
+                          )}
+                          Generate Document
+                        </button>
+                      </div>
+                    </div>
+                    <textarea
+                      rows={8}
+                      value={currentNotes}
+                      onChange={(e) => updateCurrentNotes(e.target.value)}
+                      placeholder="Write meeting notes or key decisions here..."
+                      className="studio-input mt-3 w-full rounded-lg p-3 text-xs leading-relaxed"
+                    />
+                  </div>
+
+                  {generatedDocText && (
+                    <div className="rounded-xl border border-white/[0.08] bg-[#131926] p-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-white">
+                          Generated Document ({generatedDocFilename})
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setRoute("files")}
+                          className="text-xs text-zinc-300 underline hover:text-white"
+                        >
+                          View in Library
+                        </button>
+                      </div>
+                      <pre className="mt-2.5 max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg border border-white/[0.06] bg-[#0D121C] p-3 font-sans text-xs leading-relaxed text-zinc-200">
+                        {generatedDocText}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 3: AUDIO & RECORDINGS */}
+              {activeTab === "audio" && (
+                <div className="mx-auto max-w-3xl space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/[0.08] bg-[#131926] p-4">
+                    <div>
+                      <h3 className="text-xs font-semibold text-white">Audio Recordings &amp; Exports</h3>
+                      <p className="mt-0.5 text-[11px] text-zinc-400">
+                        Record live session audio or convert this meeting into an audio file.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          isRecordingAudio ? stopLiveRecording() : startLiveRecording(selected)
+                        }
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.1] bg-[#182032] px-3 text-xs text-white"
+                      >
+                        <Radio className="h-3.5 w-3.5 text-rose-400" />
+                        {isRecordingAudio ? "Stop Recording" : "Record Session"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={convertingAudio}
+                        onClick={handleConvertMeetingToAudioAndExport}
+                        className="btn-ivory inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs"
+                      >
+                        {convertingAudio ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Headphones className="h-3.5 w-3.5" />
+                        )}
+                        Export Audio
+                      </button>
                     </div>
                   </div>
-                  <label className="flex cursor-pointer items-center gap-2 pt-1 text-xs text-zinc-200">
-                    <input
-                      type="checkbox"
-                      checked={calAutoJoin}
-                      onChange={(e) => setCalAutoJoin(e.target.checked)}
-                      className="h-3.5 w-3.5 accent-[#00D4FF]"
-                    />
-                    <span>
-                      Notify me at meeting time &amp; enable NohbyAI to{" "}
-                      <strong className="text-[#00D4FF]">
-                        Auto-Join, Auto-Record &amp; Auto-Take Notes
-                      </strong>
-                    </span>
-                  </label>
-                  <button
-                    type="submit"
-                    className="btn-ivory inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg text-xs"
-                  >
-                    <Calendar className="h-3.5 w-3.5" />
-                    Save Meeting to Calendar
-                  </button>
-                </form>
-              </div>
 
-              <div className="rounded-xl border border-white/[0.08] bg-[#101624] p-4">
-                <h3 className="font-display text-xs font-semibold text-white">
-                  Upcoming Calendar Meetings &amp; Auto-Join Queue
-                </h3>
-                <div className="mt-2.5 max-h-60 space-y-2 overflow-y-auto">
-                  {scheduledMeetings.length === 0 ? (
-                    <p className="py-8 text-center text-xs text-zinc-400">
-                      No calendar meetings scheduled yet. Add one on the left to enable automatic notifications and auto-recording.
-                    </p>
+                  {savedAudioClips.length === 0 ? (
+                    <div className="rounded-xl border border-white/[0.06] bg-[#131926] py-10 text-center text-xs text-zinc-500">
+                      No audio files recorded or exported yet.
+                    </div>
                   ) : (
-                    scheduledMeetings.map((item) => (
+                    savedAudioClips.map((clip) => (
                       <div
-                        key={item.id}
-                        className="rounded-xl border border-white/[0.07] bg-[#141C2E] p-3"
+                        key={clip.id}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-[#131926] px-4 py-3"
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="text-xs font-semibold text-white">{item.title}</p>
-                            <p className="mt-0.5 text-[11px] text-[#00D4FF]">
-                              {new Date(item.scheduledAt).toLocaleString([], {
-                                dateStyle: "medium",
-                                timeStyle: "short",
-                              })}{" "}
-                              • {item.provider}
-                            </p>
-                          </div>
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${
-                              item.autoJoinAndRecord
-                                ? "bg-emerald-500/15 text-emerald-400"
-                                : "bg-amber-500/15 text-amber-300"
-                            }`}
-                          >
-                            {item.autoJoinAndRecord ? "Auto-Join & Record ON" : "Alert Only"}
-                          </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-medium text-white">{clip.title}</p>
+                          <p className="text-[11px] text-zinc-500">
+                            {new Date(clip.createdAt).toLocaleTimeString()}
+                          </p>
                         </div>
-                        <div className="mt-2 flex items-center justify-end gap-1.5">
+                        <audio controls src={clip.url} className="h-8 max-w-[240px]" />
+                        <div className="flex items-center gap-1.5">
+                          <a
+                            href={clip.url}
+                            download={`${clip.title.replace(/\s+/g, "-")}.${
+                              clip.mimeType.includes("wav")
+                                ? "wav"
+                                : clip.mimeType.includes("webm")
+                                  ? "webm"
+                                  : "mp3"
+                            }`}
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-white/[0.1] px-2.5 text-[11px] text-zinc-200 hover:bg-white/[0.06]"
+                          >
+                            <Download className="h-3 w-3" /> Download
+                          </a>
                           <button
                             type="button"
-                            onClick={() => handleTriggerScheduledMeetingNow(item)}
-                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-[#00D4FF]/40 bg-[#00D4FF]/15 px-2.5 text-[10px] font-medium text-[#00D4FF]"
+                            onClick={() => handleSaveRecordingToLibrary(clip)}
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-white/[0.1] px-2.5 text-[11px] text-zinc-200 hover:bg-white/[0.06]"
                           >
-                            <Play className="h-2.5 w-2.5 fill-current" /> Join &amp; Record Now
+                            <Save className="h-3 w-3" /> Save to Library
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleDeleteCalendarMeeting(item.id)}
-                            className="rounded-lg p-1 text-zinc-400 hover:bg-rose-500/15 hover:text-rose-400"
-                            title="Delete scheduled meeting"
+                            onClick={() =>
+                              setSavedAudioClips((prev) => prev.filter((c) => c.id !== clip.id))
+                            }
+                            className="rounded-lg p-1.5 text-zinc-500 hover:bg-rose-500/15 hover:text-rose-400"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -1854,145 +1714,247 @@ export function MeetingsScreen() {
                     ))
                   )}
                 </div>
-              </div>
-            </div>
-          )}
+              )}
 
-          {/* TAB 5: ACTION ITEMS */}
-          {activeTab === "actions" && (
-            <div className="space-y-2">
-              {selected.actionItems.length === 0 ? (
-                <div className="rounded-xl border border-white/[0.08] bg-[#101624] p-4 text-xs text-zinc-400">
-                  No action items extracted yet. End &amp; Summarise the session to extract follow-ups.
-                </div>
-              ) : (
-                selected.actionItems.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between gap-2.5 rounded-xl border border-white/[0.07] bg-[#101624] px-4 py-3 text-xs text-zinc-200"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
-                      <span>{cleanDisplayText(item)}</span>
+              {/* TAB 4: CALENDAR & AUTO-JOIN */}
+              {activeTab === "calendar" && (
+                <div className="mx-auto grid max-w-3xl gap-4 sm:grid-cols-2">
+                  <div className="rounded-xl border border-white/[0.08] bg-[#131926] p-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-semibold text-white">Calendar Integration</h3>
+                      <span className="text-[11px] text-zinc-400">
+                        {calendarConnected ? "Connected" : "Not connected"}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 flex items-center gap-2">
+                      <select
+                        value={calendarProvider}
+                        onChange={(e) =>
+                          setCalendarProvider(e.target.value as typeof calendarProvider)
+                        }
+                        className="studio-input h-8 flex-1 rounded-lg px-2.5 text-xs"
+                      >
+                        <option value="Google Calendar">Google Calendar</option>
+                        <option value="iCloud Calendar">iCloud Calendar</option>
+                        <option value="Outlook Calendar">Outlook Calendar</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={handleConnectCalendar}
+                        className="inline-flex h-8 items-center rounded-lg border border-white/[0.12] bg-[#182032] px-3 text-xs font-medium text-white"
+                      >
+                        {calendarConnected ? "Sync" : "Connect"}
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleScheduleCalendarMeeting} className="mt-4 space-y-2.5">
+                      <input
+                        type="text"
+                        required
+                        value={calTitle}
+                        onChange={(e) => setCalTitle(e.target.value)}
+                        placeholder="Meeting title..."
+                        className="studio-input h-8 w-full rounded-lg px-2.5 text-xs"
+                      />
+                      <input
+                        type="datetime-local"
+                        required
+                        value={calDateTime}
+                        onChange={(e) => setCalDateTime(e.target.value)}
+                        className="studio-input h-8 w-full rounded-lg px-2.5 text-xs"
+                      />
+                      <input
+                        type="text"
+                        value={calUrl}
+                        onChange={(e) => setCalUrl(e.target.value)}
+                        placeholder="Meeting URL (optional)..."
+                        className="studio-input h-8 w-full rounded-lg px-2.5 text-xs"
+                      />
+                      <label className="flex cursor-pointer items-center gap-2 pt-1 text-xs text-zinc-300">
+                        <input
+                          type="checkbox"
+                          checked={calAutoJoin}
+                          onChange={(e) => setCalAutoJoin(e.target.checked)}
+                          className="h-3.5 w-3.5"
+                        />
+                        <span>Notify, auto-join, record &amp; take notes</span>
+                      </label>
+                      <button
+                        type="submit"
+                        className="btn-ivory inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg text-xs"
+                      >
+                        <Calendar className="h-3.5 w-3.5" />
+                        Schedule Meeting
+                      </button>
+                    </form>
+                  </div>
+
+                  <div className="rounded-xl border border-white/[0.08] bg-[#131926] p-4">
+                    <h3 className="text-xs font-semibold text-white">Upcoming Scheduled Meetings</h3>
+                    <div className="mt-3 space-y-2">
+                      {scheduledMeetings.length === 0 ? (
+                        <p className="py-8 text-center text-xs text-zinc-500">
+                          No upcoming meetings scheduled.
+                        </p>
+                      ) : (
+                        scheduledMeetings.map((item) => (
+                          <div
+                            key={item.id}
+                            className="rounded-lg border border-white/[0.07] bg-[#171E2E] p-3"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="text-xs font-medium text-white">{item.title}</p>
+                                <p className="mt-0.5 text-[11px] text-zinc-400">
+                                  {new Date(item.scheduledAt).toLocaleString([], {
+                                    dateStyle: "medium",
+                                    timeStyle: "short",
+                                  })}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteCalendarMeeting(item.id)}
+                                className="rounded p-1 text-zinc-500 hover:text-rose-400"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                            <div className="mt-2 flex items-center justify-between">
+                              <span className="text-[10px] text-zinc-400">
+                                {item.autoJoinAndRecord ? "Auto-Join & Record" : "Alert Only"}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleTriggerScheduledMeetingNow(item)}
+                                className="inline-flex h-6 items-center gap-1 rounded border border-white/[0.1] px-2 text-[10px] text-white hover:bg-white/[0.06]"
+                              >
+                                <Play className="h-2.5 w-2.5 fill-current" /> Start Now
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
-                ))
+                </div>
               )}
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </section>
 
       {/* ============================================================
-          FLOATING STEALTH MEETING & INTERVIEW ANSWER CARD MODAL
-          (Freely Draggable Anywhere, Large & Resizable, Screen-Share Invisible)
+          MOVABLE STEALTH ANSWER CARD MODAL
+          - Only renders when explicitly enabled by the user (showStealthCard === true)
+          - Smooth 360° pointer dragging in ANY direction across the entire viewport
+          - Resizable to any width & height via bottom-right resize handle or expand button
           ============================================================ */}
       {showStealthCard && selected && (
-        <motion.div
-          drag
-          dragMomentum={false}
+        <div
           style={{
-            resize: stealthCardMinimized ? "none" : "both",
-            overflow: stealthCardMinimized ? "visible" : "auto",
+            left: `${cardPos.x}px`,
+            top: `${cardPos.y}px`,
+            width: stealthCardMinimized ? "320px" : `${cardSize.width}px`,
+            height: stealthCardMinimized ? "auto" : `${cardSize.height}px`,
           }}
-          className={`dropdown-surface fixed bottom-12 left-4 z-50 rounded-2xl border border-[#00D4FF]/65 shadow-[0_16px_55px_rgba(0,180,255,0.35)] backdrop-blur-xl lg:bottom-5 lg:left-6 ${
-            stealthCardMinimized
-              ? "w-80 p-3"
-              : stealthCardExpanded
-                ? "min-h-[340px] w-[96vw] sm:w-[700px] md:w-[780px] p-5"
-                : "min-h-[260px] w-[92vw] sm:w-[540px] md:w-[620px] p-4 sm:p-5"
-          }`}
+          className="dropdown-surface fixed z-50 flex flex-col justify-between rounded-2xl border border-white/[0.16] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.65)] backdrop-blur-xl"
         >
-          {/* Draggable Header Bar */}
+          {/* 360° Free-Drag Header Bar */}
           <div
-            title="Drag this Stealth Card anywhere on your screen"
-            className="flex cursor-grab items-center justify-between gap-2 select-none active:cursor-grabbing"
+            onPointerDown={handleCardPointerDown}
+            onPointerMove={handleCardPointerMove}
+            onPointerUp={handleCardPointerUp}
+            onPointerCancel={handleCardPointerUp}
+            title="Drag to move anywhere in any direction"
+            className="flex cursor-move items-center justify-between gap-2 border-b border-white/[0.08] pb-2.5 select-none touch-none"
           >
             <div className="flex items-center gap-2">
               <GripHorizontal className="h-4 w-4 shrink-0 text-zinc-400" />
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/45 bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
-                <Shield className="h-3 w-3" />
-                Stealth Card • Screen-Share Invisible
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-white">
+                <Shield className="h-3.5 w-3.5 text-emerald-400" />
+                Stealth Response Card
               </span>
-              <span className="hidden text-[10px] text-zinc-400 sm:inline">
-                Drag anywhere • Resize corner
-              </span>
+              <span className="text-[10px] text-zinc-500">Screen-Share Protected</span>
             </div>
 
             <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={toggleExternalStealthCardWindow}
-                title="Float Stealth Card outside browser on device background"
-                className="rounded-lg p-1.5 text-zinc-400 transition hover:bg-white/[0.08] hover:text-[#00D4FF]"
+                title="Float outside browser on device background"
+                className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/[0.08] hover:text-white"
               >
-                <PictureInPicture2 className="h-4 w-4" />
+                <PictureInPicture2 className="h-3.5 w-3.5" />
               </button>
               {!stealthCardMinimized && (
                 <button
                   type="button"
-                  onClick={() => setStealthCardExpanded((v) => !v)}
-                  title={stealthCardExpanded ? "Standard Large Size" : "Expand to XL Teleprompter Size"}
-                  className={`rounded-lg p-1.5 transition ${
-                    stealthCardExpanded
-                      ? "bg-[#00D4FF]/20 text-[#00D4FF]"
-                      : "text-zinc-400 hover:bg-white/[0.08] hover:text-white"
-                  }`}
+                  onClick={() =>
+                    setCardSize((cur) =>
+                      cur.width < 720
+                        ? { width: 780, height: 420 }
+                        : { width: 620, height: 320 }
+                    )
+                  }
+                  title="Toggle Large / XL size"
+                  className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/[0.08] hover:text-white"
                 >
-                  <Maximize2 className="h-4 w-4" />
+                  <Maximize2 className="h-3.5 w-3.5" />
                 </button>
               )}
               <button
                 type="button"
                 onClick={() => setStealthCardMinimized((v) => !v)}
-                title={stealthCardMinimized ? "Expand Stealth Card" : "Minimize Stealth Card"}
-                className="rounded-lg p-1.5 text-zinc-400 transition hover:bg-white/[0.08] hover:text-white"
+                title={stealthCardMinimized ? "Expand" : "Minimize"}
+                className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/[0.08] hover:text-white"
               >
-                <Minimize2 className="h-4 w-4" />
+                <Minimize2 className="h-3.5 w-3.5" />
               </button>
               <button
                 type="button"
                 onClick={() => setShowStealthCard(false)}
                 title="Close Stealth Card"
-                className="rounded-lg p-1.5 text-zinc-400 transition hover:bg-rose-500/15 hover:text-rose-400"
+                className="rounded-lg p-1.5 text-zinc-400 hover:bg-rose-500/15 hover:text-rose-400"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>
 
           {!stealthCardMinimized && (
-            <div className="mt-3.5 space-y-3">
-              {/* Caught Question Box */}
-              <div className="rounded-xl border border-white/[0.1] bg-[#0E1525]/95 px-4 py-3">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
-                  Caught Question ({isListening ? "Listening Live" : "Ready"})
+            <div className="mt-3 flex flex-1 flex-col gap-3 overflow-hidden">
+              {/* Caught Question */}
+              <div className="shrink-0 rounded-xl border border-white/[0.08] bg-[#0F1522] px-3.5 py-2.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                  Question ({isListening ? "Listening Live" : "Ready"})
                 </p>
-                <p className="mt-1 text-sm font-medium leading-snug text-zinc-100">
+                <p className="mt-1 line-clamp-2 text-sm text-zinc-100">
                   {liveCaption ||
                     (latestSegment
                       ? cleanDisplayText(latestSegment.content)
-                      : "Speak or let the interviewer ask a question — NohbyAI will catch it automatically.")}
+                      : "Waiting for incoming question...")}
                 </p>
               </div>
 
-              {/* First-Person Teleprompter Answer Box */}
-              <div className="rounded-xl border border-[#00D4FF]/45 bg-gradient-to-br from-[#00D4FF]/14 to-violet-500/14 px-4 py-3.5">
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#00D4FF]">
-                    Your Answer (Read Aloud in First Person)
+              {/* First-Person Suggested Response */}
+              <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-white/[0.12] bg-[#131B2C] px-4 py-3">
+                <div className="flex shrink-0 items-center justify-between">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                    Your Answer (First Person)
                   </p>
                   {latestSegment?.aiHint && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2.5">
                       <button
                         type="button"
                         onClick={() => {
                           navigator.clipboard
                             .writeText(cleanFirstPersonAnswer(latestSegment.aiHint))
-                            .then(() => showToast("info", "Answer copied."))
+                            .then(() => showToast("info", "Copied."))
                             .catch(() => null);
                         }}
-                        className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-300 hover:text-white"
+                        className="inline-flex items-center gap-1 text-[11px] text-zinc-300 hover:text-white"
                       >
                         <Copy className="h-3 w-3" /> Copy
                       </button>
@@ -2005,26 +1967,43 @@ export function MeetingsScreen() {
                             voiceType: voiceSettings?.voiceType || "female",
                           });
                         }}
-                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#00D4FF] hover:underline"
+                        className="inline-flex items-center gap-1 text-[11px] text-zinc-300 hover:text-white"
                       >
-                        <Volume2 className="h-3.5 w-3.5" /> Whisper
+                        <Volume2 className="h-3.5 w-3.5" /> Speak
                       </button>
                     </div>
                   )}
                 </div>
-                <p
-                  className={`mt-1.5 overflow-y-auto font-medium leading-relaxed text-white ${
-                    stealthCardExpanded ? "max-h-72 text-base" : "max-h-48 text-sm sm:text-[15px]"
-                  }`}
-                >
+                <div className="mt-1.5 flex-1 overflow-y-auto pr-1 text-[15px] leading-relaxed text-white">
                   {latestSegment?.aiHint
                     ? cleanFirstPersonAnswer(latestSegment.aiHint)
-                    : `I'm ${user?.name || "ready"}, and I'm prepared to walk through my architecture, engineering experience, and project impact as soon as a question is asked.`}
-                </p>
+                    : "Your personalized first-person response will appear here as soon as a question is caught."}
+                </div>
               </div>
             </div>
           )}
-        </motion.div>
+
+          {/* Smooth Corner Resize Handle */}
+          {!stealthCardMinimized && (
+            <div
+              onPointerDown={handleResizePointerDown}
+              onPointerMove={handleResizePointerMove}
+              onPointerUp={handleResizePointerUp}
+              onPointerCancel={handleResizePointerUp}
+              title="Drag corner to resize"
+              className="absolute right-1.5 bottom-1.5 flex h-5 w-5 cursor-nwse-resize items-end justify-end p-0.5 text-zinc-500 select-none touch-none hover:text-white"
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path
+                  d="M9 1L1 9M9 5L5 9M9 8.5L8.5 9"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

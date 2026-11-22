@@ -54,12 +54,34 @@ const WORKSPACE_ROUTE_COMMANDS: Array<{ triggers: string[]; route: NavRoute; lab
     label: "Settings",
   },
   {
-    triggers: ["open tasks", "go to tasks", "show tasks", "show my tasks", "open scheduled", "scheduled tasks"],
+    triggers: [
+      "open tasks",
+      "go to tasks",
+      "show tasks",
+      "show my tasks",
+      "open scheduled",
+      "scheduled tasks",
+      "create a task",
+      "create task",
+      "schedule a task",
+      "schedule task",
+      "remind me to",
+    ],
     route: "tasks",
     label: "Scheduled Tasks",
   },
   {
-    triggers: ["open meetings", "go to meetings", "show meetings", "meeting room", "start a meeting", "start meeting", "new meeting"],
+    triggers: [
+      "open meetings",
+      "go to meetings",
+      "show meetings",
+      "meeting room",
+      "start a meeting",
+      "start meeting",
+      "new meeting",
+      "start interview",
+      "record meeting",
+    ],
     route: "meetings",
     label: "Meetings",
   },
@@ -97,8 +119,7 @@ const WORKSPACE_ROUTE_COMMANDS: Array<{ triggers: string[]; route: NavRoute; lab
 
 /**
  * Synchronously resolves client-side browser / navigation / theme commands
- * so browser tabs can be opened immediately inside the user's click/speech handler
- * without ever being blocked by browser popup blockers.
+ * so actions trigger immediately when the user speaks or types a command.
  */
 export function resolveImmediateClientAction(commandText: string): ClientAction | null {
   const raw = commandText.trim();
@@ -118,10 +139,36 @@ export function resolveImmediateClientAction(commandText: string): ClientAction 
     return { type: "set_theme", theme: "dark", label: "Dark Mode" };
   }
 
-  // 2. Workspace screen navigation
+  // 2. Workspace screen navigation (exact triggers)
   for (const item of WORKSPACE_ROUTE_COMMANDS) {
     if (item.triggers.some((t) => lower.includes(t))) {
       return { type: "navigate_route", route: item.route, label: item.label };
+    }
+  }
+
+  // 2b. Flexible verb + workspace screen noun ("open my settings", "show me the library", "check my tasks")
+  if (
+    ["open ", "go to ", "show ", "view ", "check ", "take me to ", "launch "].some((v) =>
+      lower.includes(v)
+    ) &&
+    !["google ", "icloud ", "youtube", "gmail", "github", "whatsapp"].some((w) =>
+      lower.includes(w)
+    )
+  ) {
+    const flexRoutes: Array<{ nouns: string[]; route: NavRoute; label: string }> = [
+      { nouns: ["setting", "configuration"], route: "settings", label: "Settings" },
+      { nouns: ["task", "scheduled"], route: "tasks", label: "Scheduled Tasks" },
+      { nouns: ["meeting", "interview"], route: "meetings", label: "Meetings" },
+      { nouns: ["plugin", "integration"], route: "integrations", label: "Plugins" },
+      { nouns: ["library", "my files", "document"], route: "files", label: "Library" },
+      { nouns: ["memory", "memories"], route: "memory", label: "Memory" },
+      { nouns: ["device", "connected node"], route: "devices", label: "Devices" },
+      { nouns: ["chat room"], route: "assistant", label: "Chat Room" },
+    ];
+    for (const item of flexRoutes) {
+      if (item.nouns.some((n) => lower.includes(n))) {
+        return { type: "navigate_route", route: item.route, label: item.label };
+      }
     }
   }
 
@@ -211,6 +258,8 @@ export interface ClientActionHandlers {
 
 /**
  * Executes a resolved ClientAction immediately on the user's device (Tauri native OS or Web).
+ * If a voice command triggers a URL launch and the browser blocks the background popup,
+ * dispatches "nohby-browser-action" so the in-app Quick Action Launcher appears immediately.
  */
 export async function executeClientAction(
   action: ClientAction | null | undefined,
@@ -244,18 +293,28 @@ export async function executeClientAction(
         handlers.showToast?.("success", `Opened ${label} in your device browser.`);
         return true;
       } catch {
-        // Fall through to window.open
+        // Fall through to web launcher
       }
     }
 
     if (typeof window !== "undefined" && typeof window.open === "function") {
       try {
-        window.open(targetUrl, "_blank", "noopener,noreferrer");
-        handlers.showToast?.("success", `Opened ${label} in a new browser tab.`);
-        return true;
+        const win = window.open(targetUrl, "_blank", "noopener,noreferrer");
+        if (win) {
+          handlers.showToast?.("success", `Opened ${label} in a new browser tab.`);
+          return true;
+        }
       } catch {
-        return false;
+        // Fall through to in-app launcher modal
       }
+
+      // Browser blocked popup from async voice timer -> open immediate in-app launcher card
+      window.dispatchEvent(
+        new CustomEvent("nohby-browser-action", {
+          detail: { url: targetUrl, label },
+        })
+      );
+      return true;
     }
   }
 
@@ -267,11 +326,6 @@ export async function executeClientAction(
   return false;
 }
 
-/**
- * Processes the backend SendMessageResponseData after a message completes:
- * - Executes server-returned clientAction if it wasn't already triggered synchronously
- * - Records verified task execution on the connected device in the background
- */
 export async function finalizeAssistantExecution(
   data: SendMessageResponseData,
   options: ClientActionHandlers & {
@@ -347,6 +401,14 @@ async function runStepLocally(
       try {
         const opened = window.open(targetUrl, "_blank", "noopener,noreferrer");
         openedTab = Boolean(opened);
+        if (!openedTab) {
+          window.dispatchEvent(
+            new CustomEvent("nohby-browser-action", {
+              detail: { url: targetUrl, label: queryText.slice(0, 40) },
+            })
+          );
+          openedTab = true;
+        }
       } catch {
         openedTab = false;
       }
@@ -386,10 +448,6 @@ async function runStepLocally(
   };
 }
 
-/**
- * Executes a queued, approved task on the local device using the Phase 5
- * Local Agent Execution Protocol (claim -> step events -> complete/fail).
- */
 export async function executeTaskLocally(
   task: Task,
   deviceId: string,
