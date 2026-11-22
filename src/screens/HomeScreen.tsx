@@ -60,9 +60,12 @@ export function HomeScreen() {
   const [recentMessages, setRecentMessages] = useState<Message[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  // Voice Control Dock state
+  // Voice Control Dock state (persisted in sessionStorage so it stays the way the user left it until they leave the app)
   const [orbStyle, setOrbStyle] = useState<OrbStyleOption>(() => getSelectedOrbStyle());
-  const [voiceActive, setVoiceActive] = useState(false);
+  const [voiceActive, setVoiceActive] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return sessionStorage.getItem("nohbyone.voiceDockSwitchOn") === "true";
+  });
   const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
   const [jarvisState, setJarvisState] = useState<"standby" | "awake" | "thinking" | "speaking">("standby");
   const [interimTranscript, setInterimTranscript] = useState("");
@@ -73,6 +76,10 @@ export function HomeScreen() {
   const [dockPinned, setDockPinned] = useState(false);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
   const voiceHandleRef = useRef<VoiceSessionHandle | null>(null);
+  const voiceActiveRef = useRef<boolean>(voiceActive);
+  const busyBusyRef = useRef<boolean>(false);
+  voiceActiveRef.current = voiceActive;
+  busyBusyRef.current = sending || isAssistantSpeaking;
 
   const isDockOpen = dockHovered || dockPinned || showTextInput;
 
@@ -247,19 +254,106 @@ export function HomeScreen() {
   );
 
   const interimTimerRef = useRef<number | null>(null);
+  const restartLoopTimerRef = useRef<number | null>(null);
+  const lastCommittedSpeechRef = useRef<string>("");
 
-  const setManualMicState = (active: boolean) => {
+  const setManualMicState = useCallback((active: boolean) => {
     setVoiceActive(active);
-    window.dispatchEvent(new CustomEvent("nohby-manual-mic", { detail: { active } }));
-  };
+    voiceActiveRef.current = active;
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("nohbyone.voiceDockSwitchOn", active ? "true" : "false");
+      window.dispatchEvent(new CustomEvent("nohby-manual-mic", { detail: { active } }));
+    }
+  }, []);
+
+  // Continuous voice loop while the user has the switch set to "On"
+  useEffect(() => {
+    if (!voiceActive) {
+      if (interimTimerRef.current) window.clearTimeout(interimTimerRef.current);
+      if (restartLoopTimerRef.current) window.clearTimeout(restartLoopTimerRef.current);
+      voiceHandleRef.current?.cancel();
+      voiceHandleRef.current = null;
+      setInterimTranscript("");
+      window.dispatchEvent(new CustomEvent("nohby-manual-mic", { detail: { active: false } }));
+      return;
+    }
+
+    if (!isSpeechRecognitionSupported()) {
+      return;
+    }
+
+    window.dispatchEvent(new CustomEvent("nohby-manual-mic", { detail: { active: true } }));
+    let unmounted = false;
+
+    const startContinuousLoop = () => {
+      if (unmounted || !voiceActiveRef.current) return;
+      lastCommittedSpeechRef.current = "";
+
+      const commitDelta = (fullText: string) => {
+        if (busyBusyRef.current) return;
+        const prev = lastCommittedSpeechRef.current;
+        const delta = fullText.startsWith(prev)
+          ? fullText.slice(prev.length).trim()
+          : fullText.trim();
+        lastCommittedSpeechRef.current = fullText;
+        if (!delta) return;
+        setInterimTranscript("");
+        sendToActiveSession(delta, "voice");
+      };
+
+      voiceHandleRef.current = startLocalVoiceRecognition({
+        language: voiceSettings?.inputLanguage || "en-US",
+        onInterim: (fullText: string) => {
+          if (busyBusyRef.current) return;
+          const prev = lastCommittedSpeechRef.current;
+          const pendingDelta = fullText.startsWith(prev)
+            ? fullText.slice(prev.length).trim()
+            : fullText.trim();
+          setInterimTranscript(pendingDelta);
+
+          if (interimTimerRef.current) window.clearTimeout(interimTimerRef.current);
+          if (pendingDelta) {
+            interimTimerRef.current = window.setTimeout(() => {
+              commitDelta(fullText);
+            }, 850);
+          }
+        },
+        onFinal: (fullText: string) => {
+          if (interimTimerRef.current) {
+            window.clearTimeout(interimTimerRef.current);
+            interimTimerRef.current = null;
+          }
+          commitDelta(fullText);
+        },
+        onError: (msg: string) => {
+          if (msg === "not-allowed" || msg === "service-not-allowed") {
+            showToast("error", "Microphone access denied by browser.");
+            setManualMicState(false);
+          }
+        },
+        onEnd: () => {
+          // Keep the switch ON and auto-restart recognition unless user explicitly turned it Off
+          if (!unmounted && voiceActiveRef.current) {
+            restartLoopTimerRef.current = window.setTimeout(startContinuousLoop, 300);
+          }
+        },
+      });
+    };
+
+    startContinuousLoop();
+
+    return () => {
+      unmounted = true;
+      if (interimTimerRef.current) window.clearTimeout(interimTimerRef.current);
+      if (restartLoopTimerRef.current) window.clearTimeout(restartLoopTimerRef.current);
+      voiceHandleRef.current?.cancel();
+      voiceHandleRef.current = null;
+    };
+  }, [sendToActiveSession, setManualMicState, showToast, voiceActive, voiceSettings?.inputLanguage]);
 
   const toggleVoiceMic = () => {
     if (voiceActive) {
-      if (interimTimerRef.current) window.clearTimeout(interimTimerRef.current);
-      voiceHandleRef.current?.stop();
-      voiceHandleRef.current = null;
       setManualMicState(false);
-      setInterimTranscript("");
       return;
     }
 
@@ -271,60 +365,14 @@ export function HomeScreen() {
 
     stopSpeaking();
     setManualMicState(true);
-    setInterimTranscript("");
-    let committed = false;
-
-    const commitVoiceText = (rawText: string) => {
-      if (committed) return;
-      const trimmed = rawText.trim();
-      if (!trimmed) return;
-      committed = true;
-      if (interimTimerRef.current) {
-        window.clearTimeout(interimTimerRef.current);
-        interimTimerRef.current = null;
-      }
-      setInterimTranscript("");
-      voiceHandleRef.current?.stop();
-      voiceHandleRef.current = null;
-      setManualMicState(false);
-      sendToActiveSession(trimmed, "voice");
-    };
-
-    voiceHandleRef.current = startLocalVoiceRecognition({
-      language: voiceSettings?.inputLanguage || "en-US",
-      onInterim: (text: string) => {
-        setInterimTranscript(text);
-        if (interimTimerRef.current) window.clearTimeout(interimTimerRef.current);
-        if (text.trim()) {
-          interimTimerRef.current = window.setTimeout(() => {
-            commitVoiceText(text);
-          }, 850);
-        }
-      },
-      onFinal: (text: string) => {
-        commitVoiceText(text);
-      },
-      onError: (msg: string) => {
-        if (msg !== "no-speech" && msg !== "aborted") {
-          showToast("error", `Voice error: ${msg}`);
-        }
-        setManualMicState(false);
-      },
-      onEnd: () => {
-        setManualMicState(false);
-      },
-    });
   };
 
   const handleStopInterrupt = () => {
     if (interimTimerRef.current) window.clearTimeout(interimTimerRef.current);
-    voiceHandleRef.current?.cancel();
-    voiceHandleRef.current = null;
     stopSpeaking();
-    setManualMicState(false);
     setIsAssistantSpeaking(false);
     setInterimTranscript("");
-    showToast("info", "Voice output and listening interrupted.");
+    showToast("info", "Voice output interrupted.");
   };
 
   // Latest assistant & user bubbles from real conversation history

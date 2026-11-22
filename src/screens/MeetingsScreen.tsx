@@ -70,7 +70,10 @@ export function MeetingsScreen() {
   const [hiddenOverlay, setHiddenOverlay] = useState(false);
 
   // Background listening & real-time 30-bar sound frequency monitor
-  const [isListening, setIsListening] = useState(false);
+  const [isListening, setIsListening] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return sessionStorage.getItem("nohbyone.meetingMicOn") === "true";
+  });
   const [liveCaption, setLiveCaption] = useState("");
   const [manualInput, setManualInput] = useState("");
   const [waveLevels, setWaveLevels] = useState<number[]>(() =>
@@ -79,20 +82,33 @@ export function MeetingsScreen() {
   const voiceHandleRef = useRef<VoiceSessionHandle | null>(null);
   const stopMonitorRef = useRef<(() => void) | null>(null);
   const interimCommitTimerRef = useRef<number | null>(null);
+  const restartTimerRef = useRef<number | null>(null);
+  const isListeningRef = useRef<boolean>(isListening);
   const lastSentFinalRef = useRef<string>("");
+  isListeningRef.current = isListening;
 
-  const stopAudioCapture = useCallback(() => {
+  const stopAudioCapture = useCallback((persistOff = false) => {
     if (interimCommitTimerRef.current) {
       window.clearTimeout(interimCommitTimerRef.current);
       interimCommitTimerRef.current = null;
+    }
+    if (restartTimerRef.current) {
+      window.clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
     }
     if (stopMonitorRef.current) {
       stopMonitorRef.current();
       stopMonitorRef.current = null;
     }
-    voiceHandleRef.current?.stop();
+    voiceHandleRef.current?.cancel();
     voiceHandleRef.current = null;
-    setIsListening(false);
+    if (persistOff) {
+      setIsListening(false);
+      isListeningRef.current = false;
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("nohbyone.meetingMicOn", "false");
+      }
+    }
     setLiveCaption("");
     setWaveLevels(WAVE_BARS.map((h) => h / 24));
     window.dispatchEvent(new CustomEvent("nohby-manual-mic", { detail: { active: false } }));
@@ -218,22 +234,83 @@ export function MeetingsScreen() {
     []
   );
 
+  const startMeetingRecognitionLoop = useCallback(
+    (activeMeetingId: string) => {
+      if (!isListeningRef.current) return;
+      lastSentFinalRef.current = "";
+      voiceHandleRef.current = startLocalVoiceRecognition({
+        language: voiceSettings?.inputLanguage || "en-US",
+        onInterim: (fullText: string) => {
+          const prevSent = lastSentFinalRef.current;
+          const pendingDelta = fullText.startsWith(prevSent)
+            ? fullText.slice(prevSent.length).trim()
+            : fullText.trim();
+
+          setLiveCaption(pendingDelta);
+
+          if (interimCommitTimerRef.current) {
+            window.clearTimeout(interimCommitTimerRef.current);
+          }
+          if (pendingDelta) {
+            interimCommitTimerRef.current = window.setTimeout(() => {
+              lastSentFinalRef.current = fullText;
+              setLiveCaption("");
+              sendTranscriptSegment(activeMeetingId, pendingDelta, "Speaker");
+            }, 850);
+          }
+        },
+        onFinal: (fullText: string) => {
+          if (interimCommitTimerRef.current) {
+            window.clearTimeout(interimCommitTimerRef.current);
+            interimCommitTimerRef.current = null;
+          }
+          const prevSent = lastSentFinalRef.current;
+          const delta = fullText.startsWith(prevSent)
+            ? fullText.slice(prevSent.length).trim()
+            : fullText.trim();
+          lastSentFinalRef.current = fullText;
+          if (delta) {
+            setLiveCaption("");
+            sendTranscriptSegment(activeMeetingId, delta, "Speaker");
+          }
+        },
+        onError: (msg: string) => {
+          if (msg === "not-allowed" || msg === "service-not-allowed") {
+            showToast("error", "Microphone access denied by browser.");
+            stopAudioCapture(true);
+          }
+        },
+        onEnd: () => {
+          if (isListeningRef.current) {
+            restartTimerRef.current = window.setTimeout(
+              () => startMeetingRecognitionLoop(activeMeetingId),
+              300
+            );
+          }
+        },
+      });
+    },
+    [sendTranscriptSegment, showToast, stopAudioCapture, voiceSettings?.inputLanguage]
+  );
+
   const toggleBackgroundMic = () => {
     if (!selected) {
       showToast("info", "Start a session first.");
       return;
     }
     if (isListening) {
-      stopAudioCapture();
+      stopAudioCapture(true);
       return;
     }
     if (!isSpeechRecognitionSupported()) {
       showToast("error", "Speech recognition unavailable in this browser.");
       return;
     }
-    const activeMeetingId = selected.id;
-    lastSentFinalRef.current = "";
     setIsListening(true);
+    isListeningRef.current = true;
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("nohbyone.meetingMicOn", "true");
+    }
     window.dispatchEvent(new CustomEvent("nohby-manual-mic", { detail: { active: true } }));
 
     // Start 60fps real-time high/low sound frequency analyser across all 30 bars
@@ -243,58 +320,12 @@ export function MeetingsScreen() {
       stopMonitorRef.current = stopFn;
     });
 
-    voiceHandleRef.current = startLocalVoiceRecognition({
-      language: voiceSettings?.inputLanguage || "en-US",
-      onInterim: (fullText: string) => {
-        const prevSent = lastSentFinalRef.current;
-        const pendingDelta = fullText.startsWith(prevSent)
-          ? fullText.slice(prevSent.length).trim()
-          : fullText.trim();
-
-        setLiveCaption(pendingDelta);
-
-        if (interimCommitTimerRef.current) {
-          window.clearTimeout(interimCommitTimerRef.current);
-        }
-        if (pendingDelta) {
-          // Commit phrase after 850ms pause so speaker segments and AI hints appear sub-second
-          interimCommitTimerRef.current = window.setTimeout(() => {
-            lastSentFinalRef.current = fullText;
-            setLiveCaption("");
-            sendTranscriptSegment(activeMeetingId, pendingDelta, "Speaker");
-          }, 850);
-        }
-      },
-      onFinal: (fullText: string) => {
-        if (interimCommitTimerRef.current) {
-          window.clearTimeout(interimCommitTimerRef.current);
-          interimCommitTimerRef.current = null;
-        }
-        const prevSent = lastSentFinalRef.current;
-        const delta = fullText.startsWith(prevSent)
-          ? fullText.slice(prevSent.length).trim()
-          : fullText.trim();
-        lastSentFinalRef.current = fullText;
-        if (delta) {
-          setLiveCaption("");
-          sendTranscriptSegment(activeMeetingId, delta, "Speaker");
-        }
-      },
-      onError: (msg: string) => {
-        if (msg !== "no-speech" && msg !== "aborted") {
-          showToast("error", `Mic error: ${msg}`);
-        }
-        stopAudioCapture();
-      },
-      onEnd: () => {
-        stopAudioCapture();
-      },
-    });
+    startMeetingRecognitionLoop(selected.id);
   };
 
   const handleStopAndSummarise = async () => {
     if (!selected) return;
-    stopAudioCapture();
+    stopAudioCapture(true);
     try {
       const res = await apiClient.stopMeeting(selected.id);
       setSelected(res.data.meeting);
