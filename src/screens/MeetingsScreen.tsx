@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import {
   Bell,
   Calendar,
@@ -8,8 +9,10 @@ import {
   Eye,
   EyeOff,
   FileText,
+  GripHorizontal,
   Headphones,
   Loader2,
+  Maximize2,
   Mic,
   MicOff,
   Minimize2,
@@ -28,7 +31,7 @@ import {
 } from "lucide-react";
 
 import { ApiError, apiClient } from "../lib/api";
-import { cleanDisplayText } from "../lib/formatText";
+import { cleanDisplayText, cleanFirstPersonAnswer } from "../lib/formatText";
 import {
   isSpeechRecognitionSupported,
   speakText,
@@ -109,6 +112,7 @@ export function MeetingsScreen() {
   // Floating Stealth Card Modal (In-App + Screen-Share-Invisible OS Desktop Overlay)
   const [showStealthCard, setShowStealthCard] = useState(true);
   const [stealthCardMinimized, setStealthCardMinimized] = useState(false);
+  const [stealthCardExpanded, setStealthCardExpanded] = useState(false);
   const [externalStealthActive, setExternalStealthActive] = useState(false);
   const stealthPopupRef = useRef<Window | null>(null);
 
@@ -865,7 +869,7 @@ export function MeetingsScreen() {
     }
     if (aEl) {
       aEl.textContent = latestSegment?.aiHint
-        ? cleanDisplayText(latestSegment.aiHint)
+        ? cleanFirstPersonAnswer(latestSegment.aiHint)
         : "Your personalized first-person answer ('I...', 'In my experience...') will appear here immediately when a question is caught.";
     }
   }, [isListening, latestSegment, liveCaption]);
@@ -889,14 +893,14 @@ export function MeetingsScreen() {
       let pipWin: Window | null = null;
       if (window.documentPictureInPicture?.requestWindow) {
         pipWin = await window.documentPictureInPicture.requestWindow({
-          width: 430,
-          height: 310,
+          width: 580,
+          height: 410,
         });
       } else {
         pipWin = window.open(
           "",
           "NohbyStealthMeetingCard",
-          "width=430,height=330,menubar=no,toolbar=no,location=no,status=no"
+          "width=580,height=420,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
         );
       }
 
@@ -1881,56 +1885,90 @@ export function MeetingsScreen() {
 
       {/* ============================================================
           FLOATING STEALTH MEETING & INTERVIEW ANSWER CARD MODAL
-          (Protected from Screen Share via Hardware Shield / External PiP)
+          (Freely Draggable Anywhere, Large & Resizable, Screen-Share Invisible)
           ============================================================ */}
       {showStealthCard && selected && (
-        <div
-          className={`dropdown-surface fixed bottom-16 left-4 z-40 rounded-2xl border border-[#00D4FF]/55 shadow-[0_12px_40px_rgba(0,180,255,0.3)] backdrop-blur-xl transition-all lg:bottom-4 ${
-            stealthCardMinimized ? "w-72 p-2.5" : "w-[360px] sm:w-[410px] p-3.5"
+        <motion.div
+          drag
+          dragMomentum={false}
+          style={{
+            resize: stealthCardMinimized ? "none" : "both",
+            overflow: stealthCardMinimized ? "visible" : "auto",
+          }}
+          className={`dropdown-surface fixed bottom-12 left-4 z-50 rounded-2xl border border-[#00D4FF]/65 shadow-[0_16px_55px_rgba(0,180,255,0.35)] backdrop-blur-xl lg:bottom-5 lg:left-6 ${
+            stealthCardMinimized
+              ? "w-80 p-3"
+              : stealthCardExpanded
+                ? "min-h-[340px] w-[96vw] sm:w-[700px] md:w-[780px] p-5"
+                : "min-h-[260px] w-[92vw] sm:w-[540px] md:w-[620px] p-4 sm:p-5"
           }`}
         >
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-400">
-                <Shield className="h-2.5 w-2.5" />
+          {/* Draggable Header Bar */}
+          <div
+            title="Drag this Stealth Card anywhere on your screen"
+            className="flex cursor-grab items-center justify-between gap-2 select-none active:cursor-grabbing"
+          >
+            <div className="flex items-center gap-2">
+              <GripHorizontal className="h-4 w-4 shrink-0 text-zinc-400" />
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/45 bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                <Shield className="h-3 w-3" />
                 Stealth Card • Screen-Share Invisible
               </span>
+              <span className="hidden text-[10px] text-zinc-400 sm:inline">
+                Drag anywhere • Resize corner
+              </span>
             </div>
+
             <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={toggleExternalStealthCardWindow}
                 title="Float Stealth Card outside browser on device background"
-                className="rounded p-1 text-zinc-400 hover:bg-white/[0.08] hover:text-[#00D4FF]"
+                className="rounded-lg p-1.5 text-zinc-400 transition hover:bg-white/[0.08] hover:text-[#00D4FF]"
               >
-                <PictureInPicture2 className="h-3.5 w-3.5" />
+                <PictureInPicture2 className="h-4 w-4" />
               </button>
+              {!stealthCardMinimized && (
+                <button
+                  type="button"
+                  onClick={() => setStealthCardExpanded((v) => !v)}
+                  title={stealthCardExpanded ? "Standard Large Size" : "Expand to XL Teleprompter Size"}
+                  className={`rounded-lg p-1.5 transition ${
+                    stealthCardExpanded
+                      ? "bg-[#00D4FF]/20 text-[#00D4FF]"
+                      : "text-zinc-400 hover:bg-white/[0.08] hover:text-white"
+                  }`}
+                >
+                  <Maximize2 className="h-4 w-4" />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setStealthCardMinimized((v) => !v)}
                 title={stealthCardMinimized ? "Expand Stealth Card" : "Minimize Stealth Card"}
-                className="rounded p-1 text-zinc-400 hover:bg-white/[0.08] hover:text-white"
+                className="rounded-lg p-1.5 text-zinc-400 transition hover:bg-white/[0.08] hover:text-white"
               >
-                <Minimize2 className="h-3.5 w-3.5" />
+                <Minimize2 className="h-4 w-4" />
               </button>
               <button
                 type="button"
                 onClick={() => setShowStealthCard(false)}
                 title="Close Stealth Card"
-                className="rounded p-1 text-zinc-400 hover:bg-rose-500/15 hover:text-rose-400"
+                className="rounded-lg p-1.5 text-zinc-400 transition hover:bg-rose-500/15 hover:text-rose-400"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
           </div>
 
           {!stealthCardMinimized && (
-            <div className="mt-2.5 space-y-2">
-              <div className="rounded-xl border border-white/[0.08] bg-[#0E1525]/90 px-3 py-2">
-                <p className="text-[9px] font-bold uppercase tracking-wider text-amber-400">
+            <div className="mt-3.5 space-y-3">
+              {/* Caught Question Box */}
+              <div className="rounded-xl border border-white/[0.1] bg-[#0E1525]/95 px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
                   Caught Question ({isListening ? "Listening Live" : "Ready"})
                 </p>
-                <p className="mt-0.5 line-clamp-2 text-xs text-zinc-200">
+                <p className="mt-1 text-sm font-medium leading-snug text-zinc-100">
                   {liveCaption ||
                     (latestSegment
                       ? cleanDisplayText(latestSegment.content)
@@ -1938,36 +1976,55 @@ export function MeetingsScreen() {
                 </p>
               </div>
 
-              <div className="rounded-xl border border-[#00D4FF]/40 bg-gradient-to-br from-[#00D4FF]/12 to-violet-500/12 px-3 py-2.5">
+              {/* First-Person Teleprompter Answer Box */}
+              <div className="rounded-xl border border-[#00D4FF]/45 bg-gradient-to-br from-[#00D4FF]/14 to-violet-500/14 px-4 py-3.5">
                 <div className="flex items-center justify-between">
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-[#00D4FF]">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#00D4FF]">
                     Your Answer (Read Aloud in First Person)
                   </p>
                   {latestSegment?.aiHint && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        stopSpeaking();
-                        speakText(cleanDisplayText(latestSegment.aiHint), {
-                          language: voiceSettings?.inputLanguage || "en-US",
-                          voiceType: voiceSettings?.voiceType || "female",
-                        });
-                      }}
-                      className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#00D4FF] hover:underline"
-                    >
-                      <Volume2 className="h-3 w-3" /> Whisper
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard
+                            .writeText(cleanFirstPersonAnswer(latestSegment.aiHint))
+                            .then(() => showToast("info", "Answer copied."))
+                            .catch(() => null);
+                        }}
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-300 hover:text-white"
+                      >
+                        <Copy className="h-3 w-3" /> Copy
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          stopSpeaking();
+                          speakText(cleanFirstPersonAnswer(latestSegment.aiHint), {
+                            language: voiceSettings?.inputLanguage || "en-US",
+                            voiceType: voiceSettings?.voiceType || "female",
+                          });
+                        }}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#00D4FF] hover:underline"
+                      >
+                        <Volume2 className="h-3.5 w-3.5" /> Whisper
+                      </button>
+                    </div>
                   )}
                 </div>
-                <p className="mt-1 max-h-28 overflow-y-auto text-xs font-medium leading-relaxed text-white">
+                <p
+                  className={`mt-1.5 overflow-y-auto font-medium leading-relaxed text-white ${
+                    stealthCardExpanded ? "max-h-72 text-base" : "max-h-48 text-sm sm:text-[15px]"
+                  }`}
+                >
                   {latestSegment?.aiHint
-                    ? cleanDisplayText(latestSegment.aiHint)
+                    ? cleanFirstPersonAnswer(latestSegment.aiHint)
                     : `I'm ${user?.name || "ready"}, and I'm prepared to walk through my architecture, engineering experience, and project impact as soon as a question is asked.`}
                 </p>
               </div>
             </div>
           )}
-        </div>
+        </motion.div>
       )}
     </div>
   );

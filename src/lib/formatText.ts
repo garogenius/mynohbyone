@@ -17,3 +17,20 @@ export function cleanDisplayText(raw: string | null | undefined): string {
     .replace(/\*\*/g, "")
     .trim();
 }
+
+/**
+ * Strips any conversational meta-preface like
+ * "Suleiman, here is a concise, ready-to-say answer:" or "Here is your answer:"
+ * so the teleprompter answer reads directly in the first person.
+ */
+export function cleanFirstPersonAnswer(raw: string | null | undefined): string {
+  const cleaned = cleanDisplayText(raw);
+  if (!cleaned) return "";
+  return cleaned
+    .replace(
+      /^(?:[A-Z][a-z]+,\s*)?(?:here\s+is|this\s+is)\s+(?:a|your)\s+[^:]{2,55}:\s*/i,
+      ""
+    )
+    .replace(/^["']|["']$/g, "")
+    .trim();
+}
