@@ -436,6 +436,27 @@ export const apiClient = {
     return request<{ task: Task }>(`/tasks/${taskId}/cancel`, { method: "POST" });
   },
 
+  updateTask(
+    taskId: string,
+    payload: {
+      instruction?: string;
+      scheduledAt?: string;
+      scheduleLabel?: string;
+      recurrence?: string;
+    }
+  ) {
+    return request<{ task: Task }>(`/tasks/${taskId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteTask(taskId: string) {
+    return request<{ deleted: boolean; id: string }>(`/tasks/${taskId}`, {
+      method: "DELETE",
+    });
+  },
+
   listPermissions() {
     return request<{ permissions: Permission[] }>("/permissions", { method: "GET" });
   },
@@ -717,6 +738,55 @@ export const apiClient = {
   stopMeeting(meetingId: string) {
     return request<{ meeting: MeetingItem }>(`/meetings/${meetingId}/stop`, {
       method: "POST",
+    });
+  },
+
+  updateMeeting(
+    meetingId: string,
+    payload: {
+      title?: string;
+      summary?: string;
+      actionItems?: string[];
+      status?: string;
+      stealthMode?: boolean;
+    }
+  ) {
+    return request<{ meeting: MeetingItem }>(`/meetings/${meetingId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteMeetingTranscript(meetingId: string, segmentId: string) {
+    return request<{ deleted: boolean; segmentId: string; meeting: MeetingItem }>(
+      `/meetings/${meetingId}/transcript/${segmentId}`,
+      { method: "DELETE" }
+    );
+  },
+
+  generateMeetingDocument(meetingId: string, payload: { notes?: string } = {}) {
+    return request<{
+      documentText: string;
+      filename: string;
+      fileId: string;
+      keyPoints: string[];
+    }>(`/meetings/${meetingId}/generate-document`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  exportMeetingAudio(
+    meetingId: string,
+    payload: { notes?: string; voiceType?: string; language?: string } = {}
+  ) {
+    return request<{
+      audio: SpeechSynthesisResult;
+      filename: string;
+      narrationText: string;
+    }>(`/meetings/${meetingId}/audio-export`, {
+      method: "POST",
+      body: JSON.stringify(payload),
     });
   },
 
