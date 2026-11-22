@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import {
   CheckCircle2,
   Cpu,
+  EyeOff,
   Loader2,
   LogOut,
   Mic,
   Monitor,
   Moon,
+  Radio,
   Save,
   Shield,
   Sun,
@@ -42,6 +44,7 @@ export function SettingsScreen() {
     loadVoiceSettings,
     updateVoiceSettings,
     setIsSpeaking,
+    setRoute,
     showToast,
     logout,
     busy,
@@ -215,8 +218,70 @@ export function SettingsScreen() {
     });
   };
 
+  const handleToggleJarvis = async () => {
+    const next = !wakeWordEnabled;
+    try {
+      if (next && navigator.mediaDevices?.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((t) => t.stop());
+      }
+      setWakeWordEnabled(next);
+      setAutoSpeakResponses(true);
+      await updateVoiceSettings({
+        wakeWordEnabled: next,
+        autoSpeakResponses: true,
+        wakeWordPhrase: wakeWordPhrase.trim() || "Hey Nohby",
+      });
+      showToast(
+        "success",
+        next
+          ? `Jarvis Mode ON — say "${wakeWordPhrase.trim() || "Hey Nohby"}" anytime in the background.`
+          : "Jarvis Mode turned off."
+      );
+    } catch {
+      showToast("error", "Allow microphone permission to enable hands-free 'Hey Nohby' mode.");
+    }
+  };
+
   return (
     <div className="w-full max-w-5xl space-y-4">
+      {/* Hands-Free Jarvis Mode & Stealth Mode */}
+      <section className="nohby-frame p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-display text-sm font-semibold text-white">
+              Background Jarvis Mode &amp; Stealth Privacy
+            </h2>
+            <p className="mt-0.5 text-xs text-zinc-400">
+              Enable hands-free &ldquo;{wakeWordPhrase || "Hey Nohby"}&rdquo; background listening or launch hidden stealth meeting mode.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleToggleJarvis}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition ${
+                wakeWordEnabled
+                  ? "border-emerald-500/45 bg-emerald-500/15 text-emerald-300"
+                  : "border-[#00D4FF]/35 bg-[#00D4FF]/10 text-[#00D4FF] hover:bg-[#00D4FF]/20"
+              }`}
+            >
+              <Radio className={`h-3.5 w-3.5 ${wakeWordEnabled ? "animate-pulse text-emerald-400" : ""}`} />
+              <span>{wakeWordEnabled ? `"${wakeWordPhrase || "Hey Nohby"}" Active` : "Enable Hey Nohby (Jarvis)"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setRoute("meetings")}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.12] bg-[#0C121E] px-3 text-xs font-medium text-zinc-200 transition hover:border-[#00D4FF]/45 hover:text-white"
+            >
+              <EyeOff className="h-3.5 w-3.5 text-[#00D4FF]" />
+              <span>Open Stealth Mode</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
       {/* AI Chat Engine (Real LLM Connection) */}
       <section className="nohby-frame p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">

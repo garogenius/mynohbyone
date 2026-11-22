@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AudioLines,
-  EyeOff,
   Keyboard,
   Loader2,
   Mic,
-  Radio,
   Send,
   Square,
 } from "lucide-react";
@@ -40,7 +38,6 @@ export function HomeScreen() {
     health,
     voiceSettings,
     loadVoiceSettings,
-    updateVoiceSettings,
     setRoute,
     showToast,
   } = useAppStore();
@@ -63,7 +60,6 @@ export function HomeScreen() {
   const [sending, setSending] = useState(false);
   const voiceHandleRef = useRef<VoiceSessionHandle | null>(null);
 
-  const jarvisEnabled = Boolean(voiceSettings?.wakeWordEnabled);
   const isOrbMoving =
     voiceActive ||
     isAssistantSpeaking ||
@@ -188,33 +184,6 @@ export function HomeScreen() {
     [conversationId, currentDeviceId, sending, showToast, voiceSettings]
   );
 
-  const toggleJarvisBackgroundMode = async () => {
-    if (!isSpeechRecognitionSupported()) {
-      showToast("error", "Voice recognition is not supported in this browser.");
-      return;
-    }
-    const next = !jarvisEnabled;
-    try {
-      if (next && navigator.mediaDevices?.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach((t) => t.stop());
-      }
-      await updateVoiceSettings({
-        wakeWordEnabled: next,
-        autoSpeakResponses: true,
-        wakeWordPhrase: voiceSettings?.wakeWordPhrase || "Hey Nohby",
-      });
-      showToast(
-        "success",
-        next
-          ? `Jarvis Mode ON — say "${voiceSettings?.wakeWordPhrase || "Hey Nohby"}" anytime, even in the background!`
-          : "Jarvis Mode turned off."
-      );
-    } catch {
-      showToast("error", "Please allow microphone access to enable hands-free 'Hey Nohby' mode.");
-    }
-  };
-
   const toggleVoiceMic = () => {
     if (voiceActive) {
       voiceHandleRef.current?.stop();
@@ -287,8 +256,8 @@ export function HomeScreen() {
           LEFT / CENTER: ACTIVE SESSION STAGE (Zero-Scroll Room)
           ============================================================ */}
       <section className="nohby-stage flex flex-col justify-between p-3.5 sm:p-4 lg:h-full lg:overflow-hidden">
-        {/* Stage Header */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        {/* Clean Stage Header (Exact Reference Match) */}
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <h2 className="font-display text-sm font-semibold text-white">Active Session</h2>
             {(voiceActive || jarvisState === "awake") && (
@@ -303,32 +272,6 @@ export function HomeScreen() {
                 NohbyAI Speaking
               </span>
             )}
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={toggleJarvisBackgroundMode}
-              className={`inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium transition ${
-                jarvisEnabled
-                  ? "border-emerald-500/45 bg-emerald-500/15 text-emerald-300"
-                  : "border-white/[0.12] bg-[#101624]/80 text-zinc-300 hover:border-[#00D4FF]/50 hover:text-white"
-              }`}
-              title={`Enable hands-free background listening ("${voiceSettings?.wakeWordPhrase || "Hey Nohby"}")`}
-            >
-              <Radio className={`h-3 w-3 ${jarvisEnabled ? "animate-pulse text-emerald-400" : "text-[#00D4FF]"}`} />
-              <span>{jarvisEnabled ? `"${voiceSettings?.wakeWordPhrase || "Hey Nohby"}" Active` : "Hey Nohby (Jarvis)"}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setRoute("meetings")}
-              className="inline-flex h-7 items-center gap-1.5 rounded-full border border-white/[0.12] bg-[#101624]/80 px-2.5 text-[11px] font-medium text-zinc-300 transition hover:border-[#00D4FF]/50 hover:text-white"
-              title="Open Stealth Hidden Meeting & Interview Listener"
-            >
-              <EyeOff className="h-3 w-3 text-[#00D4FF]" />
-              <span>Stealth Mode</span>
-            </button>
           </div>
         </div>
 
