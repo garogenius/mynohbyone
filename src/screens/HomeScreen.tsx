@@ -17,6 +17,7 @@ import {
 
 import { ApiError, apiClient } from "../lib/api";
 import { cleanDisplayText } from "../lib/formatText";
+import { PluginApprovalCard } from "../components/PluginApprovalCard";
 import {
   executeClientAction,
   finalizeAssistantExecution,
@@ -246,10 +247,18 @@ export function HomeScreen() {
           showToast,
         });
 
+        const assistantMsgWithAction: Message = {
+          ...res.data.assistantMessage,
+          attachments: [
+            ...(res.data.assistantMessage.attachments || []),
+            ...(res.data.clientAction ? [res.data.clientAction as Record<string, unknown>] : []),
+          ],
+        };
+
         setRecentMessages((prev) => [
           ...prev.slice(-2),
           res.data.userMessage,
-          res.data.assistantMessage,
+          assistantMsgWithAction,
         ]);
         setTextDraft("");
 
@@ -560,6 +569,18 @@ export function HomeScreen() {
                     </div>
                   )}
                 </div>
+
+                {(() => {
+                  const latestApprovalAction =
+                    (latestAssistantMsg?.attachments as any[])?.find((att: any) => att?.type === "plugin_approval_required") ||
+                    ((latestAssistantMsg as any)?.clientAction?.type === "plugin_approval_required" ? (latestAssistantMsg as any).clientAction : null);
+
+                  return latestApprovalAction ? (
+                    <div className="mx-auto mb-2.5 w-full max-w-lg px-2">
+                      <PluginApprovalCard action={latestApprovalAction} />
+                    </div>
+                  ) : null;
+                })()}
 
                 {/* Optional Inline Text Input */}
                 {showTextInput && (

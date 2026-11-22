@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Loader2,
   MoreHorizontal,
+  Play,
   Plug,
   Plus,
   RefreshCw,
@@ -134,6 +135,11 @@ export function IntegrationsScreen() {
   // Connect modal state
   const [connectingProvider, setConnectingProvider] = useState<IntegrationProviderSpec | null>(null);
   const [accountLabel, setAccountLabel] = useState("");
+  const [configWaPhoneId, setConfigWaPhoneId] = useState("");
+  const [configWaToken, setConfigWaToken] = useState("");
+  const [configSmtpHost, setConfigSmtpHost] = useState("");
+  const [configSmtpPass, setConfigSmtpPass] = useState("");
+  const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const loadAll = useCallback(async () => {
@@ -188,15 +194,30 @@ export function IntegrationsScreen() {
     e.preventDefault();
     if (!connectingProvider || !accountLabel.trim() || submitting) return;
 
+    const configPayload: Record<string, unknown> = {};
+    if (connectingProvider.provider === "whatsapp") {
+      if (configWaPhoneId.trim()) configPayload.phoneNumberId = configWaPhoneId.trim();
+      if (configWaToken.trim()) configPayload.accessToken = configWaToken.trim();
+    } else if (["gmail", "email", "outlook"].includes(connectingProvider.provider)) {
+      if (configSmtpHost.trim()) configPayload.smtpHost = configSmtpHost.trim();
+      if (configSmtpPass.trim()) configPayload.smtpPassword = configSmtpPass.trim();
+    }
+
     setSubmitting(true);
     try {
       await apiClient.connectIntegration(connectingProvider.provider, {
         accountLabel: accountLabel.trim(),
         scopes: connectingProvider.defaultScopes,
+        config: Object.keys(configPayload).length > 0 ? configPayload : undefined,
       });
       showToast("success", `${connectingProvider.displayName} connected.`);
       setConnectingProvider(null);
       setAccountLabel("");
+      setConfigWaPhoneId("");
+      setConfigWaToken("");
+      setConfigSmtpHost("");
+      setConfigSmtpPass("");
+      setShowAdvancedConfig(false);
       await loadAll();
     } catch (err) {
       showToast("error", err instanceof ApiError ? err.message : "Connection failed.");
@@ -228,6 +249,20 @@ export function IntegrationsScreen() {
       await loadAll();
     } catch (err) {
       showToast("error", err instanceof ApiError ? err.message : "Disconnect failed.");
+    } finally {
+      setActingId(null);
+    }
+  };
+
+  const handleTestPlugin = async (item: IntegrationItem) => {
+    setActingId(item.id);
+    setMenuOpenProvider(null);
+    try {
+      const res = await apiClient.testIntegrationConnection(item.provider);
+      showToast("success", res.message || `${item.displayName} verified: online and responsive.`);
+      await loadAll();
+    } catch (err) {
+      showToast("error", err instanceof ApiError ? err.message : "Plugin verification failed.");
     } finally {
       setActingId(null);
     }
@@ -290,6 +325,14 @@ export function IntegrationsScreen() {
 
               {isMenuOpen && (
                 <div className="dropdown-surface absolute right-0 top-full z-30 mt-1 w-44 rounded-xl p-1.5 shadow-xl">
+                  <button
+                    type="button"
+                    onClick={() => handleTestPlugin(conn)}
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-emerald-300 transition hover:bg-emerald-500/10"
+                  >
+                    <Play className="h-3.5 w-3.5 text-emerald-400" />
+                    Test Connection
+                  </button>
                   <button
                     type="button"
                     onClick={() => handleSync(conn)}
@@ -441,6 +484,96 @@ export function IntegrationsScreen() {
                   className="studio-input h-9 w-full rounded-lg px-3 text-xs"
                 />
               </div>
+
+              {/* Optional Advanced API / Gateway Configuration */}
+              {(connectingProvider.provider === "whatsapp" ||
+                ["gmail", "email", "outlook"].includes(connectingProvider.provider)) && (
+                <div className="rounded-xl border border-white/[0.08] bg-[#101726]/60 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-zinc-300">
+                      {connectingProvider.provider === "whatsapp"
+                        ? "Meta WhatsApp Cloud API (Optional)"
+                        : "Custom SMTP Dispatch Gateway (Optional)"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvancedConfig((v) => !v)}
+                      className="text-[10px] font-medium text-[#00D4FF] hover:underline"
+                    >
+                      {showAdvancedConfig ? "Hide" : "Configure"}
+                    </button>
+                  </div>
+
+                  {!showAdvancedConfig && (
+                    <p className="mt-1 text-[10px] text-zinc-400">
+                      {connectingProvider.provider === "whatsapp"
+                        ? "Nohby ONE will use the Direct WhatsApp Bridge (wa.me) for 1-click messaging."
+                        : "Nohby ONE will use the secure Cloud Mail Gateway."}
+                    </p>
+                  )}
+
+                  {showAdvancedConfig && connectingProvider.provider === "whatsapp" && (
+                    <div className="mt-2.5 space-y-2">
+                      <div>
+                        <label className="mb-1 block text-[10px] text-zinc-400">
+                          Meta Phone Number ID
+                        </label>
+                        <input
+                          type="text"
+                          value={configWaPhoneId}
+                          onChange={(e) => setConfigWaPhoneId(e.target.value)}
+                          placeholder="e.g. 104829104819482"
+                          className="studio-input h-7 w-full rounded-md px-2.5 text-[11px]"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[10px] text-zinc-400">
+                          System User Access Token
+                        </label>
+                        <input
+                          type="password"
+                          value={configWaToken}
+                          onChange={(e) => setConfigWaToken(e.target.value)}
+                          placeholder="EAAB..."
+                          className="studio-input h-7 w-full rounded-md px-2.5 text-[11px]"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {showAdvancedConfig &&
+                    ["gmail", "email", "outlook"].includes(connectingProvider.provider) && (
+                      <div className="mt-2.5 space-y-2">
+                        <div>
+                          <label className="mb-1 block text-[10px] text-zinc-400">SMTP Host</label>
+                          <input
+                            type="text"
+                            value={configSmtpHost}
+                            onChange={(e) => setConfigSmtpHost(e.target.value)}
+                            placeholder={
+                              connectingProvider.provider === "gmail"
+                                ? "smtp.gmail.com"
+                                : "smtp-mail.outlook.com"
+                            }
+                            className="studio-input h-7 w-full rounded-md px-2.5 text-[11px]"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-[10px] text-zinc-400">
+                            App Password / Token
+                          </label>
+                          <input
+                            type="password"
+                            value={configSmtpPass}
+                            onChange={(e) => setConfigSmtpPass(e.target.value)}
+                            placeholder="App-specific password"
+                            className="studio-input h-7 w-full rounded-md px-2.5 text-[11px]"
+                          />
+                        </div>
+                      </div>
+                    )}
+                </div>
+              )}
 
               <div className="rounded-xl border border-white/[0.08] bg-[#141B2D]/70 p-3">
                 <div className="flex items-center gap-1.5 text-[11px] font-medium text-[#00D4FF]">

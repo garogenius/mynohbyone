@@ -83,12 +83,21 @@ export interface ProposedStep {
 }
 
 export interface ClientAction {
+  [key: string]: unknown;
   type: "open_url" | "navigate_route" | "set_theme" | "memory_saved" | string;
   url?: string;
   route?: string;
   theme?: "light" | "dark" | "system";
   label?: string;
   content?: string;
+  provider?: string;
+  tool?: string;
+  recipient?: string;
+  subject?: string;
+  taskId?: string;
+  approvalId?: string;
+  stepId?: string;
+  directUrl?: string;
 }
 
 export interface InterpretationResult {

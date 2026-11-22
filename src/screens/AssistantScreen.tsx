@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 
 import { ConfirmationDialog } from "../components/StateViews";
+import { PluginApprovalCard } from "../components/PluginApprovalCard";
 import { ApiError, apiClient } from "../lib/api";
 import {
   loadChatWorkspaceMeta,
@@ -340,11 +341,19 @@ export function AssistantScreen() {
           showToast,
         });
 
+        const assistantWithAction: Message = {
+          ...res.data.assistantMessage,
+          attachments: [
+            ...(res.data.assistantMessage.attachments || []),
+            ...(res.data.clientAction ? [res.data.clientAction as Record<string, unknown>] : []),
+          ],
+        };
+
         setStreamingText("");
         setMessages((prev) => [
           ...prev.filter((m) => m.id !== tempUserId),
           res.data.userMessage,
-          res.data.assistantMessage,
+          assistantWithAction,
         ]);
 
         // Refresh sidebar list order/title
@@ -1136,6 +1145,18 @@ export function AssistantScreen() {
                     >
                       {cleanDisplayText(msg.content)}
                     </div>
+
+                    {!isUser && (() => {
+                      const approvalAction =
+                        (msg.attachments as any[])?.find((att: any) => att?.type === "plugin_approval_required") ||
+                        ((msg as any).clientAction?.type === "plugin_approval_required" ? (msg as any).clientAction : null);
+
+                      return approvalAction ? (
+                        <div className="w-full max-w-[90%] sm:max-w-[82%]">
+                          <PluginApprovalCard action={approvalAction} />
+                        </div>
+                      ) : null;
+                    })()}
 
                     {!isUser && (
                       <div className="mt-1 flex items-center gap-1 pl-1">

@@ -428,6 +428,20 @@ export function TasksScreen() {
     }
   };
 
+  const handleRunNow = async (task: Task) => {
+    setActingId(task.id);
+    try {
+      const res = await apiClient.executeTaskNow(task.id);
+      showToast("success", res.message || "Task executed successfully.");
+      await loadAll();
+      await selectTask(task.id);
+    } catch (err) {
+      showToast("error", err instanceof ApiError ? err.message : "Execution failed.");
+    } finally {
+      setActingId(null);
+    }
+  };
+
   const handleExecuteLocally = async (task: Task) => {
     setActingId(task.id);
     try {
@@ -603,6 +617,20 @@ export function TasksScreen() {
                       </div>
 
                       <div className="flex shrink-0 items-center gap-0.5 opacity-75 transition group-hover:opacity-100">
+                        {task.status !== "completed" && task.status !== "cancelled" && (
+                          <button
+                            type="button"
+                            disabled={actingId === task.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRunNow(task);
+                            }}
+                            className="rounded p-1 text-zinc-400 hover:bg-emerald-500/15 hover:text-emerald-400"
+                            title="Run task immediately"
+                          >
+                            <Play className="h-3 w-3 fill-current" />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={(e) => {
@@ -715,6 +743,21 @@ export function TasksScreen() {
               </button>
 
               <div className="flex items-center gap-2">
+                {selectedTask.status !== "completed" && selectedTask.status !== "cancelled" && (
+                  <button
+                    type="button"
+                    disabled={actingId === selectedTask.id}
+                    onClick={() => handleRunNow(selectedTask)}
+                    className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-2.5 text-[11px] font-semibold text-emerald-400 hover:bg-emerald-500/25 transition"
+                  >
+                    {actingId === selectedTask.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Play className="h-3 w-3 fill-current" />
+                    )}
+                    Run Task Now
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => openEditTaskModal(selectedTask)}

@@ -436,6 +436,10 @@ export const apiClient = {
     return request<{ task: Task }>(`/tasks/${taskId}/cancel`, { method: "POST" });
   },
 
+  executeTaskNow(taskId: string) {
+    return request<{ task: Task }>(`/tasks/${taskId}/execute`, { method: "POST" });
+  },
+
   updateTask(
     taskId: string,
     payload: {
@@ -694,6 +698,33 @@ export const apiClient = {
   disconnectIntegration(integrationId: string) {
     return request<{ disconnected: boolean; id: string }>(`/integrations/${integrationId}`, {
       method: "DELETE",
+    });
+  },
+
+  executeIntegrationAction(
+    provider: string,
+    payload: { action?: string; data?: Record<string, unknown> }
+  ) {
+    return request<{
+      success: boolean;
+      provider: string;
+      action: string;
+      summary: string;
+      evidence: Record<string, unknown>;
+    }>(`/integrations/${provider}/execute`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  testIntegrationConnection(provider: string) {
+    return request<{
+      alive: boolean;
+      provider: string;
+      testResult: Record<string, unknown>;
+      checkedAt: string;
+    }>(`/integrations/${provider}/test`, {
+      method: "POST",
     });
   },
 
