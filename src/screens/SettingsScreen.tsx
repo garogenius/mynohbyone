@@ -440,11 +440,17 @@ export function SettingsScreen() {
                       : "border-white/[0.08] bg-[#0C121E] text-zinc-300 hover:border-[#00D4FF]/40"
                   }`}
                 >
-                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full border border-[#00D4FF]/40">
+                  <div
+                    className={`shrink-0 overflow-hidden border border-[#00D4FF]/40 ${
+                      opt.shape === "wide" ? "h-11 w-20 rounded-lg" : "h-12 w-12 rounded-full"
+                    }`}
+                  >
                     <img
                       src={opt.gif}
                       alt={opt.label}
-                      className="h-full w-full scale-[1.34] object-cover"
+                      className={`h-full w-full object-cover ${
+                        opt.shape === "wide" ? "" : "scale-[1.34]"
+                      }`}
                     />
                   </div>
                   <div className="min-w-0 flex-1">

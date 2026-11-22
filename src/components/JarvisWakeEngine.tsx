@@ -306,7 +306,9 @@ export function JarvisWakeEngine() {
         onClick={() => setCollapsed(false)}
         title={`NohbyAI Jarvis Mode — Say "${wakePhrase}" (Click to expand)`}
         aria-label="Expand NohbyAI Jarvis Mode"
-        className={`dropdown-surface fixed bottom-16 right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full p-1 transition duration-300 lg:bottom-4 ${
+        className={`dropdown-surface fixed bottom-16 right-4 z-40 flex items-center justify-center rounded-full p-1 transition duration-300 lg:bottom-4 ${
+          orbStyle.shape === "wide" ? "h-10 w-16" : "h-11 w-11"
+        } ${
           isAnimating
             ? "scale-105 border-[#00D4FF]/80 shadow-[0_0_24px_rgba(0,212,255,0.55)] ring-2 ring-[#00D4FF]/30"
             : "hover:scale-105 hover:border-[#00D4FF]/60"
@@ -316,7 +318,9 @@ export function JarvisWakeEngine() {
           <img
             src={isAnimating ? orbStyle.gif : orbStyle.still}
             alt="NohbyAI Jarvis Mode"
-            className="h-full w-full scale-[1.34] rounded-full object-cover"
+            className={`h-full w-full rounded-full object-cover ${
+              orbStyle.shape === "wide" ? "" : "scale-[1.34]"
+            }`}
           />
         </span>
         <span
@@ -341,7 +345,9 @@ export function JarvisWakeEngine() {
         onClick={() => setCollapsed(true)}
         title="Minimize to icon"
         aria-label="Minimize NohbyAI Jarvis pill to icon"
-        className={`relative h-8 w-8 shrink-0 overflow-hidden rounded-full border transition ${
+        className={`relative shrink-0 overflow-hidden rounded-full border transition ${
+          orbStyle.shape === "wide" ? "h-8 w-14" : "h-8 w-8"
+        } ${
           isAnimating
             ? "border-[#00D4FF] shadow-[0_0_14px_rgba(0,212,255,0.55)]"
             : "border-[#00D4FF]/45 hover:border-[#00D4FF]"
@@ -350,7 +356,9 @@ export function JarvisWakeEngine() {
         <img
           src={isAnimating ? orbStyle.gif : orbStyle.still}
           alt="NohbyAI Jarvis Mode"
-          className="h-full w-full scale-[1.34] rounded-full object-cover"
+          className={`h-full w-full rounded-full object-cover ${
+            orbStyle.shape === "wide" ? "" : "scale-[1.34]"
+          }`}
         />
       </button>
 

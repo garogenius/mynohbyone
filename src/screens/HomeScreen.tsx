@@ -329,27 +329,33 @@ export function HomeScreen() {
           </div>
         </div>
 
-        {/* Centerpiece: Still /vioce-wave-image.jpg when idle -> Animated /vioce-wave.gif when talking/listening */}
-        <div className="my-1 flex flex-1 items-center justify-center">
+        {/* Centerpiece: Adapts frame automatically to selected wave shape (circular orb vs wide horizontal wave) */}
+        <div className="my-1 flex flex-1 items-center justify-center px-2">
           <button
             type="button"
             onClick={toggleVoiceMic}
             aria-label={voiceActive ? "Stop voice listening" : "Start voice listening"}
-            className={`group relative flex h-44 w-44 items-center justify-center overflow-hidden rounded-full transition duration-300 xl:h-52 xl:w-52 ${
+            className={`group relative flex items-center justify-center overflow-hidden transition duration-300 ${
+              orbStyle.shape === "wide"
+                ? "aspect-[16/9] max-h-52 w-full max-w-[440px] rounded-2xl xl:max-h-56 xl:max-w-[500px]"
+                : "h-44 w-44 rounded-full xl:h-52 xl:w-52"
+            } ${
               isOrbMoving
-                ? "scale-105 shadow-[0_0_65px_rgba(0,212,255,0.55)]"
-                : "hover:scale-[1.02] shadow-[0_0_32px_rgba(0,102,255,0.28)]"
+                ? "scale-[1.03] shadow-[0_0_65px_rgba(0,212,255,0.55)]"
+                : "hover:scale-[1.015] shadow-[0_0_32px_rgba(0,102,255,0.28)]"
             }`}
           >
             <img
               src={isOrbMoving ? orbStyle.gif : orbStyle.still}
               alt={orbStyle.label}
-              className={`h-full w-full scale-[1.34] rounded-full object-cover transition duration-300 ${
-                isOrbMoving ? "opacity-100" : "opacity-95"
-              }`}
+              className={`h-full w-full object-cover transition duration-300 ${
+                orbStyle.shape === "wide" ? "rounded-2xl" : "scale-[1.34] rounded-full"
+              } ${isOrbMoving ? "opacity-100" : "opacity-95"}`}
             />
             <span
-              className={`pointer-events-none absolute inset-0 rounded-full border transition ${
+              className={`pointer-events-none absolute inset-0 border transition ${
+                orbStyle.shape === "wide" ? "rounded-2xl" : "rounded-full"
+              } ${
                 isOrbMoving
                   ? "border-[#00D4FF]/75 ring-4 ring-[#00D4FF]/20"
                   : "border-[#00D4FF]/30 group-hover:border-[#00D4FF]/55"
