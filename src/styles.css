@@ -264,8 +264,10 @@
   border-color: rgba(8, 20, 46, 0.08) !important;
 }
 
-[data-theme="light"] .bg-white\/\[0\.08\] {
-  background-color: rgba(0, 92, 230, 0.09) !important;
+[data-theme="light"] .bg-white\/\[0\.08\],
+[data-theme="light"] .bg-white\/\[0\.1\],
+[data-theme="light"] .bg-white\/\[0\.12\] {
+  background-color: rgba(8, 20, 46, 0.08) !important;
 }
 
 [data-theme="light"] .bg-white\/\[0\.04\],
@@ -275,6 +277,7 @@
 }
 
 [data-theme="light"] .hover\:bg-white\/\[0\.04\]:hover,
+[data-theme="light"] .hover\:bg-white\/\[0\.05\]:hover,
 [data-theme="light"] .hover\:bg-white\/\[0\.06\]:hover,
 [data-theme="light"] .hover\:bg-white\/\[0\.08\]:hover {
   background-color: rgba(0, 92, 230, 0.07) !important;
@@ -411,6 +414,9 @@
 }
 
 [data-theme="light"] .bg-\[\#141B2D\],
+[data-theme="light"] .bg-\[\#141B2D\]\/40,
+[data-theme="light"] .bg-\[\#141B2D\]\/55,
+[data-theme="light"] .bg-\[\#141B2D\]\/60,
 [data-theme="light"] .bg-\[\#141B2D\]\/70,
 [data-theme="light"] .bg-\[\#141B2D\]\/75,
 [data-theme="light"] .bg-\[\#141B2D\]\/80,
@@ -422,6 +428,7 @@
   background-color: #f3f6fb !important;
 }
 
+[data-theme="light"] .hover\:bg-\[\#141B2D\]:hover,
 [data-theme="light"] .hover\:bg-\[\#172038\]:hover,
 [data-theme="light"] .hover\:bg-\[\#161E30\]:hover {
   background-color: #e8f0fe !important;

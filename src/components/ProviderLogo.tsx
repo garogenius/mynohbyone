@@ -161,6 +161,76 @@ export function ProviderLogo({
           />
         </svg>
       );
+    case "google_drive":
+      return (
+        <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+          <rect width="48" height="48" rx="12" fill="#FFFFFF" />
+          <path fill="#0066DA" d="M16.2 32.5l-3.8-6.6 8.2-14.2 3.8 6.6z" />
+          <path fill="#00AC47" d="M20.6 11.7h7.6l8.2 14.2h-7.6z" />
+          <path fill="#EA4335" d="M36.4 25.9l-3.8 6.6H16.2l3.8-6.6z" />
+          <path fill="#FFBA00" d="M24.4 18.3l3.8-6.6 8.2 14.2-3.8 6.6z" opacity="0.85" />
+        </svg>
+      );
+    case "remote_desktop":
+      return (
+        <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+          <rect width="48" height="48" rx="12" fill="#111318" />
+          <rect x="9" y="12" width="30" height="24" rx="4" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeDasharray="3 2" />
+          <text x="24" y="28" textAnchor="middle" fill="#FFFFFF" fontSize="14" fontWeight="800" fontFamily="sans-serif">
+            DC
+          </text>
+        </svg>
+      );
+    case "health":
+      return (
+        <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+          <rect width="48" height="48" rx="12" fill="#FFFFFF" />
+          <circle cx="24" cy="15" r="5" fill="#FF2D55" />
+          <circle cx="31.8" cy="19.5" r="5" fill="#FF3B30" />
+          <circle cx="31.8" cy="28.5" r="5" fill="#FF2D55" />
+          <circle cx="24" cy="33" r="5" fill="#FF3B30" />
+          <circle cx="16.2" cy="28.5" r="5" fill="#FF2D55" />
+          <circle cx="16.2" cy="19.5" r="5" fill="#FF3B30" />
+          <path
+            fill="#FFFFFF"
+            d="M24 29.2l-4.2-4c-1.5-1.4-1.5-3.7 0-5.1 1.3-1.2 3.3-1.1 4.2.2.9-1.3 2.9-1.4 4.2-.2 1.5 1.4 1.5 3.7 0 5.1l-4.2 4z"
+          />
+        </svg>
+      );
+    case "supabase":
+      return (
+        <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+          <rect width="48" height="48" rx="12" fill="#FFFFFF" />
+          <path
+            fill="#3ECF8E"
+            d="M26.6 35.8c-.8 1-2.4.4-2.4-.9V25h10.2c1.4 0 2.2 1.6 1.3 2.7l-9.1 8.1z"
+          />
+          <path
+            fill="#249361"
+            d="M21.4 12.2c.8-1 2.4-.4 2.4.9V23H13.6c-1.4 0-2.2-1.6-1.3-2.7l9.1-8.1z"
+          />
+        </svg>
+      );
+    case "icloud_mail":
+      return (
+        <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+          <rect width="48" height="48" rx="12" fill="#0A84FF" />
+          <rect x="11" y="15" width="26" height="18" rx="3" fill="#FFFFFF" />
+          <path fill="none" stroke="#0A84FF" strokeWidth="2.2" d="M12 16.5L24 25.5l12-9" />
+        </svg>
+      );
+    case "icloud_calendar":
+      return (
+        <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+          <rect width="48" height="48" rx="12" fill="#FFFFFF" />
+          <text x="24" y="18" textAnchor="middle" fill="#FF3B30" fontSize="8" fontWeight="700" fontFamily="sans-serif">
+            Tue
+          </text>
+          <text x="24" y="34" textAnchor="middle" fill="#111111" fontSize="18" fontWeight="600" fontFamily="sans-serif">
+            1
+          </text>
+        </svg>
+      );
     default:
       return (
         <div
