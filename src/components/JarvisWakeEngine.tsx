@@ -12,6 +12,7 @@ import {
   type VoiceSessionHandle,
 } from "../lib/voice";
 import { useAppStore } from "../store/useAppStore";
+import type { Message } from "../types/api";
 
 function playJarvisChime() {
   try {
@@ -42,7 +43,7 @@ function playJarvisChime() {
 export function JarvisWakeEngine() {
   const {
     phase,
-    activeRoute,
+    user,
     currentDeviceId,
     voiceSettings,
     loadVoiceSettings,
@@ -56,10 +57,13 @@ export function JarvisWakeEngine() {
   const [collapsed, setCollapsed] = useState(false);
   const [orbStyle, setOrbStyle] = useState<OrbStyleOption>(() => getSelectedOrbStyle());
   const [speechDetected, setSpeechDetected] = useState(false);
+  const [manualMicActive, setManualMicActive] = useState(false);
 
   const handleRef = useRef<VoiceSessionHandle | null>(null);
   const restartTimerRef = useRef<number | null>(null);
   const speechPulseTimerRef = useRef<number | null>(null);
+  const interimCommitTimerRef = useRef<number | null>(null);
+  const awakeExpireTimerRef = useRef<number | null>(null);
   const awakeUntilRef = useRef<number>(0);
   const busyRef = useRef<boolean>(false);
   const lastProcessedRef = useRef<string>("");
@@ -69,11 +73,21 @@ export function JarvisWakeEngine() {
   const wakePhrase = voiceSettings?.wakeWordPhrase || "Hey Nohby";
   const lang = voiceSettings?.inputLanguage || "en-US";
   const isHausa = lang.toLowerCase().startsWith("ha");
+  const firstName =
+    (user?.profile?.displayName || user?.name || "").trim().split(/\s+/)[0] || "";
 
   useEffect(() => {
     const onOrbChange = () => setOrbStyle(getSelectedOrbStyle());
+    const onManualMic = (e: Event) => {
+      const detail = (e as CustomEvent<{ active?: boolean }>).detail;
+      setManualMicActive(Boolean(detail?.active));
+    };
     window.addEventListener("nohby-orb-style-change", onOrbChange);
-    return () => window.removeEventListener("nohby-orb-style-change", onOrbChange);
+    window.addEventListener("nohby-manual-mic", onManualMic);
+    return () => {
+      window.removeEventListener("nohby-orb-style-change", onOrbChange);
+      window.removeEventListener("nohby-manual-mic", onManualMic);
+    };
   }, []);
 
   useEffect(() => {
@@ -96,6 +110,101 @@ export function JarvisWakeEngine() {
     setStatus(state);
     window.dispatchEvent(new CustomEvent("nohby-jarvis-state", { detail: { state } }));
   }, []);
+
+  const scheduleAwakeWindow = useCallback(
+    (durationMs = 20000) => {
+      awakeUntilRef.current = Date.now() + durationMs;
+      emitJarvisState("awake");
+      if (awakeExpireTimerRef.current) {
+        window.clearTimeout(awakeExpireTimerRef.current);
+      }
+      awakeExpireTimerRef.current = window.setTimeout(() => {
+        if (!busyRef.current && Date.now() >= awakeUntilRef.current) {
+          emitJarvisState("standby");
+        }
+      }, durationMs + 100);
+    },
+    [emitJarvisState]
+  );
+
+  const greetAndOpenListeningWindow = useCallback(() => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    playJarvisChime();
+
+    const ack = isHausa
+      ? `Na'am${firstName ? ` ${firstName}` : ""}, ina ji. Me zan taimaka maka da shi?`
+      : `Yes${firstName ? ` ${firstName}` : ""}, I'm listening. How can I help you?`;
+
+    setLastHeard(wakePhrase);
+
+    // Immediately show greeting exchange on Assistant screen bubbles
+    const nowIso = new Date().toISOString();
+    const syntheticUser: Message = {
+      id: `jarvis-wake-u-${Date.now()}`,
+      conversationId: convIdRef.current || "jarvis",
+      userId: user?.id || "",
+      role: "user",
+      content: wakePhrase,
+      inputType: "voice",
+      attachments: [],
+      modelProvider: null,
+      modelName: null,
+      tokenUsage: {},
+      createdAt: nowIso,
+    };
+    const syntheticAssistant: Message = {
+      id: `jarvis-wake-a-${Date.now()}`,
+      conversationId: convIdRef.current || "jarvis",
+      userId: user?.id || "",
+      role: "assistant",
+      content: ack,
+      inputType: "text",
+      attachments: [],
+      modelProvider: "nohby_assistant",
+      modelName: "nohby-core",
+      tokenUsage: {},
+      createdAt: nowIso,
+    };
+    window.dispatchEvent(
+      new CustomEvent("nohby-jarvis-reply", {
+        detail: {
+          userMessage: syntheticUser,
+          assistantMessage: syntheticAssistant,
+        },
+      })
+    );
+
+    emitJarvisState("speaking");
+    setIsSpeaking(true);
+    speakText(ack, {
+      language: lang,
+      voiceType: voiceSettings?.voiceType || "female",
+      pitch: voiceSettings?.ttsPitch,
+      rate: voiceSettings?.ttsRate ?? 1.0,
+      onStart: () => {
+        emitJarvisState("speaking");
+        setIsSpeaking(true);
+      },
+      onEnd: () => {
+        setIsSpeaking(false);
+        busyRef.current = false;
+        scheduleAwakeWindow(20000);
+      },
+    });
+  }, [
+    emitJarvisState,
+    firstName,
+    isHausa,
+    lang,
+    scheduleAwakeWindow,
+    setIsSpeaking,
+    user?.id,
+    voiceSettings?.ttsPitch,
+    voiceSettings?.ttsRate,
+    voiceSettings?.voiceType,
+    wakePhrase,
+  ]);
 
   const processCommand = useCallback(
     async (commandText: string) => {
@@ -151,7 +260,7 @@ export function JarvisWakeEngine() {
 
         emitJarvisState("speaking");
         setIsSpeaking(true);
-        speakText(reply.slice(0, 340), {
+        speakText(reply.slice(0, 360), {
           language: lang,
           voiceType: voiceSettings?.voiceType || "female",
           pitch: voiceSettings?.ttsPitch,
@@ -163,7 +272,8 @@ export function JarvisWakeEngine() {
           onEnd: () => {
             setIsSpeaking(false);
             busyRef.current = false;
-            emitJarvisState("standby");
+            // Stay awake for 18s after answering so user can ask a follow-up naturally
+            scheduleAwakeWindow(18000);
           },
         });
       } catch {
@@ -171,15 +281,56 @@ export function JarvisWakeEngine() {
         emitJarvisState("standby");
       }
     },
-    [currentDeviceId, emitJarvisState, lang, setIsSpeaking, voiceSettings]
+    [currentDeviceId, emitJarvisState, lang, scheduleAwakeWindow, setIsSpeaking, voiceSettings]
+  );
+
+  const handleUtteranceChunk = useCallback(
+    (deltaText: string) => {
+      const delta = deltaText.trim();
+      if (!delta || busyRef.current) return;
+
+      // Ignore self-echo of the assistant's own greeting phrase
+      const lowerDelta = delta.toLowerCase();
+      if (
+        lowerDelta.includes("i'm listening") ||
+        lowerDelta.includes("how can i help you") ||
+        lowerDelta.includes("ina ji")
+      ) {
+        return;
+      }
+
+      const primary = extractWakeWordCommand(delta, wakePhrase);
+      const wakeMatch = !primary.matched ? extractWakeWordCommand(delta, "Sannu Nohby") : primary;
+
+      if (wakeMatch.matched) {
+        if (wakeMatch.command && wakeMatch.command.length >= 2) {
+          playJarvisChime();
+          awakeUntilRef.current = 0;
+          processCommand(wakeMatch.command);
+        } else {
+          greetAndOpenListeningWindow();
+        }
+        return;
+      }
+
+      // If inside active awake window after saying "Hey Nohby", accept command directly
+      if (Date.now() < awakeUntilRef.current) {
+        awakeUntilRef.current = 0;
+        processCommand(delta);
+      }
+    },
+    [greetAndOpenListeningWindow, processCommand, wakePhrase]
   );
 
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || manualMicActive) {
       if (restartTimerRef.current) window.clearTimeout(restartTimerRef.current);
+      if (interimCommitTimerRef.current) window.clearTimeout(interimCommitTimerRef.current);
       handleRef.current?.cancel();
       handleRef.current = null;
-      emitJarvisState("standby");
+      if (!enabled) {
+        emitJarvisState("standby");
+      }
       return;
     }
 
@@ -195,22 +346,46 @@ export function JarvisWakeEngine() {
     let unmounted = false;
 
     const startLoop = () => {
-      if (unmounted) return;
+      if (unmounted || manualMicActive) return;
       lastProcessedRef.current = "";
       handleRef.current = startLocalVoiceRecognition({
         language: lang,
         onInterim: (text: string) => {
+          if (busyRef.current) return;
           if (text.trim()) {
             triggerSpeechPulse();
           }
-          const check = extractWakeWordCommand(text, wakePhrase);
-          const altCheck = !check.matched ? extractWakeWordCommand(text, "Sannu Nohby") : check;
-          if (altCheck.matched) {
-            emitJarvisState("awake");
-            setLastHeard(altCheck.command || wakePhrase);
+
+          const prev = lastProcessedRef.current;
+          const pendingDelta = text.startsWith(prev)
+            ? text.slice(prev.length).trim()
+            : text.trim();
+          if (!pendingDelta) return;
+
+          const check = extractWakeWordCommand(pendingDelta, wakePhrase);
+          const altCheck = !check.matched
+            ? extractWakeWordCommand(pendingDelta, "Sannu Nohby")
+            : check;
+          const isAwakeWindow = Date.now() < awakeUntilRef.current;
+
+          if (altCheck.matched || isAwakeWindow) {
+            setLastHeard(altCheck.command || pendingDelta);
+            if (interimCommitTimerRef.current) {
+              window.clearTimeout(interimCommitTimerRef.current);
+            }
+            // If Chrome STT pauses for 1.3s without emitting isFinal, commit immediately
+            interimCommitTimerRef.current = window.setTimeout(() => {
+              if (unmounted || busyRef.current) return;
+              lastProcessedRef.current = text;
+              handleUtteranceChunk(pendingDelta);
+            }, 1300);
           }
         },
         onFinal: (fullText: string) => {
+          if (interimCommitTimerRef.current) {
+            window.clearTimeout(interimCommitTimerRef.current);
+            interimCommitTimerRef.current = null;
+          }
           if (busyRef.current) return;
           const prev = lastProcessedRef.current;
           const delta = fullText.startsWith(prev)
@@ -219,37 +394,7 @@ export function JarvisWakeEngine() {
           lastProcessedRef.current = fullText;
           if (!delta) return;
 
-          const primary = extractWakeWordCommand(delta, wakePhrase);
-          const hausaWake = !primary.matched ? extractWakeWordCommand(delta, "Sannu Nohby") : primary;
-          const shortWake = !hausaWake.matched ? extractWakeWordCommand(delta, "Hey Nobi") : hausaWake;
-
-          if (shortWake.matched) {
-            playJarvisChime();
-            if (shortWake.command) {
-              awakeUntilRef.current = 0;
-              processCommand(shortWake.command);
-            } else {
-              // User said just "Hey Nohby" — greet & open 12s command window
-              awakeUntilRef.current = Date.now() + 12000;
-              emitJarvisState("speaking");
-              const ack = isHausa ? "Na'am, ina ji." : "Yes, I'm listening.";
-              speakText(ack, {
-                language: lang,
-                voiceType: voiceSettings?.voiceType || "female",
-                pitch: voiceSettings?.ttsPitch,
-                rate: voiceSettings?.ttsRate ?? 1.0,
-                onStart: () => emitJarvisState("speaking"),
-                onEnd: () => emitJarvisState("awake"),
-              });
-            }
-            return;
-          }
-
-          // If inside awake window after saying "Hey Nohby", accept command directly
-          if (Date.now() < awakeUntilRef.current) {
-            awakeUntilRef.current = 0;
-            processCommand(delta);
-          }
+          handleUtteranceChunk(delta);
         },
         onError: (err: string) => {
           if (err === "not-allowed" || err === "service-not-allowed") {
@@ -261,8 +406,8 @@ export function JarvisWakeEngine() {
           }
         },
         onEnd: () => {
-          if (!unmounted && enabled) {
-            restartTimerRef.current = window.setTimeout(startLoop, 450);
+          if (!unmounted && enabled && !manualMicActive) {
+            restartTimerRef.current = window.setTimeout(startLoop, 400);
           }
         },
       });
@@ -274,25 +419,23 @@ export function JarvisWakeEngine() {
       unmounted = true;
       if (restartTimerRef.current) window.clearTimeout(restartTimerRef.current);
       if (speechPulseTimerRef.current) window.clearTimeout(speechPulseTimerRef.current);
+      if (interimCommitTimerRef.current) window.clearTimeout(interimCommitTimerRef.current);
       handleRef.current?.cancel();
       handleRef.current = null;
     };
   }, [
+    emitJarvisState,
     enabled,
-    isHausa,
+    handleUtteranceChunk,
     lang,
-    processCommand,
+    manualMicActive,
     showToast,
     triggerSpeechPulse,
     updateVoiceSettings,
-    voiceSettings?.ttsPitch,
-    voiceSettings?.ttsRate,
-    voiceSettings?.voiceType,
     wakePhrase,
-    emitJarvisState,
   ]);
 
-  if (!enabled || activeRoute === "home") {
+  if (!enabled) {
     return null;
   }
 
@@ -362,7 +505,12 @@ export function JarvisWakeEngine() {
         />
       </button>
 
-      <div className="min-w-0 pr-0.5">
+      <button
+        type="button"
+        onClick={greetAndOpenListeningWindow}
+        title="Click or say 'Hey Nohby' to talk"
+        className="min-w-0 pr-0.5 text-left"
+      >
         <p className="flex items-center gap-1.5 text-[11px] font-semibold text-white">
           <Radio
             className={`h-3 w-3 shrink-0 ${
@@ -382,7 +530,7 @@ export function JarvisWakeEngine() {
         {lastHeard && isActive && (
           <p className="max-w-[160px] truncate text-[10px] text-zinc-400">{lastHeard}</p>
         )}
-      </div>
+      </button>
 
       <button
         type="button"

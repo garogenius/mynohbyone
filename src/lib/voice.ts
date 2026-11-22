@@ -41,8 +41,53 @@ export function isSpeechSynthesisSupported(): boolean {
   return typeof window !== "undefined" && "speechSynthesis" in window;
 }
 
+const NOHBY_PHONETIC_VARIANTS = [
+  "hey nohby",
+  "hey nobi",
+  "hey noby",
+  "hey nobby",
+  "hey nobody",
+  "hey no be",
+  "hey know be",
+  "hey know me",
+  "hey novi",
+  "hey nubi",
+  "hey nobie",
+  "hey nohbi",
+  "hey nohbie",
+  "hey noah",
+  "hey obi",
+  "hey toby",
+  "hey ruby",
+  "hey bobby",
+  "hey kobe",
+  "a nohby",
+  "a nobi",
+  "hay nohby",
+  "hay nobi",
+  "hi nohby",
+  "hi nobi",
+  "hi nobby",
+  "hello nohby",
+  "hello nobi",
+  "hello nobby",
+  "ok nohby",
+  "ok nobi",
+  "okay nohby",
+  "okay nobi",
+  "sannu nohby",
+  "sannu nobi",
+  "sannu nobby",
+  "sannu nobody",
+  "nohby",
+  "nobi",
+  "noby",
+  "nobby",
+];
+
 /**
- * Checks whether a spoken transcript starts with (or contains) the configured wake word.
+ * Checks whether a spoken transcript starts with (or contains) the configured wake word
+ * or common browser STT phonetic variants of "Hey Nohby" / "Sannu Nohby".
  * Returns { matched, command } so wake-word mode only forwards intentional commands.
  */
 export function extractWakeWordCommand(
@@ -56,17 +101,35 @@ export function extractWakeWordCommand(
   }
 
   const lower = normalizedTranscript.toLowerCase();
-  const idx = lower.indexOf(normalizedWake);
-  if (idx === -1) {
-    return { matched: false, command: "" };
+  const candidates = [normalizedWake];
+  if (
+    normalizedWake.includes("nohby") ||
+    normalizedWake.includes("nobi") ||
+    normalizedWake.includes("noby")
+  ) {
+    for (const v of NOHBY_PHONETIC_VARIANTS) {
+      if (!candidates.includes(v)) candidates.push(v);
+    }
   }
 
-  const after = normalizedTranscript
-    .slice(idx + normalizedWake.length)
-    .replace(/^[\s,.:;!?-]+/, "")
-    .trim();
+  // Sort longest-first so "hey nobody" matches before "nohby"
+  candidates.sort((a, b) => b.length - a.length);
 
-  return { matched: true, command: after };
+  for (const phrase of candidates) {
+    const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(`(?:^|[\\s,.:;!?-])${escaped}(?=$|[\\s,.:;!?-])`, "i");
+    const match = regex.exec(lower);
+    if (match) {
+      const endIndex = match.index + match[0].length;
+      const after = normalizedTranscript
+        .slice(endIndex)
+        .replace(/^[\s,.:;!?-]+/, "")
+        .trim();
+      return { matched: true, command: after };
+    }
+  }
+
+  return { matched: false, command: "" };
 }
 
 export interface VoiceSessionHandle {
@@ -111,16 +174,23 @@ export function startLocalVoiceRecognition(options: {
   };
 
   recognition.onerror = (evt) => {
-    if (!cancelled) {
-      options.onError(evt.error || "speech_recognition_error");
+    if (cancelled) return;
+    if (evt.error === "language-not-supported" && recognition.lang !== "en-US") {
+      recognition.lang = "en-US";
+      return;
     }
+    options.onError(evt.error || "speech_recognition_error");
   };
 
   recognition.onend = () => {
     options.onEnd();
   };
 
-  recognition.start();
+  try {
+    recognition.start();
+  } catch {
+    // Ignore start collision
+  }
 
   return {
     stop: () => {
@@ -235,6 +305,13 @@ function pickBestSpeechVoice(language: string, voiceType?: string): SpeechSynthe
   return genderMatch || pool[0] || null;
 }
 
+let activeUtterance: SpeechSynthesisUtterance | null = null;
+let activeSpeechTimer: number | null = null;
+
+export function isCurrentlySpeaking(): boolean {
+  return Boolean(activeUtterance);
+}
+
 export function speakText(
   text: string,
   options: {
@@ -251,9 +328,33 @@ export function speakText(
     return;
   }
 
-  window.speechSynthesis.cancel();
+  if (activeSpeechTimer) {
+    window.clearTimeout(activeSpeechTimer);
+    activeSpeechTimer = null;
+  }
+
+  try {
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.resume();
+  } catch {
+    // Ignore synth reset errors
+  }
+
+  let finished = false;
+  const finishOnce = () => {
+    if (finished) return;
+    finished = true;
+    if (activeSpeechTimer) {
+      window.clearTimeout(activeSpeechTimer);
+      activeSpeechTimer = null;
+    }
+    activeUtterance = null;
+    options.onEnd?.();
+  };
+
   const preset = VOICE_PERSONA_PRESETS.find((p) => p.id === options.voiceType);
   const utterance = new SpeechSynthesisUtterance(text);
+  activeUtterance = utterance;
   utterance.rate = options.rate ?? preset?.rate ?? 1.0;
   utterance.pitch = options.pitch ?? preset?.pitch ?? 1.0;
   utterance.lang = options.language || "en-US";
@@ -261,16 +362,36 @@ export function speakText(
   const matchedVoice = pickBestSpeechVoice(utterance.lang, options.voiceType);
   if (matchedVoice) {
     utterance.voice = matchedVoice;
+    utterance.lang = matchedVoice.lang || utterance.lang;
   }
 
   utterance.onstart = () => options.onStart?.();
-  utterance.onend = () => options.onEnd?.();
-  utterance.onerror = () => options.onEnd?.();
-  window.speechSynthesis.speak(utterance);
+  utterance.onend = () => finishOnce();
+  utterance.onerror = () => finishOnce();
+
+  // Safety watchdog in case browser TTS is muted or drops onend event
+  const maxDurationMs = Math.max(3500, Math.min(24000, text.length * 85));
+  activeSpeechTimer = window.setTimeout(finishOnce, maxDurationMs);
+
+  try {
+    window.speechSynthesis.speak(utterance);
+  } catch {
+    finishOnce();
+  }
 }
 
 export function stopSpeaking(): void {
+  if (activeSpeechTimer) {
+    window.clearTimeout(activeSpeechTimer);
+    activeSpeechTimer = null;
+  }
+  activeUtterance = null;
   if (isSpeechSynthesisSupported()) {
-    window.speechSynthesis.cancel();
+    try {
+      window.speechSynthesis.cancel();
+    } catch {
+      // Ignore
+    }
   }
 }
+

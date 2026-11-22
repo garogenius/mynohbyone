@@ -929,7 +929,7 @@ export function AssistantScreen() {
         <div className="mt-2 space-y-1.5 text-[10px]">
           <div className="flex items-center justify-between">
             <span className="text-zinc-400">Engine:</span>
-            <span className="font-medium text-white">NohbyAI · Gemini</span>
+            <span className="font-medium text-white">NohbyAI Core</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-zinc-400">Auto-Speak:</span>

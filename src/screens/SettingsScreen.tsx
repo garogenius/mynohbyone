@@ -34,7 +34,7 @@ import { useAppStore } from "../store/useAppStore";
 import type { VoicePersonaId } from "../types/api";
 
 const AI_PROVIDER_OPTIONS = [
-  { id: "gemini", label: "Google Gemini (Primary)", defaultModel: "gemini-flash-latest", baseUrl: "https://generativelanguage.googleapis.com/v1beta" },
+  { id: "gemini", label: "NohbyAI Core (Primary)", defaultModel: "nohby-core-flash", baseUrl: "https://generativelanguage.googleapis.com/v1beta" },
   { id: "openai", label: "OpenAI", defaultModel: "gpt-4o-mini", baseUrl: "https://api.openai.com/v1" },
   { id: "groq", label: "Groq (Ultra-Fast)", defaultModel: "llama-3.3-70b-versatile", baseUrl: "https://api.groq.com/openai/v1" },
   { id: "openrouter", label: "OpenRouter", defaultModel: "openai/gpt-4o-mini", baseUrl: "https://openrouter.ai/api/v1" },
@@ -59,7 +59,7 @@ export function SettingsScreen() {
 
   // AI Chat Engine state
   const [aiProvider, setAiProvider] = useState("gemini");
-  const [aiModel, setAiModel] = useState("gemini-flash-latest");
+  const [aiModel, setAiModel] = useState("nohby-core-flash");
   const [aiBaseUrl, setAiBaseUrl] = useState("https://generativelanguage.googleapis.com/v1beta");
   const [aiApiKey, setAiApiKey] = useState("");
   const [aiConnected, setAiConnected] = useState(false);
@@ -103,7 +103,9 @@ export function SettingsScreen() {
       .then((res) => {
         const cfg = res.data.config;
         if (cfg.provider && cfg.provider !== "nohby_assistant") setAiProvider(cfg.provider);
-        if (cfg.model && cfg.model !== "nohby-one-assistant-v1") setAiModel(cfg.model);
+        if (cfg.model && cfg.model !== "nohby-one-assistant-v1") {
+          setAiModel(cfg.model.toLowerCase().startsWith("gemini") ? "nohby-core-flash" : cfg.model);
+        }
         if (cfg.baseUrl) setAiBaseUrl(cfg.baseUrl);
         setAiConnected(cfg.connected);
         setAiMaskedKey(cfg.maskedKey);
@@ -296,10 +298,10 @@ export function SettingsScreen() {
             <Cpu className="h-4 w-4 text-[#00D4FF]" />
             <div>
               <h2 className="font-display text-sm font-semibold text-white">
-                AI Chat Engine (Live LLM)
+                NohbyAI Chat Engine (Live LLM)
               </h2>
               <p className="text-xs text-zinc-400">
-                Connect Google Gemini, OpenAI, Groq, OpenRouter, or DeepSeek for real generative chat in English &amp; Hausa.
+                Configure NohbyAI Core or connect a custom engine for real generative chat in English &amp; Hausa.
               </p>
             </div>
           </div>
@@ -347,7 +349,7 @@ export function SettingsScreen() {
                 type="text"
                 value={aiModel}
                 onChange={(e) => setAiModel(e.target.value)}
-                placeholder="gemini-2.0-flash / gpt-4o-mini"
+                placeholder="nohby-core-flash / gpt-4o-mini"
                 className="studio-input h-9 w-full rounded-lg px-3 text-xs"
               />
             </div>
