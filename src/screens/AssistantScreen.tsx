@@ -444,7 +444,7 @@ export function AssistantScreen() {
         <button
           type="button"
           onClick={handleCreateConversation}
-          className="flex min-h-[38px] flex-1 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-indigo-500"
+          className="btn-ivory flex min-h-[38px] flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs"
         >
           <MessageSquarePlus className="h-3.5 w-3.5" />
           New Chat
@@ -853,7 +853,7 @@ export function AssistantScreen() {
               type="submit"
               disabled={sending || !composer.trim()}
               aria-label="Send message"
-              className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white transition hover:bg-indigo-500 disabled:opacity-40"
+              className="btn-ivory flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl"
             >
               {sending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

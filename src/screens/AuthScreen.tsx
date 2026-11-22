@@ -1,12 +1,30 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { ArrowRight, Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck, User as UserIcon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ArrowRight, Check, Eye, EyeOff, Loader2 } from "lucide-react";
 
 import { BrandMark } from "../components/BrandMark";
 import { ApiError, apiClient } from "../lib/api";
 import { useAppStore } from "../store/useAppStore";
 
 type AuthMode = "login" | "register" | "forgot";
+
+const EDITORIAL_SLIDES = [
+  {
+    eyebrow: "LOCAL-FIRST ARCHITECTURE",
+    headline: "Intelligence in the cloud. Control on your machine.",
+    body: "Nohby ONE plans and reasons with precision, while every desktop action runs locally under your explicit authority.",
+  },
+  {
+    eyebrow: "SCOPED APPROVAL ENGINE",
+    headline: "Nothing sensitive executes without your sign-off.",
+    body: "Review exact parameters, recipients, and risk levels before an email is sent, a file is modified, or a post goes live.",
+  },
+  {
+    eyebrow: "TRANSPARENT VOICE & AGENTS",
+    headline: "Natural voice control with zero covert activity.",
+    body: "Configurable wake words, visible microphone telemetry, and instant per-device session revocation built into the core.",
+  },
+];
 
 export function AuthScreen() {
   const { login, register, busy, error, clearError, showToast } = useAppStore();
@@ -18,12 +36,27 @@ export function AuthScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [localMsg, setLocalMsg] = useState<string | null>(null);
   const [submittingForgot, setSubmittingForgot] = useState(false);
+  const [slideIndex, setSlideIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setSlideIndex((prev) => (prev + 1) % EDITORIAL_SLIDES.length);
+    }, 6500);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const switchMode = (next: AuthMode) => {
     setMode(next);
     setLocalMsg(null);
     clearError();
   };
+
+  const passwordChecks = [
+    { label: "8+ characters", ok: password.length >= 8 },
+    { label: "Uppercase", ok: /[A-Z]/.test(password) },
+    { label: "Lowercase", ok: /[a-z]/.test(password) },
+    { label: "Number", ok: /\d/.test(password) },
+  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +66,7 @@ export function AuthScreen() {
       try {
         await login(email.trim(), password);
       } catch {
-        // Handled in store
+        // Error surfaced in store
       }
       return;
     }
@@ -42,7 +75,7 @@ export function AuthScreen() {
       try {
         await register(name.trim(), email.trim(), password);
       } catch {
-        // Handled in store
+        // Error surfaced in store
       }
       return;
     }
@@ -59,199 +92,327 @@ export function AuthScreen() {
     }
   };
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0A0B0E] px-4 py-8 sm:px-6">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-        className="grid w-full max-w-4xl overflow-hidden rounded-2xl border border-white/[0.08] bg-[#111318] shadow-2xl md:grid-cols-12"
-      >
-        <div className="flex flex-col justify-between border-b border-white/[0.08] bg-[#0D0F13] p-6 sm:p-8 md:col-span-5 md:border-r md:border-b-0">
-          <div>
-            <div className="flex items-center gap-3">
-              <BrandMark size="md" />
-              <div>
-                <h1 className="text-base font-semibold tracking-tight text-white">Nohby ONE</h1>
-                <p className="text-xs text-zinc-500">Nohby Technologies Limited</p>
-              </div>
-            </div>
+  const currentSlide = EDITORIAL_SLIDES[slideIndex];
 
-            <h2 className="mt-8 text-xl font-semibold leading-snug tracking-tight text-white">
-              Local-first personal AI operating assistant.
-            </h2>
-            <p className="mt-3 text-xs leading-relaxed text-zinc-400">
-              Cloud intelligence plans and coordinates. Your desktop agent executes only what you
-              authorise, with explicit approvals and per-device session revocation.
-            </p>
+  return (
+    <div className="grid min-h-screen w-full bg-[#0B0C0E] lg:grid-cols-12">
+      {/* Left: Full-bleed architectural studio showcase (Desktop lg+) */}
+      <section className="relative hidden overflow-hidden border-r border-white/[0.08] bg-[#090A0C] lg:col-span-6 lg:flex lg:flex-col lg:justify-between xl:col-span-7">
+        {/* Bespoke studio visual with slow cinematic Ken Burns drift */}
+        <motion.img
+          src="/nohby-studio.jpg"
+          alt="Nohby ONE architectural glass and brushed titanium sculpture"
+          initial={{ scale: 1.02 }}
+          animate={{ scale: [1.02, 1.09, 1.02] }}
+          transition={{ duration: 28, repeat: Infinity, ease: "easeInOut" }}
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-85"
+        />
+
+        {/* Editorial dark vignette for crisp legibility */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0B0C0E] via-[#0B0C0E]/35 to-[#0B0C0E]/65" />
+
+        {/* Top bar */}
+        <div className="relative z-10 flex items-center justify-between p-8 xl:p-10">
+          <div className="flex items-center gap-3">
+            <BrandMark size="md" />
+            <div>
+              <span className="font-display text-sm font-semibold tracking-tight text-[#F4F1EA]">
+                Nohby ONE
+              </span>
+              <span className="ml-2 font-mono text-[11px] text-[#A1A3AA]">v0.3</span>
+            </div>
           </div>
 
-          <div className="mt-8 space-y-2.5 border-t border-white/[0.06] pt-5 text-xs text-zinc-400">
+          <span className="font-mono text-[11px] tracking-widest text-[#D6C6A5]/80 uppercase">
+            Nohby Technologies
+          </span>
+        </div>
+
+        {/* Bottom editorial statement with smooth Framer Motion crossfade */}
+        <div className="relative z-10 max-w-xl p-8 xl:p-12">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={slideIndex}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <p className="font-mono text-[11px] tracking-[0.18em] text-[#D6C6A5] uppercase">
+                {currentSlide.eyebrow}
+              </p>
+              <h2 className="font-display mt-3 text-3xl font-semibold leading-[1.18] tracking-tight text-[#F4F1EA] xl:text-4xl">
+                {currentSlide.headline}
+              </h2>
+              <p className="mt-3.5 text-sm leading-relaxed text-[#B2B4BC]">
+                {currentSlide.body}
+              </p>
+            </motion.div>
+          </AnimatePresence>
+
+          {/* Minimalist slide indicators */}
+          <div className="mt-8 flex items-center gap-2">
+            {EDITORIAL_SLIDES.map((s, idx) => (
+              <button
+                key={s.eyebrow}
+                type="button"
+                onClick={() => setSlideIndex(idx)}
+                aria-label={`Show highlight ${idx + 1}`}
+                className={`h-1 rounded-full transition-all duration-300 ${
+                  idx === slideIndex
+                    ? "w-8 bg-[#F4F1EA]"
+                    : "w-2 bg-white/20 hover:bg-white/40"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Right: Distraction-free crafted Auth Studio (Desktop, Tablet & Mobile) */}
+      <section className="flex min-h-screen flex-col justify-between lg:col-span-6 xl:col-span-5">
+        {/* Mobile & Tablet compact studio banner */}
+        <div className="relative h-36 w-full overflow-hidden border-b border-white/[0.08] sm:h-44 lg:hidden">
+          <img
+            src="/nohby-studio.jpg"
+            alt=""
+            className="h-full w-full object-cover object-center opacity-75"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0B0C0E] via-[#0B0C0E]/45 to-transparent" />
+          <div className="absolute right-5 bottom-4 left-5 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400" />
-              <span>Rotating refresh tokens &amp; scoped device sessions</span>
+              <BrandMark size="sm" />
+              <span className="font-display text-sm font-semibold text-[#F4F1EA]">
+                Nohby ONE
+              </span>
             </div>
-            <div className="flex items-center gap-2.5">
-              <Lock className="h-4 w-4 shrink-0 text-indigo-400" />
-              <span>No covert recording or unrestricted remote control</span>
-            </div>
+            <span className="font-mono text-[10px] tracking-widest text-[#D6C6A5] uppercase">
+              Local-First AI OS
+            </span>
           </div>
         </div>
 
-        <div className="p-6 sm:p-8 md:col-span-7">
-          <div className="flex items-center gap-1 rounded-lg border border-white/[0.08] bg-[#0A0B0E] p-1">
-            <button
-              type="button"
-              onClick={() => switchMode("login")}
-              className={`min-h-[36px] flex-1 rounded-md text-xs font-medium transition ${
-                mode === "login"
-                  ? "bg-[#1C1F28] text-white"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => switchMode("register")}
-              className={`min-h-[36px] flex-1 rounded-md text-xs font-medium transition ${
-                mode === "register"
-                  ? "bg-[#1C1F28] text-white"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              Create Account
-            </button>
-          </div>
+        {/* Centered form container */}
+        <div className="flex flex-1 items-center justify-center px-5 py-8 sm:px-10 lg:px-12">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full max-w-[400px]"
+          >
+            {/* Sliding segmented tab switch */}
+            {mode !== "forgot" && (
+              <div className="relative mb-8 grid grid-cols-2 rounded-xl border border-white/[0.08] bg-[#121418] p-1">
+                {(["login", "register"] as const).map((tab) => {
+                  const active = mode === tab;
+                  return (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => switchMode(tab)}
+                      className={`relative z-10 min-h-[38px] rounded-lg text-xs font-medium transition-colors ${
+                        active ? "text-[#0B0C0E]" : "text-[#A1A3AA] hover:text-[#F4F1EA]"
+                      }`}
+                    >
+                      {active && (
+                        <motion.span
+                          layoutId="auth-active-tab"
+                          transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                          className="absolute inset-0 -z-10 rounded-lg bg-[#F4F1EA]"
+                        />
+                      )}
+                      {tab === "login" ? "Sign In" : "Create Account"}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
-          <div className="mt-6">
-            <h3 className="text-base font-semibold text-white">
-              {mode === "login"
-                ? "Sign in to your workspace"
-                : mode === "register"
-                ? "Create your Nohby ONE account"
-                : "Reset your password"}
-            </h3>
-            <p className="mt-1 text-xs text-zinc-400">
-              {mode === "login"
-                ? "Authenticate to connect this device to your account."
-                : mode === "register"
-                ? "Minimum 8 characters including uppercase, lowercase, and a number."
-                : "Enter your account email to request password recovery."}
-            </p>
-          </div>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={mode}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.2 }}
+              >
+                <h1 className="font-display text-2xl font-semibold tracking-tight text-[#F4F1EA]">
+                  {mode === "login"
+                    ? "Welcome back"
+                    : mode === "register"
+                    ? "Create your account"
+                    : "Reset your password"}
+                </h1>
+                <p className="mt-1.5 text-sm text-[#8E9199]">
+                  {mode === "login"
+                    ? "Sign in to connect this device to your Nohby ONE workspace."
+                    : mode === "register"
+                    ? "Set up your personal operating assistant in seconds."
+                    : "Enter your account email and we will send recovery instructions."}
+                </p>
+              </motion.div>
+            </AnimatePresence>
 
-          {error && (
-            <div className="mt-4 rounded-lg border border-rose-500/30 bg-rose-950/30 px-3.5 py-2.5 text-xs text-rose-200">
-              {error}
-            </div>
-          )}
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-5 rounded-xl border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-xs leading-relaxed text-rose-200"
+              >
+                {error}
+              </motion.div>
+            )}
 
-          {localMsg && (
-            <div className="mt-4 rounded-lg border border-indigo-500/30 bg-indigo-950/30 px-3.5 py-2.5 text-xs text-indigo-200">
-              {localMsg}
-            </div>
-          )}
+            {localMsg && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-5 rounded-xl border border-[#D6C6A5]/30 bg-[#D6C6A5]/10 px-4 py-3 text-xs leading-relaxed text-[#F4F1EA]"
+              >
+                {localMsg}
+              </motion.div>
+            )}
 
-          <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-            {mode === "register" && (
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-zinc-300">Full Name</label>
-                <div className="relative">
-                  <UserIcon className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+              {mode === "register" && (
+                <div>
+                  <label
+                    htmlFor="auth-name"
+                    className="mb-1.5 block text-xs font-medium text-[#C8C9CE]"
+                  >
+                    Full name
+                  </label>
                   <input
+                    id="auth-name"
                     type="text"
                     required
                     minLength={2}
+                    autoComplete="name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Alex Morgan"
-                    className="w-full rounded-lg border border-white/[0.1] bg-[#0A0B0E] py-2.5 pr-3.5 pl-9 text-sm text-white placeholder-zinc-600 outline-none transition focus:border-indigo-500"
+                    className="studio-input h-11 w-full rounded-xl px-3.5 text-sm"
                   />
                 </div>
-              </div>
-            )}
+              )}
 
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-zinc-300">Email Address</label>
-              <div className="relative">
-                <Mail className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+              <div>
+                <label
+                  htmlFor="auth-email"
+                  className="mb-1.5 block text-xs font-medium text-[#C8C9CE]"
+                >
+                  Work or personal email
+                </label>
                 <input
+                  id="auth-email"
                   type="email"
                   required
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@company.com"
-                  className="w-full rounded-lg border border-white/[0.1] bg-[#0A0B0E] py-2.5 pr-3.5 pl-9 text-sm text-white placeholder-zinc-600 outline-none transition focus:border-indigo-500"
+                  placeholder="name@company.com"
+                  className="studio-input h-11 w-full rounded-xl px-3.5 text-sm"
                 />
               </div>
-            </div>
 
-            {mode !== "forgot" && (
-              <div>
-                <div className="mb-1.5 flex items-center justify-between">
-                  <label className="text-xs font-medium text-zinc-300">Password</label>
-                  {mode === "login" && (
+              {mode !== "forgot" && (
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <label
+                      htmlFor="auth-password"
+                      className="text-xs font-medium text-[#C8C9CE]"
+                    >
+                      Password
+                    </label>
+                    {mode === "login" && (
+                      <button
+                        type="button"
+                        onClick={() => switchMode("forgot")}
+                        className="text-xs font-medium text-[#A1A3AA] transition hover:text-[#F4F1EA]"
+                      >
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input
+                      id="auth-password"
+                      type={showPassword ? "text" : "password"}
+                      required
+                      minLength={mode === "register" ? 8 : 1}
+                      autoComplete={mode === "login" ? "current-password" : "new-password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      className="studio-input h-11 w-full rounded-xl pr-11 pl-3.5 text-sm"
+                    />
                     <button
                       type="button"
-                      onClick={() => switchMode("forgot")}
-                      className="text-xs font-medium text-indigo-400 hover:text-indigo-300"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute top-1/2 right-2.5 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-[#6E717A] transition hover:text-[#F4F1EA]"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
                     >
-                      Forgot password?
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
                     </button>
+                  </div>
+
+                  {mode === "register" && (
+                    <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+                      {passwordChecks.map((rule) => (
+                        <div
+                          key={rule.label}
+                          className={`flex items-center gap-1.5 text-[11px] transition-colors ${
+                            rule.ok ? "text-emerald-400" : "text-[#6E717A]"
+                          }`}
+                        >
+                          <Check className="h-3 w-3 shrink-0" />
+                          <span>{rule.label}</span>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
-                <div className="relative">
-                  <Lock className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    required
-                    minLength={mode === "register" ? 8 : 1}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••••••"
-                    className="w-full rounded-lg border border-white/[0.1] bg-[#0A0B0E] py-2.5 pr-10 pl-9 text-sm text-white placeholder-zinc-600 outline-none transition focus:border-indigo-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="absolute top-1/2 right-2.5 -translate-y-1/2 p-1 text-zinc-500 hover:text-zinc-300"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={busy || submittingForgot}
+                className="btn-ivory mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm"
+              >
+                {(busy || submittingForgot) && <Loader2 className="h-4 w-4 animate-spin" />}
+                <span>
+                  {mode === "login"
+                    ? "Sign In"
+                    : mode === "register"
+                    ? "Create Account"
+                    : "Send Recovery Link"}
+                </span>
+                {!busy && !submittingForgot && <ArrowRight className="h-4 w-4" />}
+              </button>
+            </form>
+
+            {mode === "forgot" && (
+              <button
+                type="button"
+                onClick={() => switchMode("login")}
+                className="mt-5 text-xs font-medium text-[#A1A3AA] transition hover:text-[#F4F1EA]"
+              >
+                ← Return to Sign In
+              </button>
             )}
-
-            <button
-              type="submit"
-              disabled={busy || submittingForgot}
-              className="mt-2 flex min-h-[42px] w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:opacity-50"
-            >
-              {(busy || submittingForgot) && <Loader2 className="h-4 w-4 animate-spin" />}
-              <span>
-                {mode === "login"
-                  ? "Sign In"
-                  : mode === "register"
-                  ? "Create Account"
-                  : "Send Reset Instructions"}
-              </span>
-              {!busy && !submittingForgot && <ArrowRight className="h-4 w-4" />}
-            </button>
-          </form>
-
-          {mode === "forgot" && (
-            <button
-              type="button"
-              onClick={() => switchMode("login")}
-              className="mt-4 text-xs font-medium text-zinc-400 hover:text-zinc-200"
-            >
-              Back to Sign In
-            </button>
-          )}
+          </motion.div>
         </div>
-      </motion.div>
+
+        {/* Subtle legal/security footer */}
+        <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.06] px-6 py-4 text-[11px] text-[#6E717A] sm:px-10">
+          <span>© {new Date().getFullYear()} Nohby Technologies Limited</span>
+          <span>Encrypted sessions · Local execution</span>
+        </footer>
+      </section>
     </div>
   );
 }

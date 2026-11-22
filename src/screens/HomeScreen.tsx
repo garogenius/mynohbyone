@@ -44,7 +44,7 @@ export function HomeScreen() {
             <button
               type="button"
               onClick={() => setRoute("assistant")}
-              className="inline-flex min-h-[38px] items-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-indigo-500"
+              className="btn-ivory inline-flex min-h-[38px] items-center gap-2 rounded-lg px-3.5 py-2 text-xs"
             >
               <MessageSquare className="h-3.5 w-3.5" />
               Open Assistant

@@ -182,7 +182,7 @@ export function SettingsScreen() {
             <button
               type="submit"
               disabled={busy}
-              className="inline-flex min-h-[38px] items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50"
+              className="btn-ivory inline-flex min-h-[38px] items-center gap-2 rounded-lg px-4 py-2 text-xs"
             >
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
               Save Profile

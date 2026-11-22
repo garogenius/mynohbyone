@@ -43,11 +43,13 @@ export function App() {
 
   if (phase === "booting") {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#0A0B0E] px-4">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#0B0C0E] px-4">
         <BrandMark size="lg" />
-        <h1 className="mt-5 text-base font-semibold tracking-tight text-white">Nohby ONE</h1>
-        <div className="mt-3 flex items-center gap-2 text-xs text-zinc-400">
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400" />
+        <h1 className="font-display mt-5 text-base font-semibold tracking-tight text-[#F4F1EA]">
+          Nohby ONE
+        </h1>
+        <div className="mt-3 flex items-center gap-2 text-xs text-[#8E9199]">
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-[#D6C6A5]" />
           <span>{bootMessage}</span>
         </div>
       </div>
@@ -56,18 +58,20 @@ export function App() {
 
   if (phase === "offline") {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#0A0B0E] px-4 text-center">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#0B0C0E] px-4 text-center">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-rose-500/25 bg-rose-500/10 text-rose-400">
           <WifiOff className="h-5 w-5" />
         </div>
-        <h1 className="mt-4 text-base font-semibold text-white">Backend Unavailable</h1>
-        <p className="mt-1.5 max-w-sm text-xs leading-relaxed text-zinc-400">
+        <h1 className="font-display mt-4 text-base font-semibold text-[#F4F1EA]">
+          Backend Unavailable
+        </h1>
+        <p className="mt-1.5 max-w-sm text-xs leading-relaxed text-[#8E9199]">
           {error || "Could not connect to the Nohby ONE backend service. Ensure the API is running."}
         </p>
         <button
           type="button"
           onClick={() => bootstrap()}
-          className="mt-5 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-500"
+          className="btn-ivory mt-5 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs"
         >
           <RefreshCw className="h-3.5 w-3.5" />
           Retry Connection

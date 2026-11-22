@@ -96,7 +96,7 @@ function SidebarContent({
               <span className="flex items-center gap-2.5">
                 <Icon
                   className={`h-4 w-4 ${
-                    isActive ? "text-indigo-400" : "text-zinc-500 group-hover:text-zinc-300"
+                    isActive ? "text-[#D6C6A5]" : "text-zinc-500 group-hover:text-zinc-300"
                   }`}
                 />
                 {item.label}

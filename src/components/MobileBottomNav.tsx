@@ -34,7 +34,7 @@ export function MobileBottomNav({
             type="button"
             onClick={() => onSelect(tab.id)}
             className={`flex min-h-[44px] min-w-[64px] flex-col items-center justify-center gap-1 rounded-lg px-2 text-[11px] font-medium transition ${
-              active ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"
+              active ? "text-[#F4F1EA]" : "text-zinc-500 hover:text-zinc-300"
             }`}
           >
             <Icon className="h-4 w-4" />
