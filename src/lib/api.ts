@@ -17,9 +17,25 @@ import type {
   VoiceSettings,
 } from "../types/api";
 
-export const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1"
-).replace(/\/$/, "");
+const PRODUCTION_API_BASE_URL =
+  "https://respectful-transformation-production-87dc0ab5.up.railway.app/api/v1";
+
+function resolveApiBaseUrl(): string {
+  const fromEnv = import.meta.env.VITE_API_BASE_URL;
+  if (fromEnv && fromEnv.trim()) {
+    return fromEnv.trim().replace(/\/$/, "");
+  }
+  if (
+    typeof window !== "undefined" &&
+    window.location.hostname !== "localhost" &&
+    window.location.hostname !== "127.0.0.1"
+  ) {
+    return PRODUCTION_API_BASE_URL;
+  }
+  return "http://localhost:8000/api/v1";
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
 
 const ROOT_BASE_URL = API_BASE_URL.replace(/\/api\/v1$/, "");
 
