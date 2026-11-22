@@ -3,12 +3,17 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Check,
   Copy,
+  Folder,
+  FolderPlus,
   History,
   Loader2,
   MessageSquare,
   MessageSquarePlus,
   Mic,
   MicOff,
+  Pencil,
+  Pin,
+  PinOff,
   Search,
   Send,
   Sparkles,
@@ -21,6 +26,13 @@ import {
 
 import { ConfirmationDialog } from "../components/StateViews";
 import { ApiError, apiClient } from "../lib/api";
+import {
+  loadChatWorkspaceMeta,
+  PROJECT_COLORS,
+  saveChatWorkspaceMeta,
+  type ChatProject,
+  type ChatWorkspaceMeta,
+} from "../lib/chatWorkspace";
 import { RealtimeClient } from "../lib/realtime";
 import {
   isSpeechRecognitionSupported,
@@ -95,6 +107,25 @@ export function AssistantScreen() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [autoSpeak, setAutoSpeak] = useState(false);
+
+  // Chat Workspace: Pinned chats, inline rename, and Projects
+  const [workspaceMeta, setWorkspaceMeta] = useState<ChatWorkspaceMeta>(() =>
+    loadChatWorkspaceMeta(user?.id)
+  );
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectColor, setNewProjectColor] = useState<ChatProject["color"]>("cyan");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [assigningProjectConvId, setAssigningProjectConvId] = useState<string | null>(null);
+
+  const updateWorkspaceMeta = useCallback(
+    (updater: (prev: ChatWorkspaceMeta) => ChatWorkspaceMeta) => {
+      setWorkspaceMeta((prev) => saveChatWorkspaceMeta(updater(prev), user?.id));
+    },
+    [user?.id]
+  );
 
   // Voice capture
   const [voiceActive, setVoiceActive] = useState(false);
@@ -267,6 +298,13 @@ export function AssistantScreen() {
           setActiveId(targetId);
           activeIdRef.current = targetId;
           setConversations((prev) => [created.data.conversation, ...prev]);
+          if (selectedProjectId) {
+            const newId = targetId;
+            updateWorkspaceMeta((prev) => ({
+              ...prev,
+              chatProjectMap: { ...prev.chatProjectMap, [newId]: selectedProjectId },
+            }));
+          }
         }
 
         const res = await apiClient.sendMessage(targetId, {
@@ -306,7 +344,7 @@ export function AssistantScreen() {
         setSending(false);
       }
     },
-    [autoSpeak, composer, currentDeviceId, sending, showToast, voiceSettings]
+    [autoSpeak, composer, currentDeviceId, selectedProjectId, sending, showToast, updateWorkspaceMeta, voiceSettings]
   );
 
   const toggleVoiceMic = () => {
@@ -380,15 +418,309 @@ export function AssistantScreen() {
     });
   };
 
-  const filteredConversations = conversations.filter((c) =>
-    c.title.toLowerCase().includes(search.trim().toLowerCase())
-  );
+  // ---- Pin / Rename / Project Handlers ----
+  const handleTogglePin = (convId: string) => {
+    const alreadyPinned = workspaceMeta.pinnedIds.includes(convId);
+    updateWorkspaceMeta((prev) => ({
+      ...prev,
+      pinnedIds: alreadyPinned
+        ? prev.pinnedIds.filter((id) => id !== convId)
+        : [convId, ...prev.pinnedIds],
+    }));
+    showToast("info", alreadyPinned ? "Chat unpinned." : "Chat pinned to top.");
+  };
+
+  const handleStartRename = (conv: Conversation) => {
+    setRenamingId(conv.id);
+    setRenameDraft(conv.title);
+    setAssigningProjectConvId(null);
+  };
+
+  const handleCommitRename = async (conv: Conversation) => {
+    const nextTitle = renameDraft.trim();
+    setRenamingId(null);
+    if (!nextTitle || nextTitle === conv.title) return;
+
+    // Optimistic update
+    setConversations((prev) =>
+      prev.map((c) => (c.id === conv.id ? { ...c, title: nextTitle } : c))
+    );
+    try {
+      const res = await apiClient.updateConversation(conv.id, { title: nextTitle });
+      setConversations((prev) =>
+        prev.map((c) => (c.id === conv.id ? res.data.conversation : c))
+      );
+      showToast("success", "Chat renamed.");
+    } catch (err) {
+      // Revert on failure
+      setConversations((prev) =>
+        prev.map((c) => (c.id === conv.id ? { ...c, title: conv.title } : c))
+      );
+      showToast("error", err instanceof ApiError ? err.message : "Failed to rename chat.");
+    }
+  };
+
+  const handleCreateProject = () => {
+    const name = newProjectName.trim();
+    if (!name) return;
+    const project: ChatProject = {
+      id: `proj-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      name,
+      color: newProjectColor,
+      createdAt: new Date().toISOString(),
+    };
+    updateWorkspaceMeta((prev) => ({
+      ...prev,
+      projects: [project, ...prev.projects],
+    }));
+    setSelectedProjectId(project.id);
+    setNewProjectName("");
+    setCreatingProject(false);
+    showToast("success", `Project "${project.name}" created.`);
+  };
+
+  const handleDeleteProject = (projectId: string) => {
+    updateWorkspaceMeta((prev) => {
+      const nextMap = { ...prev.chatProjectMap };
+      Object.keys(nextMap).forEach((cid) => {
+        if (nextMap[cid] === projectId) delete nextMap[cid];
+      });
+      return {
+        ...prev,
+        projects: prev.projects.filter((p) => p.id !== projectId),
+        chatProjectMap: nextMap,
+      };
+    });
+    if (selectedProjectId === projectId) {
+      setSelectedProjectId(null);
+    }
+    showToast("info", "Project removed.");
+  };
+
+  const handleAssignProject = (convId: string, projectId: string | null) => {
+    updateWorkspaceMeta((prev) => {
+      const nextMap = { ...prev.chatProjectMap };
+      if (projectId) nextMap[convId] = projectId;
+      else delete nextMap[convId];
+      return { ...prev, chatProjectMap: nextMap };
+    });
+    setAssigningProjectConvId(null);
+    const proj = projectId ? workspaceMeta.projects.find((p) => p.id === projectId) : null;
+    showToast("info", proj ? `Moved to "${proj.name}".` : "Removed from project.");
+  };
+
+  const filteredConversations = conversations.filter((c) => {
+    const matchesSearch = c.title.toLowerCase().includes(search.trim().toLowerCase());
+    if (!matchesSearch) return false;
+    if (selectedProjectId) {
+      return workspaceMeta.chatProjectMap[c.id] === selectedProjectId;
+    }
+    return true;
+  });
+
+  const pinnedSet = new Set(workspaceMeta.pinnedIds);
+  const pinnedConversations = filteredConversations.filter((c) => pinnedSet.has(c.id));
+  const recentConversations = filteredConversations.filter((c) => !pinnedSet.has(c.id));
 
   const activeConversation = conversations.find((c) => c.id === activeId) || null;
+  const activeProject = selectedProjectId
+    ? workspaceMeta.projects.find((p) => p.id === selectedProjectId) || null
+    : null;
+
+  const renderConversationRow = (conv: Conversation) => {
+    const isSelected = conv.id === activeId;
+    const isPinned = pinnedSet.has(conv.id);
+    const isRenaming = renamingId === conv.id;
+    const assignedProjectId = workspaceMeta.chatProjectMap[conv.id];
+    const assignedProject = assignedProjectId
+      ? workspaceMeta.projects.find((p) => p.id === assignedProjectId)
+      : null;
+    const projectColorObj = assignedProject
+      ? PROJECT_COLORS.find((pc) => pc.id === assignedProject.color) || PROJECT_COLORS[0]
+      : null;
+
+    return (
+      <div key={conv.id} className="space-y-1">
+        <div
+          onClick={() => {
+            if (!isRenaming) handleSelectConversation(conv.id);
+          }}
+          className={`group flex cursor-pointer items-center justify-between gap-1 rounded-lg border px-2 py-1.5 transition ${
+            isSelected
+              ? "border-[#00D4FF]/55 bg-[#00D4FF]/12 text-white"
+              : "border-white/[0.06] bg-[#141B2D]/70 text-zinc-300 hover:border-[#00D4FF]/35 hover:text-white"
+          }`}
+        >
+          <div className="min-w-0 flex-1">
+            {isRenaming ? (
+              <div
+                className="flex items-center gap-1"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="text"
+                  value={renameDraft}
+                  onChange={(e) => setRenameDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleCommitRename(conv);
+                    } else if (e.key === "Escape") {
+                      setRenamingId(null);
+                    }
+                  }}
+                  autoFocus
+                  className="studio-input h-6 w-full rounded px-1.5 text-[11px]"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleCommitRename(conv)}
+                  className="rounded p-1 text-emerald-400 hover:bg-emerald-500/15"
+                  title="Save name"
+                >
+                  <Check className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRenamingId(null)}
+                  className="rounded p-1 text-zinc-400 hover:bg-white/[0.08]"
+                  title="Cancel"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <>
+                <p
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    handleStartRename(conv);
+                  }}
+                  className={`flex items-center gap-1 truncate text-[11px] font-medium ${
+                    isSelected ? "text-[#00D4FF]" : "text-white"
+                  }`}
+                >
+                  {isPinned && <Pin className="h-2.5 w-2.5 shrink-0 text-[#00D4FF]" />}
+                  <span className="truncate">{conv.title}</span>
+                </p>
+                <div className="mt-0.5 flex items-center gap-1.5 text-[9px] text-zinc-400">
+                  <span>{formatTimeAgo(conv.updatedAt || conv.createdAt)}</span>
+                  {assignedProject && projectColorObj && !selectedProjectId && (
+                    <span className="inline-flex max-w-[90px] items-center gap-1 truncate rounded-full border border-white/[0.1] px-1.5 py-0 text-[8.5px]">
+                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${projectColorObj.dotClass}`} />
+                      <span className="truncate">{assignedProject.name}</span>
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {!isRenaming && (
+            <div className="flex shrink-0 items-center gap-0.5 opacity-75 transition group-hover:opacity-100">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleTogglePin(conv.id);
+                }}
+                aria-label={isPinned ? "Unpin chat" : "Pin chat"}
+                title={isPinned ? "Unpin chat" : "Pin to top"}
+                className={`rounded p-1 transition ${
+                  isPinned
+                    ? "text-[#00D4FF] hover:bg-[#00D4FF]/15"
+                    : "text-zinc-500 hover:bg-white/[0.08] hover:text-[#00D4FF]"
+                }`}
+              >
+                {isPinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleStartRename(conv);
+                }}
+                aria-label={`Rename ${conv.title}`}
+                title="Rename chat"
+                className="rounded p-1 text-zinc-500 transition hover:bg-white/[0.08] hover:text-white"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+              {workspaceMeta.projects.length > 0 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setAssigningProjectConvId((cur) => (cur === conv.id ? null : conv.id));
+                  }}
+                  aria-label="Move to project"
+                  title="Assign to project"
+                  className={`rounded p-1 transition ${
+                    assignedProject
+                      ? "text-[#00D4FF] hover:bg-[#00D4FF]/15"
+                      : "text-zinc-500 hover:bg-white/[0.08] hover:text-white"
+                  }`}
+                >
+                  <Folder className="h-3 w-3" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPendingDelete(conv);
+                }}
+                aria-label={`Delete ${conv.title}`}
+                title="Delete chat"
+                className="rounded p-1 text-zinc-500 transition hover:bg-rose-500/15 hover:text-rose-400"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Inline Project Assignment Picker */}
+        {assigningProjectConvId === conv.id && (
+          <div className="dropdown-surface flex flex-wrap items-center gap-1 rounded-lg p-1.5 text-[10px]">
+            <button
+              type="button"
+              onClick={() => handleAssignProject(conv.id, null)}
+              className={`rounded-md px-1.5 py-0.5 transition ${
+                !assignedProjectId
+                  ? "bg-[#00D4FF]/15 font-semibold text-[#00D4FF]"
+                  : "text-zinc-400 hover:bg-white/[0.06] hover:text-white"
+              }`}
+            >
+              No Project
+            </button>
+            {workspaceMeta.projects.map((proj) => {
+              const colorObj = PROJECT_COLORS.find((c) => c.id === proj.color) || PROJECT_COLORS[0];
+              return (
+                <button
+                  key={proj.id}
+                  type="button"
+                  onClick={() => handleAssignProject(conv.id, proj.id)}
+                  className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 transition ${
+                    assignedProjectId === proj.id
+                      ? "bg-[#00D4FF]/15 font-semibold text-[#00D4FF]"
+                      : "text-zinc-300 hover:bg-white/[0.06] hover:text-white"
+                  }`}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${colorObj.dotClass}`} />
+                  <span className="max-w-[90px] truncate">{proj.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderHistoryRailContent = () => (
     <>
-      {/* Chat Workspace History Card */}
+      {/* Chat Workspace History + Projects Card */}
       <div className="nohby-frame flex min-h-0 flex-1 flex-col overflow-hidden p-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
@@ -396,18 +728,139 @@ export function AssistantScreen() {
             <h3 className="font-display text-[12px] font-semibold text-white">Chat History</h3>
           </div>
           <span className="rounded-full border border-white/[0.1] bg-[#161E30] px-1.5 py-0.5 text-[9px] font-medium text-zinc-400">
-            {conversations.length}
+            {filteredConversations.length}
           </span>
         </div>
 
         <button
           type="button"
           onClick={handleNewChat}
-          className="btn-ivory mt-2.5 flex h-8 w-full items-center justify-center gap-1.5 rounded-lg text-[11px] font-semibold"
+          className="btn-ivory mt-2 flex h-8 w-full items-center justify-center gap-1.5 rounded-lg text-[11px] font-semibold"
         >
           <MessageSquarePlus className="h-3.5 w-3.5" />
-          New Chat
+          {activeProject ? `New Chat in ${activeProject.name}` : "New Chat"}
         </button>
+
+        {/* Compact Projects Section */}
+        <div className="mt-2.5 border-b border-white/[0.07] pb-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+              Projects
+            </span>
+            <button
+              type="button"
+              onClick={() => setCreatingProject((v) => !v)}
+              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium text-[#00D4FF] transition hover:bg-[#00D4FF]/10"
+            >
+              <FolderPlus className="h-3 w-3" />
+              New
+            </button>
+          </div>
+
+          {creatingProject && (
+            <div className="mt-1.5 space-y-1.5 rounded-lg border border-[#00D4FF]/35 bg-[#141B2D]/70 p-2">
+              <input
+                type="text"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleCreateProject();
+                  } else if (e.key === "Escape") {
+                    setCreatingProject(false);
+                  }
+                }}
+                placeholder="Project name..."
+                autoFocus
+                className="studio-input h-7 w-full rounded-md px-2 text-[11px]"
+              />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  {PROJECT_COLORS.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setNewProjectColor(c.id)}
+                      title={c.label}
+                      className={`h-4 w-4 rounded-full transition ${c.dotClass} ${
+                        newProjectColor === c.id ? "scale-110 ring-2 ring-white/80" : "opacity-60 hover:opacity-100"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setCreatingProject(false)}
+                    className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCreateProject}
+                    disabled={!newProjectName.trim()}
+                    className="btn-ivory rounded px-2 py-0.5 text-[10px]"
+                  >
+                    Create
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Project Filter Pills */}
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            <button
+              type="button"
+              onClick={() => setSelectedProjectId(null)}
+              className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition ${
+                selectedProjectId === null
+                  ? "bg-[#00D4FF]/15 text-[#00D4FF] border border-[#00D4FF]/45"
+                  : "border border-white/[0.08] bg-[#141B2D]/70 text-zinc-400 hover:text-white"
+              }`}
+            >
+              All ({conversations.length})
+            </button>
+
+            {workspaceMeta.projects.map((proj) => {
+              const colorObj = PROJECT_COLORS.find((c) => c.id === proj.color) || PROJECT_COLORS[0];
+              const count = conversations.filter(
+                (c) => workspaceMeta.chatProjectMap[c.id] === proj.id
+              ).length;
+              const isSelected = selectedProjectId === proj.id;
+              return (
+                <div
+                  key={proj.id}
+                  className={`group inline-flex items-center gap-1 rounded-full border pl-2 pr-1 py-0.5 text-[10px] font-medium transition ${
+                    isSelected
+                      ? "border-[#00D4FF]/50 bg-[#00D4FF]/15 text-[#00D4FF]"
+                      : "border-white/[0.08] bg-[#141B2D]/70 text-zinc-300 hover:border-[#00D4FF]/35"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProjectId(isSelected ? null : proj.id)}
+                    className="inline-flex items-center gap-1"
+                  >
+                    <span className={`h-1.5 w-1.5 rounded-full ${colorObj.dotClass}`} />
+                    <span className="max-w-[92px] truncate">{proj.name}</span>
+                    <span className="text-[9px] opacity-70">({count})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteProject(proj.id)}
+                    title={`Delete project ${proj.name}`}
+                    className="rounded-full p-0.5 text-zinc-500 opacity-60 hover:text-rose-400 hover:opacity-100"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
         {/* Compact Search */}
         <div className="relative mt-2">
@@ -421,8 +874,8 @@ export function AssistantScreen() {
           />
         </div>
 
-        {/* Thread List */}
-        <div className="mt-2.5 flex-1 space-y-1 overflow-y-auto pr-0.5">
+        {/* Thread List (Pinned + Recent) */}
+        <div className="mt-2 flex-1 space-y-2 overflow-y-auto pr-0.5">
           {loadingList ? (
             <div className="flex items-center justify-center py-8 text-[11px] text-zinc-400">
               <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin text-[#00D4FF]" />
@@ -430,47 +883,35 @@ export function AssistantScreen() {
             </div>
           ) : filteredConversations.length === 0 ? (
             <div className="rounded-lg border border-dashed border-white/[0.1] px-2.5 py-5 text-center text-[10px] text-zinc-400">
-              {search ? "No matching chats" : "No chat history yet — start a conversation"}
+              {search
+                ? "No matching chats"
+                : activeProject
+                  ? `No chats in "${activeProject.name}" yet`
+                  : "No chat history yet — start a conversation"}
             </div>
           ) : (
-            filteredConversations.map((conv) => {
-              const isSelected = conv.id === activeId;
-              return (
-                <div
-                  key={conv.id}
-                  onClick={() => handleSelectConversation(conv.id)}
-                  className={`group flex cursor-pointer items-center justify-between gap-1.5 rounded-lg border px-2.5 py-2 transition ${
-                    isSelected
-                      ? "border-[#00D4FF]/55 bg-[#00D4FF]/12 text-white"
-                      : "border-white/[0.06] bg-[#141B2D]/70 text-zinc-300 hover:border-[#00D4FF]/35 hover:text-white"
-                  }`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className={`truncate text-[11px] font-medium ${
-                        isSelected ? "text-[#00D4FF]" : "text-white"
-                      }`}
-                    >
-                      {conv.title}
-                    </p>
-                    <p className="mt-0.5 text-[9px] text-zinc-400">
-                      {formatTimeAgo(conv.updatedAt || conv.createdAt)}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPendingDelete(conv);
-                    }}
-                    aria-label={`Delete ${conv.title}`}
-                    className="shrink-0 rounded p-1 text-zinc-500 opacity-60 transition hover:bg-rose-500/15 hover:text-rose-400 hover:opacity-100"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
+            <>
+              {pinnedConversations.length > 0 && (
+                <div className="space-y-1">
+                  <p className="flex items-center gap-1 px-1 text-[9px] font-semibold uppercase tracking-wider text-[#00D4FF]">
+                    <Pin className="h-2.5 w-2.5" />
+                    Pinned
+                  </p>
+                  {pinnedConversations.map(renderConversationRow)}
                 </div>
-              );
-            })
+              )}
+
+              {recentConversations.length > 0 && (
+                <div className="space-y-1">
+                  {pinnedConversations.length > 0 && (
+                    <p className="px-1 text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
+                      Recent
+                    </p>
+                  )}
+                  {recentConversations.map(renderConversationRow)}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -526,6 +967,12 @@ export function AssistantScreen() {
                 <h2 className="font-display truncate text-sm font-semibold text-white">
                   {activeConversation ? activeConversation.title : "NohbyAI Chat Room"}
                 </h2>
+                {activeProject && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[#00D4FF]/35 bg-[#00D4FF]/10 px-2 py-0.5 text-[10px] font-medium text-[#00D4FF]">
+                    <Folder className="h-2.5 w-2.5" />
+                    {activeProject.name}
+                  </span>
+                )}
                 {voiceActive && (
                   <span className="inline-flex items-center gap-1 rounded-full border border-[#00D4FF]/40 bg-[#00D4FF]/10 px-2 py-0.5 text-[10px] font-medium text-[#00D4FF]">
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#00D4FF]" />
