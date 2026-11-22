@@ -271,7 +271,7 @@ export function HomeScreen() {
         <div className="mx-auto mb-2.5 grid w-full max-w-2xl gap-2.5 sm:grid-cols-2">
           <div className="flex flex-col items-start">
             <span className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-[#00D4FF]/35 bg-[#101A2E] px-2 py-0.5 text-[10px] font-medium text-zinc-200">
-              Voice Assistant
+              NohbyAI
               <img src="/icon-white.png" alt="" className="h-3 w-3 rounded-full object-contain" />
             </span>
             <div className="nohby-bubble-ai w-full rounded-xl rounded-tl-sm px-3 py-2 text-[11px] leading-relaxed text-zinc-100">
