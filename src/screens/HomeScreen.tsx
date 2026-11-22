@@ -5,6 +5,7 @@ import {
   Keyboard,
   Loader2,
   Mic,
+  Radio,
   Send,
   Square,
 } from "lucide-react";
@@ -32,8 +33,17 @@ function formatTimeAgo(iso: string | null | undefined): string {
 }
 
 export function HomeScreen() {
-  const { user, devices, currentDeviceId, health, voiceSettings, loadVoiceSettings, setRoute, showToast } =
-    useAppStore();
+  const {
+    user,
+    devices,
+    currentDeviceId,
+    health,
+    voiceSettings,
+    loadVoiceSettings,
+    updateVoiceSettings,
+    setRoute,
+    showToast,
+  } = useAppStore();
 
   // Real live telemetry & data
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
@@ -46,34 +56,41 @@ export function HomeScreen() {
   // Voice Control Dock state
   const [voiceActive, setVoiceActive] = useState(false);
   const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
-  const [stillOrbUrl, setStillOrbUrl] = useState<string | null>(null);
+  const [jarvisState, setJarvisState] = useState<"standby" | "awake" | "thinking" | "speaking">("standby");
   const [interimTranscript, setInterimTranscript] = useState("");
   const [showTextInput, setShowTextInput] = useState(false);
   const [textDraft, setTextDraft] = useState("");
   const [sending, setSending] = useState(false);
   const voiceHandleRef = useRef<VoiceSessionHandle | null>(null);
 
-  // Capture a crisp still frame of /vioce-wave.gif so the orb stays calm & still when idle
+  const jarvisEnabled = Boolean(voiceSettings?.wakeWordEnabled);
+  const isOrbMoving =
+    voiceActive ||
+    isAssistantSpeaking ||
+    sending ||
+    jarvisState === "awake" ||
+    jarvisState === "thinking" ||
+    jarvisState === "speaking";
+
+  // Sync live bubbles and orb animation with global JarvisWakeEngine
   useEffect(() => {
-    const img = new Image();
-    img.src = "/vioce-wave.gif";
-    img.onload = () => {
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.naturalWidth || 320;
-        canvas.height = img.naturalHeight || 320;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          setStillOrbUrl(canvas.toDataURL("image/png"));
-        }
-      } catch {
-        // Fallback if canvas export is restricted
+    const onJarvisState = (e: Event) => {
+      const detail = (e as CustomEvent<{ state: "standby" | "awake" | "thinking" | "speaking" }>).detail;
+      if (detail?.state) setJarvisState(detail.state);
+    };
+    const onJarvisReply = (e: Event) => {
+      const detail = (e as CustomEvent<{ userMessage: Message; assistantMessage: Message }>).detail;
+      if (detail?.userMessage && detail?.assistantMessage) {
+        setRecentMessages((prev) => [...prev.slice(-2), detail.userMessage, detail.assistantMessage]);
       }
     };
+    window.addEventListener("nohby-jarvis-state", onJarvisState);
+    window.addEventListener("nohby-jarvis-reply", onJarvisReply);
+    return () => {
+      window.removeEventListener("nohby-jarvis-state", onJarvisState);
+      window.removeEventListener("nohby-jarvis-reply", onJarvisReply);
+    };
   }, []);
-
-  const isOrbMoving = voiceActive || isAssistantSpeaking || sending;
 
   const currentDevice = devices.find((d) => d.id === currentDeviceId) || null;
   const activeDevicesCount = devices.filter((d) => d.status === "active").length;
@@ -158,7 +175,6 @@ export function HomeScreen() {
           });
         }
 
-        // Refresh tasks in case execution was triggered
         apiClient
           .listTasks({ limit: 5 })
           .then((t) => setTasks(t.data.tasks))
@@ -171,6 +187,33 @@ export function HomeScreen() {
     },
     [conversationId, currentDeviceId, sending, showToast, voiceSettings]
   );
+
+  const toggleJarvisBackgroundMode = async () => {
+    if (!isSpeechRecognitionSupported()) {
+      showToast("error", "Voice recognition is not supported in this browser.");
+      return;
+    }
+    const next = !jarvisEnabled;
+    try {
+      if (next && navigator.mediaDevices?.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((t) => t.stop());
+      }
+      await updateVoiceSettings({
+        wakeWordEnabled: next,
+        autoSpeakResponses: true,
+        wakeWordPhrase: voiceSettings?.wakeWordPhrase || "Hey Nohby",
+      });
+      showToast(
+        "success",
+        next
+          ? `Jarvis Mode ON — say "${voiceSettings?.wakeWordPhrase || "Hey Nohby"}" anytime, even in the background!`
+          : "Jarvis Mode turned off."
+      );
+    } catch {
+      showToast("error", "Please allow microphone access to enable hands-free 'Hey Nohby' mode.");
+    }
+  };
 
   const toggleVoiceMic = () => {
     if (voiceActive) {
@@ -245,16 +288,16 @@ export function HomeScreen() {
           ============================================================ */}
       <section className="nohby-stage flex flex-col justify-between p-3.5 sm:p-4 lg:h-full lg:overflow-hidden">
         {/* Stage Header */}
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <h2 className="font-display text-sm font-semibold text-white">Active Session</h2>
-            {voiceActive && (
+            {(voiceActive || jarvisState === "awake") && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-[#00D4FF]/40 bg-[#00D4FF]/10 px-2 py-0.5 text-[10px] font-medium text-[#00D4FF]">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#00D4FF]" />
                 Listening
               </span>
             )}
-            {isAssistantSpeaking && !voiceActive && (
+            {(isAssistantSpeaking || jarvisState === "speaking") && !voiceActive && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-400/40 bg-violet-500/15 px-2 py-0.5 text-[10px] font-medium text-violet-300">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-400" />
                 NohbyAI Speaking
@@ -262,18 +305,34 @@ export function HomeScreen() {
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => setRoute("meetings")}
-            className="inline-flex h-7 items-center gap-1.5 rounded-full border border-white/[0.12] bg-[#101624]/80 px-2.5 text-[11px] font-medium text-zinc-300 transition hover:border-[#00D4FF]/50 hover:text-white"
-            title="Open Stealth Hidden Meeting & Interview Listener"
-          >
-            <EyeOff className="h-3 w-3 text-[#00D4FF]" />
-            <span>Stealth Mode</span>
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={toggleJarvisBackgroundMode}
+              className={`inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium transition ${
+                jarvisEnabled
+                  ? "border-emerald-500/45 bg-emerald-500/15 text-emerald-300"
+                  : "border-white/[0.12] bg-[#101624]/80 text-zinc-300 hover:border-[#00D4FF]/50 hover:text-white"
+              }`}
+              title={`Enable hands-free background listening ("${voiceSettings?.wakeWordPhrase || "Hey Nohby"}")`}
+            >
+              <Radio className={`h-3 w-3 ${jarvisEnabled ? "animate-pulse text-emerald-400" : "text-[#00D4FF]"}`} />
+              <span>{jarvisEnabled ? `"${voiceSettings?.wakeWordPhrase || "Hey Nohby"}" Active` : "Hey Nohby (Jarvis)"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setRoute("meetings")}
+              className="inline-flex h-7 items-center gap-1.5 rounded-full border border-white/[0.12] bg-[#101624]/80 px-2.5 text-[11px] font-medium text-zinc-300 transition hover:border-[#00D4FF]/50 hover:text-white"
+              title="Open Stealth Hidden Meeting & Interview Listener"
+            >
+              <EyeOff className="h-3 w-3 text-[#00D4FF]" />
+              <span>Stealth Mode</span>
+            </button>
+          </div>
         </div>
 
-        {/* Centerpiece: Reactive /vioce-wave.gif (Moves ONLY when listening/speaking/thinking) */}
+        {/* Centerpiece: Still /vioce-wave-image.jpg when idle -> Animated /vioce-wave.gif when talking/listening */}
         <div className="my-1 flex flex-1 items-center justify-center">
           <button
             type="button"
@@ -286,10 +345,10 @@ export function HomeScreen() {
             }`}
           >
             <img
-              src={isOrbMoving || !stillOrbUrl ? "/vioce-wave.gif" : stillOrbUrl}
+              src={isOrbMoving ? "/vioce-wave.gif" : "/vioce-wave-image.jpg"}
               alt="Nohby ONE Voice Wave"
               className={`h-full w-full rounded-full object-cover transition duration-300 ${
-                isOrbMoving ? "opacity-100" : "opacity-85"
+                isOrbMoving ? "opacity-100" : "opacity-90"
               }`}
             />
             <span

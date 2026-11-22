@@ -4,6 +4,7 @@ import { Loader2, RefreshCw, WifiOff } from "lucide-react";
 
 import { AppSidebar } from "./components/AppSidebar";
 import { BrandMark } from "./components/BrandMark";
+import { JarvisWakeEngine } from "./components/JarvisWakeEngine";
 import { MobileBottomNav } from "./components/MobileBottomNav";
 import { ToastBanner } from "./components/StateViews";
 import { Topbar } from "./components/Topbar";
@@ -156,6 +157,7 @@ export function App() {
         <MobileBottomNav activeRoute={activeRoute} onSelect={setRoute} />
       </div>
 
+      <JarvisWakeEngine />
       <ToastBanner toast={toast} onClose={clearToast} />
     </div>
   );
