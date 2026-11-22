@@ -1,6 +1,20 @@
 import { useEffect, useState } from "react";
-import { Loader2, LogOut, Mic, Monitor, Moon, Save, Shield, Sun, UserRound, Volume2 } from "lucide-react";
+import {
+  CheckCircle2,
+  Cpu,
+  Loader2,
+  LogOut,
+  Mic,
+  Monitor,
+  Moon,
+  Save,
+  Shield,
+  Sun,
+  UserRound,
+  Volume2,
+} from "lucide-react";
 
+import { ApiError, apiClient } from "../lib/api";
 import { applyTheme, getStoredTheme, type ThemePreference } from "../lib/theme";
 import {
   SUPPORTED_LANGUAGES,
@@ -11,6 +25,15 @@ import {
 import { useAppStore } from "../store/useAppStore";
 import type { VoicePersonaId } from "../types/api";
 
+const AI_PROVIDER_OPTIONS = [
+  { id: "gemini", label: "Google Gemini", defaultModel: "gemini-2.0-flash", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai" },
+  { id: "openai", label: "OpenAI", defaultModel: "gpt-4o-mini", baseUrl: "https://api.openai.com/v1" },
+  { id: "groq", label: "Groq (Ultra-Fast)", defaultModel: "llama-3.3-70b-versatile", baseUrl: "https://api.groq.com/openai/v1" },
+  { id: "openrouter", label: "OpenRouter", defaultModel: "openai/gpt-4o-mini", baseUrl: "https://openrouter.ai/api/v1" },
+  { id: "deepseek", label: "DeepSeek", defaultModel: "deepseek-chat", baseUrl: "https://api.deepseek.com/v1" },
+  { id: "custom", label: "Custom OpenAI-Compatible", defaultModel: "gpt-4o-mini", baseUrl: "" },
+] as const;
+
 export function SettingsScreen() {
   const {
     user,
@@ -19,10 +42,20 @@ export function SettingsScreen() {
     loadVoiceSettings,
     updateVoiceSettings,
     setIsSpeaking,
+    showToast,
     logout,
     busy,
     error,
   } = useAppStore();
+
+  // AI Chat Engine state
+  const [aiProvider, setAiProvider] = useState("gemini");
+  const [aiModel, setAiModel] = useState("gemini-2.0-flash");
+  const [aiBaseUrl, setAiBaseUrl] = useState("https://generativelanguage.googleapis.com/v1beta/openai");
+  const [aiApiKey, setAiApiKey] = useState("");
+  const [aiConnected, setAiConnected] = useState(false);
+  const [aiMaskedKey, setAiMaskedKey] = useState("");
+  const [savingAi, setSavingAi] = useState(false);
 
   const [name, setName] = useState(user?.name || "");
   const [displayName, setDisplayName] = useState(user?.profile?.displayName || "");
@@ -55,7 +88,47 @@ export function SettingsScreen() {
     if (!voiceSettings) {
       loadVoiceSettings();
     }
+    apiClient
+      .getAiConfig()
+      .then((res) => {
+        const cfg = res.data.config;
+        if (cfg.provider && cfg.provider !== "nohby_assistant") setAiProvider(cfg.provider);
+        if (cfg.model && cfg.model !== "nohby-one-assistant-v1") setAiModel(cfg.model);
+        if (cfg.baseUrl) setAiBaseUrl(cfg.baseUrl);
+        setAiConnected(cfg.connected);
+        setAiMaskedKey(cfg.maskedKey);
+      })
+      .catch(() => null);
   }, [voiceSettings, loadVoiceSettings]);
+
+  const handleSaveAiConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingAi(true);
+    try {
+      const payload: { provider: string; model: string; baseUrl: string; apiKey?: string } = {
+        provider: aiProvider,
+        model: aiModel.trim(),
+        baseUrl: aiBaseUrl.trim(),
+      };
+      if (aiApiKey.trim()) {
+        payload.apiKey = aiApiKey.trim();
+      }
+      const res = await apiClient.updateAiConfig(payload);
+      setAiConnected(res.data.config.connected);
+      setAiMaskedKey(res.data.config.maskedKey);
+      setAiApiKey("");
+      showToast(
+        "success",
+        res.data.config.connected
+          ? `Real AI chat connected (${res.data.config.provider} · ${res.data.config.model}).`
+          : "AI engine preferences saved."
+      );
+    } catch (err) {
+      showToast("error", err instanceof ApiError ? err.message : "Failed to save AI config.");
+    } finally {
+      setSavingAi(false);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -144,6 +217,99 @@ export function SettingsScreen() {
 
   return (
     <div className="w-full max-w-5xl space-y-4">
+      {/* AI Chat Engine (Real LLM Connection) */}
+      <section className="nohby-frame p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <Cpu className="h-4 w-4 text-[#00D4FF]" />
+            <div>
+              <h2 className="font-display text-sm font-semibold text-white">
+                AI Chat Engine (Live LLM)
+              </h2>
+              <p className="text-xs text-zinc-400">
+                Connect Google Gemini, OpenAI, Groq, OpenRouter, or DeepSeek for real generative chat in English &amp; Hausa.
+              </p>
+            </div>
+          </div>
+
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
+              aiConnected
+                ? "border border-emerald-500/35 bg-emerald-500/10 text-emerald-400"
+                : "border border-amber-500/35 bg-amber-500/10 text-amber-400"
+            }`}
+          >
+            <CheckCircle2 className="h-3 w-3" />
+            {aiConnected ? "Live LLM Connected" : "Connect API Key"}
+          </span>
+        </div>
+
+        <form onSubmit={handleSaveAiConfig} className="mt-4 space-y-3">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-300">Provider</label>
+              <select
+                value={aiProvider}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setAiProvider(id);
+                  const found = AI_PROVIDER_OPTIONS.find((p) => p.id === id);
+                  if (found) {
+                    setAiModel(found.defaultModel);
+                    setAiBaseUrl(found.baseUrl);
+                  }
+                }}
+                className="studio-input h-9 w-full rounded-lg px-3 text-xs"
+              >
+                {AI_PROVIDER_OPTIONS.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-300">Model Name</label>
+              <input
+                type="text"
+                value={aiModel}
+                onChange={(e) => setAiModel(e.target.value)}
+                placeholder="gemini-2.0-flash / gpt-4o-mini"
+                className="studio-input h-9 w-full rounded-lg px-3 text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-300">
+                API Key {aiMaskedKey ? `(Saved: ${aiMaskedKey})` : ""}
+              </label>
+              <input
+                type="password"
+                value={aiApiKey}
+                onChange={(e) => setAiApiKey(e.target.value)}
+                placeholder={aiMaskedKey ? "Enter new key to replace" : "Paste your API key..."}
+                className="studio-input h-9 w-full rounded-lg px-3 text-xs"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <p className="text-[11px] text-zinc-500">
+              Your API key is stored server-side on your profile and never exposed in responses.
+            </p>
+            <button
+              type="submit"
+              disabled={savingAi}
+              className="btn-ivory inline-flex h-8 items-center gap-1.5 rounded-lg px-3.5 text-xs"
+            >
+              {savingAi ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              Save AI Engine
+            </button>
+          </div>
+        </form>
+      </section>
+
       {/* Appearance */}
       <section className="nohby-frame p-5">
         <h2 className="font-display text-sm font-semibold text-white">Appearance</h2>

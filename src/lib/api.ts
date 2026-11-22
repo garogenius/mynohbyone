@@ -749,4 +749,39 @@ export const apiClient = {
       body: JSON.stringify({ query, limit }),
     });
   },
+
+  // AI Chat Engine Configuration (OpenAI, Gemini, Groq, OpenRouter, DeepSeek, Custom)
+  getAiConfig() {
+    return request<{
+      config: {
+        provider: string;
+        model: string;
+        baseUrl: string;
+        connected: boolean;
+        hasUserKey: boolean;
+        maskedKey: string;
+      };
+    }>("/ai/config", { method: "GET" });
+  },
+
+  updateAiConfig(payload: {
+    provider?: string;
+    model?: string;
+    baseUrl?: string;
+    apiKey?: string;
+  }) {
+    return request<{
+      config: {
+        provider: string;
+        model: string;
+        baseUrl: string;
+        connected: boolean;
+        hasUserKey: boolean;
+        maskedKey: string;
+      };
+    }>("/ai/config", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
 };
