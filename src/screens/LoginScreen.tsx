@@ -76,13 +76,7 @@ export function LoginScreen({
 
         <div className="relative z-10 flex items-center justify-between p-8 xl:p-10">
           <div className="flex items-center gap-3">
-            <BrandMark size="md" />
-            <div>
-              <span className="font-display text-sm font-semibold tracking-tight text-[#F4F1EA]">
-                Nohby ONE
-              </span>
-              <span className="ml-2 font-mono text-[11px] text-[#A1A3AA]">v0.3</span>
-            </div>
+            <BrandMark variant="logo" size="md" forceDark />
           </div>
           <span className="font-mono text-[11px] tracking-widest text-[#D6C6A5]/80 uppercase">
             Nohby Technologies
@@ -138,12 +132,7 @@ export function LoginScreen({
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0B0C0E] via-[#0B0C0E]/45 to-transparent" />
           <div className="absolute right-5 bottom-4 left-5 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <BrandMark size="sm" />
-              <span className="font-display text-sm font-semibold text-[#F4F1EA]">
-                Nohby ONE
-              </span>
-            </div>
+            <BrandMark variant="logo" size="sm" forceDark />
             <ThemeToggle compact />
           </div>
         </div>

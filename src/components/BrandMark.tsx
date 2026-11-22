@@ -1,33 +1,56 @@
+import { useEffect, useState } from "react";
+
+import { getStoredTheme, resolveTheme, type ResolvedTheme } from "../lib/theme";
+
 interface BrandMarkProps {
   size?: "sm" | "md" | "lg";
+  variant?: "icon" | "logo";
+  forceDark?: boolean;
 }
 
-export function BrandMark({ size = "md" }: BrandMarkProps) {
+export function BrandMark({
+  size = "md",
+  variant = "icon",
+  forceDark = false,
+}: BrandMarkProps) {
+  const [resolved, setResolved] = useState<ResolvedTheme>(() =>
+    resolveTheme(getStoredTheme())
+  );
+
+  useEffect(() => {
+    const onThemeChange = () => setResolved(resolveTheme(getStoredTheme()));
+    window.addEventListener("nohby-theme-change", onThemeChange);
+    return () => window.removeEventListener("nohby-theme-change", onThemeChange);
+  }, []);
+
+  const isDark = forceDark || resolved === "dark";
+
+  if (variant === "logo") {
+    const heightClass =
+      size === "sm" ? "h-6" : size === "lg" ? "h-9" : "h-7";
+    return (
+      <img
+        src={isDark ? "/logo-white.png" : "/logo-black.png"}
+        alt="NohbyOne"
+        className={`${heightClass} w-auto select-none object-contain`}
+      />
+    );
+  }
+
   const dims =
     size === "sm"
       ? "h-8 w-8 rounded-lg"
       : size === "lg"
-      ? "h-11 w-11 rounded-xl"
-      : "h-9 w-9 rounded-lg";
+      ? "h-12 w-12 rounded-2xl"
+      : "h-9 w-9 rounded-xl";
 
   return (
-    <div
-      className={`${dims} relative flex items-center justify-center border border-white/15 bg-gradient-to-b from-[#23262E] to-[#121419] shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]`}
-    >
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        className={size === "sm" ? "h-4 w-4" : size === "lg" ? "h-5 w-5" : "h-4 w-4"}
-        aria-hidden="true"
-      >
-        <path
-          d="M5.5 17V7l7 10V7M16.5 7v10M16.5 7l2.5 2.5"
-          stroke="#F4F1EA"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </div>
+    <img
+      src={isDark ? "/icon-black.png" : "/icon-white.png"}
+      alt="NohbyOne"
+      className={`${dims} shrink-0 select-none object-cover ring-1 ${
+        isDark ? "ring-white/15" : "ring-black/10"
+      }`}
+    />
   );
 }

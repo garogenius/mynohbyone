@@ -69,12 +69,7 @@ export function SignupScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
     <div className="flex min-h-screen flex-col bg-[#0B0C0E] text-[#F4F1EA]">
       {/* Distinct top editorial navigation bar */}
       <header className="flex h-16 items-center justify-between border-b border-white/[0.07] px-5 sm:px-8 lg:px-12">
-        <div className="flex items-center gap-3">
-          <BrandMark size="sm" />
-          <span className="font-display text-sm font-semibold tracking-tight text-[#F4F1EA]">
-            Nohby ONE
-          </span>
-        </div>
+        <BrandMark variant="logo" size="md" />
 
         <div className="flex items-center gap-2.5 text-xs">
           <ThemeToggle compact />

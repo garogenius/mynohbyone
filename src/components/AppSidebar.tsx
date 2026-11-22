@@ -49,19 +49,7 @@ function SidebarContent({
   return (
     <div className="flex h-full w-60 flex-col border-r border-white/[0.08] bg-[#0D0F13]">
       <div className="flex h-14 items-center justify-between border-b border-white/[0.06] px-4">
-        <div className="flex items-center gap-2.5">
-          <BrandMark size="sm" />
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="truncate text-sm font-semibold tracking-tight text-white">
-                Nohby ONE
-              </span>
-              <span className="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-[10px] text-zinc-400">
-                0.2
-              </span>
-            </div>
-          </div>
-        </div>
+        <BrandMark variant="logo" size="sm" />
 
         {onClose && (
           <button
