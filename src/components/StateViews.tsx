@@ -122,12 +122,12 @@ export function ToastBanner({
 }) {
   if (!toast) return null;
 
-  const styles =
+  const accent =
     toast.type === "success"
-      ? "border-emerald-500/30 bg-emerald-950/90 text-emerald-100"
+      ? "border-emerald-500/40 text-emerald-500"
       : toast.type === "error"
-      ? "border-rose-500/30 bg-rose-950/90 text-rose-100"
-      : "border-indigo-500/30 bg-slate-900/95 text-slate-100";
+      ? "border-rose-500/40 text-rose-500"
+      : "border-[#0066FF]/40 text-[#0066FF]";
 
   const Icon =
     toast.type === "success"
@@ -137,19 +137,19 @@ export function ToastBanner({
       : Info;
 
   return (
-    <div className="fixed right-5 bottom-5 z-50 max-w-sm">
+    <div className="fixed right-4 bottom-4 z-50 max-w-sm">
       <div
-        className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-sm shadow-2xl backdrop-blur-md ${styles}`}
+        className={`dropdown-surface flex items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-xs shadow-2xl ${accent}`}
       >
         <Icon className="h-4 w-4 shrink-0" />
-        <span className="flex-1">{toast.message}</span>
+        <span className="flex-1 font-medium text-white">{toast.message}</span>
         <button
           type="button"
           onClick={onClose}
-          className="rounded-md p-0.5 opacity-70 transition hover:opacity-100"
+          className="rounded-md p-0.5 text-zinc-400 transition hover:text-white"
           aria-label="Dismiss notification"
         >
-          <X className="h-4 w-4" />
+          <X className="h-3.5 w-3.5" />
         </button>
       </div>
     </div>

@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AudioLines,
+  ChevronDown,
+  History,
   Keyboard,
   Loader2,
   Mic,
+  Plus,
   Send,
   Square,
+  Trash2,
 } from "lucide-react";
 
 import { ApiError, apiClient } from "../lib/api";
@@ -18,7 +22,7 @@ import {
   type VoiceSessionHandle,
 } from "../lib/voice";
 import { useAppStore } from "../store/useAppStore";
-import type { FileItem, MemoryItem, Message, Task } from "../types/api";
+import type { Conversation, FileItem, MemoryItem, Message, Task } from "../types/api";
 
 function formatTimeAgo(iso: string | null | undefined): string {
   if (!iso) return "Just now";
@@ -48,8 +52,10 @@ export function HomeScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [memories, setMemories] = useState<MemoryItem[]>([]);
   const [files, setFiles] = useState<FileItem[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [recentMessages, setRecentMessages] = useState<Message[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   // Voice Control Dock state
   const [orbStyle, setOrbStyle] = useState<OrbStyleOption>(() => getSelectedOrbStyle());
@@ -107,22 +113,65 @@ export function HomeScreen() {
       apiClient.listTasks({ limit: 5 }).catch(() => null),
       apiClient.listMemories().catch(() => null),
       apiClient.listFiles({ limit: 5 }).catch(() => null),
-      apiClient.listConversations({ limit: 1 }).catch(() => null),
+      apiClient.listConversations({ limit: 20 }).catch(() => null),
     ]);
 
     if (tRes) setTasks(tRes.data.tasks);
     if (mRes) setMemories(mRes.data.memories);
     if (fRes) setFiles(fRes.data.files);
 
-    if (cRes && cRes.data.conversations.length > 0) {
-      const latestConv = cRes.data.conversations[0];
-      setConversationId(latestConv.id);
-      const detail = await apiClient.getConversation(latestConv.id).catch(() => null);
-      if (detail) {
-        setRecentMessages(detail.data.messages.slice(-4));
+    if (cRes) {
+      setConversations(cRes.data.conversations);
+      if (cRes.data.conversations.length > 0 && !conversationId) {
+        const latestConv = cRes.data.conversations[0];
+        setConversationId(latestConv.id);
+        const detail = await apiClient.getConversation(latestConv.id).catch(() => null);
+        if (detail) {
+          setRecentMessages(detail.data.messages.slice(-4));
+        }
       }
     }
-  }, []);
+  }, [conversationId]);
+
+  const handleSelectConversation = async (id: string) => {
+    setConversationId(id);
+    setHistoryOpen(false);
+    const detail = await apiClient.getConversation(id).catch(() => null);
+    if (detail) {
+      setRecentMessages(detail.data.messages.slice(-4));
+    }
+  };
+
+  const handleNewConversation = async () => {
+    try {
+      const created = await apiClient.createConversation({ title: "New Session", mode: "assistant" });
+      setConversationId(created.data.conversation.id);
+      setConversations((prev) => [created.data.conversation, ...prev]);
+      setRecentMessages([]);
+      setHistoryOpen(false);
+      showToast("info", "Started a fresh session.");
+    } catch (err) {
+      showToast("error", err instanceof ApiError ? err.message : "Unable to start new session.");
+    }
+  };
+
+  const handleDeleteConversation = async (id: string) => {
+    try {
+      await apiClient.deleteConversation(id);
+      const remaining = conversations.filter((c) => c.id !== id);
+      setConversations(remaining);
+      if (conversationId === id) {
+        if (remaining.length > 0) {
+          handleSelectConversation(remaining[0].id);
+        } else {
+          setConversationId(null);
+          setRecentMessages([]);
+        }
+      }
+    } catch (err) {
+      showToast("error", err instanceof ApiError ? err.message : "Failed to delete session.");
+    }
+  };
 
   useEffect(() => {
     if (!voiceSettings) {
@@ -457,9 +506,79 @@ export function HomeScreen() {
       </section>
 
       {/* ============================================================
-          RIGHT COLUMN: SLIM 250px COMPACT RAIL (Exact Reference Scale)
+          RIGHT COLUMN: SLIM 250px RAIL (History Dropdown + Metrics)
           ============================================================ */}
       <aside className="flex flex-col gap-2.5 lg:h-full lg:overflow-hidden">
+        {/* 0. Workspace History Dropdown */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setHistoryOpen((v) => !v)}
+            className="nohby-frame flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition hover:border-[#00D4FF]/60"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <History className="h-3.5 w-3.5 shrink-0 text-[#00D4FF]" />
+              <div className="min-w-0">
+                <p className="truncate text-[11px] font-semibold text-white">
+                  {conversations.find((c) => c.id === conversationId)?.title || "Session History"}
+                </p>
+                <p className="text-[9px] text-zinc-400">
+                  {conversations.length} workspace thread{conversations.length === 1 ? "" : "s"}
+                </p>
+              </div>
+            </div>
+            <ChevronDown
+              className={`h-3.5 w-3.5 shrink-0 text-zinc-400 transition ${
+                historyOpen ? "rotate-180 text-[#00D4FF]" : ""
+              }`}
+            />
+          </button>
+
+          {historyOpen && (
+            <div className="dropdown-surface absolute right-0 top-full z-30 mt-1.5 w-full rounded-xl border border-[#00D4FF]/35 p-2 shadow-2xl">
+              <button
+                type="button"
+                onClick={handleNewConversation}
+                className="btn-ivory mb-2 flex h-7 w-full items-center justify-center gap-1.5 rounded-lg text-[11px]"
+              >
+                <Plus className="h-3 w-3" />
+                New Session
+              </button>
+
+              <div className="max-h-48 space-y-1 overflow-y-auto">
+                {conversations.length === 0 ? (
+                  <p className="py-3 text-center text-[10px] text-zinc-400">No saved chats yet</p>
+                ) : (
+                  conversations.map((conv) => (
+                    <div
+                      key={conv.id}
+                      onClick={() => handleSelectConversation(conv.id)}
+                      className={`group flex cursor-pointer items-center justify-between gap-1.5 rounded-lg px-2 py-1.5 text-[11px] transition ${
+                        conv.id === conversationId
+                          ? "bg-[#00D4FF]/15 font-medium text-[#00D4FF]"
+                          : "text-zinc-300 hover:bg-white/[0.06]"
+                      }`}
+                    >
+                      <span className="truncate">{conv.title}</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteConversation(conv.id);
+                        }}
+                        className="shrink-0 rounded p-0.5 text-zinc-500 opacity-60 hover:text-rose-400 hover:opacity-100"
+                        title="Delete session"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* 1. System Performance */}
         <div className="nohby-frame p-3">
           <div className="flex items-baseline justify-between">
