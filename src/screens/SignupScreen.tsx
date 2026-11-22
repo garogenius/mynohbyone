@@ -73,15 +73,15 @@ export function SignupScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
       </header>
 
       {/* Single-viewport compact centered card (no scrolling on desktop/laptop) */}
-      <main className="flex flex-1 items-center justify-center px-4 py-6">
+      <main className="flex flex-1 items-center justify-center px-4 py-4">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-          className="w-full max-w-[430px] rounded-2xl border border-white/[0.09] bg-[#131519] p-6 shadow-2xl sm:p-7"
+          className="w-full max-w-[375px] rounded-xl border border-white/[0.09] bg-[#131519] p-5 shadow-2xl sm:p-6"
         >
           <div className="text-center">
-            <h1 className="font-display text-xl font-semibold tracking-tight text-[#F4F1EA]">
+            <h1 className="font-display text-lg font-semibold tracking-tight text-[#F4F1EA]">
               Create your account
             </h1>
             <p className="mt-1 text-xs text-[#8E9199]">
@@ -90,16 +90,16 @@ export function SignupScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
           </div>
 
           {(localError || error) && (
-            <div className="mt-4 rounded-xl border border-rose-500/25 bg-rose-500/10 px-3.5 py-2.5 text-xs leading-relaxed text-rose-200">
+            <div className="mt-3.5 rounded-lg border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-xs leading-relaxed text-rose-200">
               {localError || error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="mt-5 space-y-3.5">
+          <form onSubmit={handleSubmit} className="mt-4 space-y-3">
             <div>
               <label
                 htmlFor="signup-name"
-                className="mb-1 block text-xs font-medium text-[#C8C9CE]"
+                className="mb-1 block text-[11px] font-medium text-[#C8C9CE]"
               >
                 Full name
               </label>
@@ -112,14 +112,14 @@ export function SignupScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Alex Morgan"
-                className="studio-input h-10 w-full rounded-xl px-3.5 text-sm"
+                className="studio-input h-9 w-full rounded-lg px-3 text-[13px]"
               />
             </div>
 
             <div>
               <label
                 htmlFor="signup-email"
-                className="mb-1 block text-xs font-medium text-[#C8C9CE]"
+                className="mb-1 block text-[11px] font-medium text-[#C8C9CE]"
               >
                 Email address
               </label>
@@ -131,15 +131,15 @@ export function SignupScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="alex@company.com"
-                className="studio-input h-10 w-full rounded-xl px-3.5 text-sm"
+                className="studio-input h-9 w-full rounded-lg px-3 text-[13px]"
               />
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-2.5 sm:grid-cols-2">
               <div>
                 <label
                   htmlFor="signup-password"
-                  className="mb-1 block text-xs font-medium text-[#C8C9CE]"
+                  className="mb-1 block text-[11px] font-medium text-[#C8C9CE]"
                 >
                   Password
                 </label>
@@ -153,12 +153,12 @@ export function SignupScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Min. 8 chars"
-                    className="studio-input h-10 w-full rounded-xl pr-9 pl-3 text-sm"
+                    className="studio-input h-9 w-full rounded-lg pr-8 pl-3 text-[13px]"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-[#6E717A] transition hover:text-[#F4F1EA]"
+                    className="absolute top-1/2 right-1.5 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-[#6E717A] transition hover:text-[#F4F1EA]"
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
@@ -169,7 +169,7 @@ export function SignupScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
               <div>
                 <label
                   htmlFor="signup-confirm"
-                  className="mb-1 block text-xs font-medium text-[#C8C9CE]"
+                  className="mb-1 block text-[11px] font-medium text-[#C8C9CE]"
                 >
                   Confirm password
                 </label>
@@ -182,13 +182,13 @@ export function SignupScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Re-enter"
-                  className="studio-input h-10 w-full rounded-xl px-3 text-sm"
+                  className="studio-input h-9 w-full rounded-lg px-3 text-[13px]"
                 />
               </div>
             </div>
 
             {/* Compact single-line password strength meter */}
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <div className="grid grid-cols-4 gap-1.5">
                 {[1, 2, 3, 4].map((level) => (
                   <div
@@ -220,15 +220,15 @@ export function SignupScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
             <button
               type="submit"
               disabled={busy}
-              className="btn-ivory mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm"
+              className="btn-ivory mt-1 flex h-9 w-full items-center justify-center gap-1.5 rounded-lg px-3.5 text-xs"
             >
-              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               <span>Create Account</span>
-              {!busy && <ArrowRight className="h-4 w-4" />}
+              {!busy && <ArrowRight className="h-3.5 w-3.5" />}
             </button>
           </form>
 
-          <p className="mt-5 border-t border-white/[0.07] pt-4 text-center text-xs text-[#8E9199]">
+          <p className="mt-4 border-t border-white/[0.07] pt-3.5 text-center text-xs text-[#8E9199]">
             Already have an account?{" "}
             <button
               type="button"

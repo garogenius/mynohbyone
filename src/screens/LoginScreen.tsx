@@ -141,31 +141,31 @@ export function LoginScreen({
           <ThemeToggle />
         </div>
 
-        <div className="flex flex-1 items-center justify-center px-5 py-8 sm:px-10 lg:px-12">
+        <div className="flex flex-1 items-center justify-center px-5 py-6 sm:px-8">
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="w-full max-w-[390px]"
+            className="w-full max-w-[340px]"
           >
-            <h1 className="font-display text-2xl font-semibold tracking-tight text-[#F4F1EA]">
+            <h1 className="font-display text-xl font-semibold tracking-tight text-[#F4F1EA]">
               Sign in to Nohby ONE
             </h1>
-            <p className="mt-1.5 text-sm text-[#8E9199]">
+            <p className="mt-1 text-xs text-[#8E9199]">
               Enter your credentials to access your workspace.
             </p>
 
             {error && (
-              <div className="mt-5 rounded-xl border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-xs leading-relaxed text-rose-200">
+              <div className="mt-4 rounded-lg border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-xs leading-relaxed text-rose-200">
                 {error}
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            <form onSubmit={handleSubmit} className="mt-5 space-y-3">
               <div>
                 <label
                   htmlFor="login-email"
-                  className="mb-1.5 block text-xs font-medium text-[#C8C9CE]"
+                  className="mb-1 block text-[11px] font-medium text-[#C8C9CE]"
                 >
                   Email address
                 </label>
@@ -177,22 +177,22 @@ export function LoginScreen({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@company.com"
-                  className="studio-input h-11 w-full rounded-xl px-3.5 text-sm"
+                  className="studio-input h-9 w-full rounded-lg px-3 text-[13px]"
                 />
               </div>
 
               <div>
-                <div className="mb-1.5 flex items-center justify-between">
+                <div className="mb-1 flex items-center justify-between">
                   <label
                     htmlFor="login-password"
-                    className="text-xs font-medium text-[#C8C9CE]"
+                    className="text-[11px] font-medium text-[#C8C9CE]"
                   >
                     Password
                   </label>
                   <button
                     type="button"
                     onClick={onGoToForgot}
-                    className="text-xs font-medium text-[#A1A3AA] transition hover:text-[#F4F1EA]"
+                    className="text-[11px] font-medium text-[#A1A3AA] transition hover:text-[#F4F1EA]"
                   >
                     Forgot password?
                   </button>
@@ -206,15 +206,15 @@ export function LoginScreen({
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
-                    className="studio-input h-11 w-full rounded-xl pr-11 pl-3.5 text-sm"
+                    className="studio-input h-9 w-full rounded-lg pr-9 pl-3 text-[13px]"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute top-1/2 right-2.5 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-[#6E717A] transition hover:text-[#F4F1EA]"
+                    className="absolute top-1/2 right-1.5 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-[#6E717A] transition hover:text-[#F4F1EA]"
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                   </button>
                 </div>
               </div>
@@ -222,15 +222,15 @@ export function LoginScreen({
               <button
                 type="submit"
                 disabled={busy}
-                className="btn-ivory mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm"
+                className="btn-ivory mt-1 flex h-9 w-full items-center justify-center gap-1.5 rounded-lg px-3.5 text-xs"
               >
-                {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+                {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 <span>Sign In</span>
-                {!busy && <ArrowRight className="h-4 w-4" />}
+                {!busy && <ArrowRight className="h-3.5 w-3.5" />}
               </button>
             </form>
 
-            <div className="mt-7 border-t border-white/[0.07] pt-5 text-center text-xs text-[#8E9199]">
+            <div className="mt-5 border-t border-white/[0.07] pt-4 text-center text-xs text-[#8E9199]">
               New to Nohby ONE?{" "}
               <button
                 type="button"

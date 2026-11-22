@@ -43,6 +43,16 @@
     color-scheme: light;
   }
 
+  html {
+    font-size: 14px;
+  }
+
+  @media (max-width: 640px) {
+    html {
+      font-size: 14.5px;
+    }
+  }
+
   html,
   body,
   #root {
