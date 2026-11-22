@@ -45,11 +45,35 @@ export function HomeScreen() {
 
   // Voice Control Dock state
   const [voiceActive, setVoiceActive] = useState(false);
+  const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
+  const [stillOrbUrl, setStillOrbUrl] = useState<string | null>(null);
   const [interimTranscript, setInterimTranscript] = useState("");
   const [showTextInput, setShowTextInput] = useState(false);
   const [textDraft, setTextDraft] = useState("");
   const [sending, setSending] = useState(false);
   const voiceHandleRef = useRef<VoiceSessionHandle | null>(null);
+
+  // Capture a crisp still frame of /vioce-wave.gif so the orb stays calm & still when idle
+  useEffect(() => {
+    const img = new Image();
+    img.src = "/vioce-wave.gif";
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth || 320;
+        canvas.height = img.naturalHeight || 320;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          setStillOrbUrl(canvas.toDataURL("image/png"));
+        }
+      } catch {
+        // Fallback if canvas export is restricted
+      }
+    };
+  }, []);
+
+  const isOrbMoving = voiceActive || isAssistantSpeaking || sending;
 
   const currentDevice = devices.find((d) => d.id === currentDeviceId) || null;
   const activeDevicesCount = devices.filter((d) => d.status === "active").length;
@@ -129,6 +153,8 @@ export function HomeScreen() {
             voiceType: voiceSettings?.voiceType || "female",
             pitch: voiceSettings?.ttsPitch,
             rate: voiceSettings?.ttsRate ?? 1.0,
+            onStart: () => setIsAssistantSpeaking(true),
+            onEnd: () => setIsAssistantSpeaking(false),
           });
         }
 
@@ -190,6 +216,7 @@ export function HomeScreen() {
     voiceHandleRef.current = null;
     stopSpeaking();
     setVoiceActive(false);
+    setIsAssistantSpeaking(false);
     setInterimTranscript("");
     showToast("info", "Voice output and listening interrupted.");
   };
@@ -227,6 +254,12 @@ export function HomeScreen() {
                 Listening
               </span>
             )}
+            {isAssistantSpeaking && !voiceActive && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-400/40 bg-violet-500/15 px-2 py-0.5 text-[10px] font-medium text-violet-300">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-400" />
+                NohbyAI Speaking
+              </span>
+            )}
           </div>
 
           <button
@@ -240,27 +273,29 @@ export function HomeScreen() {
           </button>
         </div>
 
-        {/* Centerpiece: Official /vioce-wave.gif Animated Voice Orb */}
+        {/* Centerpiece: Reactive /vioce-wave.gif (Moves ONLY when listening/speaking/thinking) */}
         <div className="my-1 flex flex-1 items-center justify-center">
           <button
             type="button"
             onClick={toggleVoiceMic}
             aria-label={voiceActive ? "Stop voice listening" : "Start voice listening"}
             className={`group relative flex h-44 w-44 items-center justify-center rounded-full transition duration-300 xl:h-52 xl:w-52 ${
-              voiceActive
-                ? "scale-105 shadow-[0_0_60px_rgba(0,212,255,0.45)]"
-                : "hover:scale-[1.03] shadow-[0_0_40px_rgba(0,102,255,0.28)]"
+              isOrbMoving
+                ? "scale-105 shadow-[0_0_65px_rgba(0,212,255,0.5)]"
+                : "hover:scale-[1.02] shadow-[0_0_30px_rgba(0,102,255,0.2)]"
             }`}
           >
             <img
-              src="/vioce-wave.gif"
+              src={isOrbMoving || !stillOrbUrl ? "/vioce-wave.gif" : stillOrbUrl}
               alt="Nohby ONE Voice Wave"
-              className="h-full w-full rounded-full object-cover"
+              className={`h-full w-full rounded-full object-cover transition duration-300 ${
+                isOrbMoving ? "opacity-100" : "opacity-85"
+              }`}
             />
             <span
               className={`pointer-events-none absolute inset-0 rounded-full border transition ${
-                voiceActive
-                  ? "border-[#00D4FF]/70 ring-4 ring-[#00D4FF]/20"
+                isOrbMoving
+                  ? "border-[#00D4FF]/75 ring-4 ring-[#00D4FF]/20"
                   : "border-white/15 group-hover:border-[#00D4FF]/40"
               }`}
             />
