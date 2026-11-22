@@ -212,11 +212,11 @@ export function HomeScreen() {
     tasks.length > 0 ? `${Math.round(((tasks.length - tasks.filter((t) => t.status === "failed").length) / tasks.length) * 100)}%` : "100%";
 
   return (
-    <div className="grid w-full gap-3 lg:h-[calc(100vh-5.25rem)] lg:grid-cols-12 lg:overflow-hidden">
+    <div className="grid w-full gap-3 lg:h-[calc(100vh-5.25rem)] lg:grid-cols-[minmax(0,1fr)_250px] xl:grid-cols-[minmax(0,1fr)_265px] lg:overflow-hidden">
       {/* ============================================================
           LEFT / CENTER: ACTIVE SESSION STAGE (Zero-Scroll Room)
           ============================================================ */}
-      <section className="nohby-stage flex flex-col justify-between p-3.5 sm:p-4 lg:col-span-8 lg:h-full lg:overflow-hidden">
+      <section className="nohby-stage flex flex-col justify-between p-3.5 sm:p-4 lg:h-full lg:overflow-hidden">
         {/* Stage Header */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -246,7 +246,7 @@ export function HomeScreen() {
             type="button"
             onClick={toggleVoiceMic}
             aria-label={voiceActive ? "Stop voice listening" : "Start voice listening"}
-            className={`group relative flex h-40 w-40 items-center justify-center rounded-full transition duration-300 xl:h-48 xl:w-48 ${
+            className={`group relative flex h-44 w-44 items-center justify-center rounded-full transition duration-300 xl:h-52 xl:w-52 ${
               voiceActive
                 ? "scale-105 shadow-[0_0_60px_rgba(0,212,255,0.45)]"
                 : "hover:scale-[1.03] shadow-[0_0_40px_rgba(0,102,255,0.28)]"
@@ -415,17 +415,17 @@ export function HomeScreen() {
       </section>
 
       {/* ============================================================
-          RIGHT COLUMN: 3 COMPACT STACKED CARDS (Zero Scroll)
+          RIGHT COLUMN: SLIM 250px COMPACT RAIL (Exact Reference Scale)
           ============================================================ */}
-      <aside className="grid gap-3 lg:col-span-4 lg:h-full lg:grid-rows-[auto_1fr_auto] lg:overflow-hidden">
+      <aside className="flex flex-col gap-2.5 lg:h-full lg:overflow-hidden">
         {/* 1. System Performance */}
-        <div className="nohby-frame p-3.5">
+        <div className="nohby-frame p-3">
           <div className="flex items-baseline justify-between">
-            <h3 className="font-display text-xs font-semibold text-white">System Performance</h3>
-            <span className="text-[10px] text-zinc-400">Live micro-metrics</span>
+            <h3 className="font-display text-[12px] font-semibold text-white">System Performance</h3>
+            <span className="text-[9px] text-zinc-500">Live</span>
           </div>
 
-          <div className="mt-2.5 space-y-1.5 text-xs">
+          <div className="mt-2 space-y-1 text-[11px]">
             <div className="flex items-center justify-between">
               <span className="text-zinc-400">Latency:</span>
               <span className="font-mono font-semibold text-white">
@@ -437,18 +437,18 @@ export function HomeScreen() {
               <span className="font-mono font-semibold text-emerald-400">{accuracyRate}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-zinc-400">Active Nodes:</span>
+              <span className="text-zinc-400">Nodes:</span>
               <span className="font-mono font-semibold text-[#00D4FF]">
-                {activeDevicesCount} ({completedCount} done)
+                {activeDevicesCount} · {completedCount} done
               </span>
             </div>
           </div>
         </div>
 
         {/* 2. Active Tasks */}
-        <div className="nohby-frame flex flex-col overflow-hidden p-3.5">
+        <div className="nohby-frame flex min-h-0 flex-1 flex-col overflow-hidden p-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-display text-xs font-semibold text-white">Active Tasks</h3>
+            <h3 className="font-display text-[12px] font-semibold text-white">Active Tasks</h3>
             <button
               type="button"
               onClick={() => setRoute("tasks")}
@@ -463,9 +463,9 @@ export function HomeScreen() {
               <button
                 type="button"
                 onClick={() => setRoute("tasks")}
-                className="w-full rounded-lg border border-dashed border-white/[0.12] px-3 py-4 text-center text-[11px] text-zinc-400 transition hover:border-[#00D4FF]/40 hover:text-white"
+                className="w-full rounded-lg border border-dashed border-white/[0.1] px-2.5 py-3 text-center text-[10px] text-zinc-400 transition hover:border-[#00D4FF]/40 hover:text-white"
               >
-                No tasks queued — plan a task
+                No tasks queued — plan one
               </button>
             ) : (
               tasks.slice(0, 3).map((task) => {
@@ -483,7 +483,7 @@ export function HomeScreen() {
                     key={task.id}
                     type="button"
                     onClick={() => setRoute("tasks")}
-                    className={`w-full rounded-lg border px-2.5 py-2 text-left transition ${
+                    className={`w-full rounded-lg border px-2.5 py-1.5 text-left transition ${
                       isRunning
                         ? "border-[#00D4FF]/50 bg-[#00D4FF]/10"
                         : "border-white/[0.08] bg-[#141B2D]/80 hover:border-[#00D4FF]/35"
@@ -501,9 +501,9 @@ export function HomeScreen() {
         </div>
 
         {/* 3. Memory Context */}
-        <div className="nohby-frame p-3.5">
+        <div className="nohby-frame p-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-display text-xs font-semibold text-white">Memory Context</h3>
+            <h3 className="font-display text-[12px] font-semibold text-white">Memory Context</h3>
             <button
               type="button"
               onClick={() => setRoute("memory")}
@@ -513,9 +513,9 @@ export function HomeScreen() {
             </button>
           </div>
 
-          <div className="mt-2 flex flex-wrap gap-1">
+          <div className="mt-1.5 flex flex-wrap gap-1">
             {memoryTags.length > 0 ? (
-              memoryTags.map((tag) => (
+              memoryTags.slice(0, 3).map((tag) => (
                 <span
                   key={tag}
                   className="rounded-full border border-white/[0.12] bg-[#161E30] px-2 py-0.5 text-[10px] text-zinc-200"
@@ -524,13 +524,13 @@ export function HomeScreen() {
                 </span>
               ))
             ) : (
-              <span className="rounded-full border border-white/[0.12] bg-[#161E30] px-2 py-0.5 text-[10px] text-zinc-400">
-                No tags yet
+              <span className="rounded-full border border-white/[0.1] bg-[#161E30] px-2 py-0.5 text-[10px] text-zinc-400">
+                No tags
               </span>
             )}
           </div>
 
-          <div className="mt-2.5 space-y-1 text-[11px]">
+          <div className="mt-2 space-y-0.5 text-[10px]">
             <p className="truncate text-zinc-400">
               Context:{" "}
               <span className="font-medium text-white">
@@ -538,7 +538,7 @@ export function HomeScreen() {
               </span>
             </p>
             <p className="text-zinc-400">
-              Last sync:{" "}
+              Sync:{" "}
               <span className="font-medium text-white">
                 {formatTimeAgo(currentDevice?.lastSeenAt || latestMemory?.updatedAt)}
               </span>
