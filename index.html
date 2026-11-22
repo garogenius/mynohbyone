@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="dark" class="dark">
+<html lang="en" data-theme="light" class="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -14,12 +14,12 @@
     <script>
       (function () {
         try {
-          var pref = localStorage.getItem("nohbyone.theme") || "dark";
+          var pref = localStorage.getItem("nohbyone.theme") || "light";
           var resolved =
             pref === "system"
-              ? window.matchMedia("(prefers-color-scheme: light)").matches
-                ? "light"
-                : "dark"
+              ? window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light"
               : pref;
           document.documentElement.setAttribute("data-theme", resolved);
           document.documentElement.classList.toggle("dark", resolved === "dark");

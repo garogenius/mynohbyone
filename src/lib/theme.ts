@@ -4,18 +4,18 @@ export type ResolvedTheme = "light" | "dark";
 const STORAGE_KEY = "nohbyone.theme";
 
 export function getStoredTheme(): ThemePreference {
-  if (typeof window === "undefined") return "dark";
+  if (typeof window === "undefined") return "light";
   const val = localStorage.getItem(STORAGE_KEY);
   if (val === "light" || val === "dark" || val === "system") return val;
-  return "dark";
+  return "light";
 }
 
 export function resolveTheme(pref: ThemePreference): ResolvedTheme {
   if (pref === "light" || pref === "dark") return pref;
-  if (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: light)").matches) {
-    return "light";
+  if (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    return "dark";
   }
-  return "dark";
+  return "light";
 }
 
 export function applyTheme(pref: ThemePreference): ResolvedTheme {
