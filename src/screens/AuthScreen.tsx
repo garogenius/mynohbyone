@@ -200,34 +200,6 @@ export function AuthScreen() {
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             className="w-full max-w-[400px]"
           >
-            {/* Sliding segmented tab switch */}
-            {mode !== "forgot" && (
-              <div className="relative mb-8 grid grid-cols-2 rounded-xl border border-white/[0.08] bg-[#121418] p-1">
-                {(["login", "register"] as const).map((tab) => {
-                  const active = mode === tab;
-                  return (
-                    <button
-                      key={tab}
-                      type="button"
-                      onClick={() => switchMode(tab)}
-                      className={`relative z-10 min-h-[38px] rounded-lg text-xs font-medium transition-colors ${
-                        active ? "text-[#0B0C0E]" : "text-[#A1A3AA] hover:text-[#F4F1EA]"
-                      }`}
-                    >
-                      {active && (
-                        <motion.span
-                          layoutId="auth-active-tab"
-                          transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                          className="absolute inset-0 -z-10 rounded-lg bg-[#F4F1EA]"
-                        />
-                      )}
-                      {tab === "login" ? "Sign In" : "Create Account"}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
             <AnimatePresence mode="wait">
               <motion.div
                 key={mode}
@@ -238,14 +210,14 @@ export function AuthScreen() {
               >
                 <h1 className="font-display text-2xl font-semibold tracking-tight text-[#F4F1EA]">
                   {mode === "login"
-                    ? "Welcome back"
+                    ? "Sign in to Nohby ONE"
                     : mode === "register"
                     ? "Create your account"
                     : "Reset your password"}
                 </h1>
                 <p className="mt-1.5 text-sm text-[#8E9199]">
                   {mode === "login"
-                    ? "Sign in to connect this device to your Nohby ONE workspace."
+                    ? "Enter your credentials to access your workspace."
                     : mode === "register"
                     ? "Set up your personal operating assistant in seconds."
                     : "Enter your account email and we will send recovery instructions."}
@@ -395,15 +367,44 @@ export function AuthScreen() {
               </button>
             </form>
 
-            {mode === "forgot" && (
-              <button
-                type="button"
-                onClick={() => switchMode("login")}
-                className="mt-5 text-xs font-medium text-[#A1A3AA] transition hover:text-[#F4F1EA]"
-              >
-                ← Return to Sign In
-              </button>
-            )}
+            <div className="mt-6 border-t border-white/[0.07] pt-5 text-center text-xs text-[#8E9199]">
+              {mode === "login" && (
+                <>
+                  Don&apos;t have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => switchMode("register")}
+                    className="font-medium text-[#F4F1EA] underline-offset-4 transition hover:underline"
+                  >
+                    Create one
+                  </button>
+                </>
+              )}
+              {mode === "register" && (
+                <>
+                  Already have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => switchMode("login")}
+                    className="font-medium text-[#F4F1EA] underline-offset-4 transition hover:underline"
+                  >
+                    Sign in
+                  </button>
+                </>
+              )}
+              {mode === "forgot" && (
+                <>
+                  Remembered your password?{" "}
+                  <button
+                    type="button"
+                    onClick={() => switchMode("login")}
+                    className="font-medium text-[#F4F1EA] underline-offset-4 transition hover:underline"
+                  >
+                    Back to sign in
+                  </button>
+                </>
+              )}
+            </div>
           </motion.div>
         </div>
 
