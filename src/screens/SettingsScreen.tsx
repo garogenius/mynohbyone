@@ -26,7 +26,7 @@ import { useAppStore } from "../store/useAppStore";
 import type { VoicePersonaId } from "../types/api";
 
 const AI_PROVIDER_OPTIONS = [
-  { id: "gemini", label: "Google Gemini", defaultModel: "gemini-2.0-flash", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai" },
+  { id: "gemini", label: "Google Gemini (Primary)", defaultModel: "gemini-flash-latest", baseUrl: "https://generativelanguage.googleapis.com/v1beta" },
   { id: "openai", label: "OpenAI", defaultModel: "gpt-4o-mini", baseUrl: "https://api.openai.com/v1" },
   { id: "groq", label: "Groq (Ultra-Fast)", defaultModel: "llama-3.3-70b-versatile", baseUrl: "https://api.groq.com/openai/v1" },
   { id: "openrouter", label: "OpenRouter", defaultModel: "openai/gpt-4o-mini", baseUrl: "https://openrouter.ai/api/v1" },
@@ -50,8 +50,8 @@ export function SettingsScreen() {
 
   // AI Chat Engine state
   const [aiProvider, setAiProvider] = useState("gemini");
-  const [aiModel, setAiModel] = useState("gemini-2.0-flash");
-  const [aiBaseUrl, setAiBaseUrl] = useState("https://generativelanguage.googleapis.com/v1beta/openai");
+  const [aiModel, setAiModel] = useState("gemini-flash-latest");
+  const [aiBaseUrl, setAiBaseUrl] = useState("https://generativelanguage.googleapis.com/v1beta");
   const [aiApiKey, setAiApiKey] = useState("");
   const [aiConnected, setAiConnected] = useState(false);
   const [aiMaskedKey, setAiMaskedKey] = useState("");
