@@ -126,6 +126,18 @@
   box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.16);
 }
 
+.dropdown-surface {
+  background-color: #101624;
+  border: 1px solid rgba(148, 175, 224, 0.18);
+  box-shadow: 0 18px 42px -12px rgba(0, 0, 0, 0.65);
+}
+
+[data-theme="light"] .dropdown-surface {
+  background-color: #ffffff;
+  border: 1px solid rgba(8, 20, 46, 0.12);
+  box-shadow: 0 18px 40px -12px rgba(8, 20, 46, 0.22);
+}
+
 /* Dark Mode deep navy brand surfaces */
 [data-theme="dark"] .bg-\[\#0B0C0E\],
 [data-theme="dark"] .bg-\[\#0A0B0E\],

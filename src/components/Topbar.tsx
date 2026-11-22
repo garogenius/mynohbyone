@@ -72,7 +72,7 @@ export function Topbar({
     .toUpperCase();
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/[0.08] bg-[#0A0B0E]/90 px-4 backdrop-blur-md sm:px-6">
+    <header className="relative z-30 flex h-14 shrink-0 items-center justify-between border-b border-white/[0.08] bg-[#0A0B0E] px-4 sm:px-6">
       <div className="flex min-w-0 items-center gap-3">
         <button
           type="button"
@@ -117,7 +117,7 @@ export function Topbar({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 4, scale: 0.98 }}
                 transition={{ duration: 0.14 }}
-                className="absolute right-0 z-40 mt-2 w-80 overflow-hidden rounded-xl border border-white/[0.1] bg-[#111318] shadow-xl"
+                className="dropdown-surface absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-xl"
               >
                 <div className="flex items-center justify-between border-b border-white/[0.07] px-3.5 py-2.5">
                   <span className="text-xs font-semibold text-white">Notifications</span>
@@ -183,7 +183,7 @@ export function Topbar({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 4, scale: 0.98 }}
                 transition={{ duration: 0.14 }}
-                className="absolute right-0 z-40 mt-2 w-60 overflow-hidden rounded-xl border border-white/[0.1] bg-[#111318] shadow-xl"
+                className="dropdown-surface absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-xl"
               >
                 <div className="border-b border-white/[0.07] px-3.5 py-3">
                   <p className="truncate text-xs font-semibold text-white">
