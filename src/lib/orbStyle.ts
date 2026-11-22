@@ -19,14 +19,14 @@ export const ORB_STYLE_OPTIONS: OrbStyleOption[] = [
     label: "Neural Wave",
     description: "Dynamic luminous wave pulse",
     gif: "/Gemini_Generated_Gif_2jr1kn2jr1kn2jr1.gif",
-    still: "/vioce-wave-image.jpg",
+    still: "/orb-neural-still.jpg",
   },
   {
     id: "aurora",
     label: "Aurora Pulse",
     description: "Fluid multi-spectrum voice sphere",
     gif: "/Gemini_Generated_Gif_bqjogvbqjogvbqjo.gif",
-    still: "/vioce-wave-image.jpg",
+    still: "/orb-aurora-still.jpg",
   },
 ];
 
