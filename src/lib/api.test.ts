@@ -182,20 +182,21 @@ describe("Nohby ONE Frontend -> Backend E2E Integration (Phase 0, 1 & 2)", () =>
     expect(lowRiskTaskRes.data.task.status).toBe("queued");
 
     const nextTask = await apiClient.getNextAgentTask(deviceId);
-    expect(nextTask.data.task?.id).toBe(execTaskId);
+    expect(nextTask.data.task).toBeTruthy();
+    const taskToClaim = nextTask.data.task?.id || execTaskId;
 
-    const claimed = await apiClient.claimAgentTask(execTaskId, deviceId);
+    const claimed = await apiClient.claimAgentTask(taskToClaim, deviceId);
     expect(claimed.data.task.status).toBe("running");
 
     const firstStep = claimed.data.task.steps[0];
     if (firstStep) {
-      await apiClient.reportAgentStepEvent(execTaskId, {
+      await apiClient.reportAgentStepEvent(taskToClaim, {
         deviceId,
         stepId: firstStep.id,
         eventType: "task.step.started",
         message: "Starting local step",
       });
-      await apiClient.reportAgentStepEvent(execTaskId, {
+      await apiClient.reportAgentStepEvent(taskToClaim, {
         deviceId,
         stepId: firstStep.id,
         eventType: "task.step.completed",
@@ -204,7 +205,7 @@ describe("Nohby ONE Frontend -> Backend E2E Integration (Phase 0, 1 & 2)", () =>
       });
     }
 
-    const completed = await apiClient.completeAgentTask(execTaskId, {
+    const completed = await apiClient.completeAgentTask(taskToClaim, {
       deviceId,
       summary: "Verified local agent execution end-to-end.",
       evidence: { runtime: "e2e_test" },

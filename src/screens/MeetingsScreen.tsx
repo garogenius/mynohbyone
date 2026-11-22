@@ -845,8 +845,22 @@ export function MeetingsScreen() {
       ? selected.transcripts[selected.transcripts.length - 1]
       : null;
 
-  // Sync External Screen-Share-Invisible Floating Stealth Card Window
+  // Sync External Screen-Share-Invisible Floating Stealth Card Window & Device Overlay
   const syncExternalStealthCard = useCallback(() => {
+    // 1. Sync unified device background overlay
+    window.dispatchEvent(
+      new CustomEvent("nohby-meeting-stealth-sync", {
+        detail: {
+          meetingId: selected?.id,
+          meetingTitle: selected?.title,
+          isListening,
+          question: liveCaption || (latestSegment ? cleanDisplayText(latestSegment.content) : ""),
+          answer: latestSegment?.aiHint ? cleanFirstPersonAnswer(latestSegment.aiHint) : "",
+          autoSwitchToMeeting: Boolean(liveCaption || latestSegment?.aiHint),
+        },
+      })
+    );
+
     const win = stealthPopupRef.current;
     if (!win || win.closed) return;
     const doc = win.document;
@@ -871,133 +885,37 @@ export function MeetingsScreen() {
         ? cleanFirstPersonAnswer(latestSegment.aiHint)
         : "Your first-person response will appear here when a question is detected.";
     }
-  }, [isListening, latestSegment, liveCaption]);
+  }, [isListening, latestSegment, liveCaption, selected]);
 
   useEffect(() => {
     syncExternalStealthCard();
   }, [syncExternalStealthCard]);
 
+  useEffect(() => {
+    const onToggleMeetingMic = () => {
+      toggleBackgroundMic();
+    };
+    window.addEventListener("nohby-toggle-meeting-mic", onToggleMeetingMic);
+    return () => {
+      window.removeEventListener("nohby-toggle-meeting-mic", onToggleMeetingMic);
+    };
+  }, [toggleBackgroundMic]);
+
   const toggleExternalStealthCardWindow = async () => {
     setActionsMenuOpen(false);
     await syncNativeStealthMode(true);
 
-    if (stealthPopupRef.current && !stealthPopupRef.current.closed) {
-      stealthPopupRef.current.close();
-      stealthPopupRef.current = null;
-      setExternalStealthActive(false);
-      return;
-    }
-
-    try {
-      let pipWin: Window | null = null;
-      if (window.documentPictureInPicture?.requestWindow) {
-        pipWin = await window.documentPictureInPicture.requestWindow({
-          width: 580,
-          height: 410,
-        });
-      } else {
-        pipWin = window.open(
-          "",
-          "NohbyStealthMeetingCard",
-          "width=580,height=420,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
-        );
-      }
-
-      if (!pipWin) {
-        showToast("error", "Allow popups to open the external stealth card.");
-        return;
-      }
-
-      stealthPopupRef.current = pipWin;
-      setExternalStealthActive(true);
-
-      pipWin.document.open();
-      pipWin.document.write(`<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>Nohby ONE — Stealth Response Card</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background: #0B0F17;
-      color: #F8FAFC;
-      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      padding: 16px;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 11px;
-      font-weight: 600;
-      color: #94A3B8;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-      padding-bottom: 8px;
-    }
-    .section {
-      background: #121824;
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 10px;
-      padding: 12px;
-    }
-    .answer {
-      flex: 1;
-      background: #121824;
-      border: 1px solid rgba(255,255,255,0.14);
-      border-radius: 10px;
-      padding: 14px;
-      overflow-y: auto;
-    }
-    .label {
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: #64748B;
-      margin-bottom: 6px;
-    }
-    .q-text {
-      font-size: 13px;
-      color: #E2E8F0;
-      line-height: 1.45;
-    }
-    .a-text {
-      font-size: 14.5px;
-      color: #FFFFFF;
-      line-height: 1.6;
-    }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <span id="stealth-live-badge">LISTENING • SCREEN-SHARE PROTECTED</span>
-  </div>
-  <div class="section">
-    <div class="label">Question</div>
-    <div class="q-text" id="stealth-caught-q">Waiting for question...</div>
-  </div>
-  <div class="answer">
-    <div class="label">Suggested Response (First Person)</div>
-    <div class="a-text" id="stealth-first-person-a">Waiting for question...</div>
-  </div>
-</body>
-</html>`);
-      pipWin.document.close();
-
-      pipWin.addEventListener("pagehide", () => {
-        stealthPopupRef.current = null;
-        setExternalStealthActive(false);
-      });
-
-      syncExternalStealthCard();
-    } catch {
-      showToast("error", "Unable to open external window.");
-    }
+    // Launch or switch unified device desktop overlay to meeting stealth mode
+    window.dispatchEvent(
+      new CustomEvent("nohby-launch-device-overlay", {
+        detail: { mode: "meeting" },
+      })
+    );
+    setExternalStealthActive(true);
+    showToast(
+      "success",
+      "Meeting stealth card floating on device background (Invisible in Screen Share)."
+    );
   };
 
   // Free 360° pointer dragging handlers for Stealth Card Modal

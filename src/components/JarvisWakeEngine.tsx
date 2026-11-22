@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronRight, PictureInPicture2, Radio, X } from "lucide-react";
+import { ChevronRight, Radio, ShieldCheck, X } from "lucide-react";
 
 import { apiClient } from "../lib/api";
 import {
@@ -87,6 +87,18 @@ export function JarvisWakeEngine() {
   const lastProcessedRef = useRef<string>("");
   const convIdRef = useRef<string | null>(null);
   const overlayWindowRef = useRef<Window | null>(null);
+  const meetingSyncRef = useRef<{
+    meetingTitle?: string;
+    isListening?: boolean;
+    question?: string;
+    answer?: string;
+  }>({
+    meetingTitle: "",
+    isListening: false,
+    question: "",
+    answer: "",
+  });
+  const activeOverlayTabRef = useRef<"assistant" | "meeting">("assistant");
 
   const enabled = phase === "ready" && Boolean(voiceSettings?.wakeWordEnabled);
   const wakePhrase = voiceSettings?.wakeWordPhrase || "Hey Nohby";
@@ -367,11 +379,13 @@ export function JarvisWakeEngine() {
     const win = overlayWindowRef.current;
     if (!win || win.closed) return;
     const doc = win.document;
+    const origin = window.location.origin;
+    const isAnim = status !== "standby" || speechDetected;
+
+    // 1. Assistant Tab Elements
     const orbImg = doc.getElementById("nohby-overlay-orb") as HTMLImageElement | null;
     const statusEl = doc.getElementById("nohby-overlay-status");
     const subEl = doc.getElementById("nohby-overlay-sub");
-    const isAnim = status !== "standby" || speechDetected;
-    const origin = window.location.origin;
 
     if (orbImg) {
       const srcPath = isAnim ? orbStyle.gif : orbStyle.still;
@@ -389,7 +403,47 @@ export function JarvisWakeEngine() {
               : `Say "${wakePhrase}"`;
     }
     if (subEl) {
-      subEl.textContent = lastHeard || "Tap orb or speak wake phrase anywhere";
+      subEl.textContent = lastHeard || "Floating on device background across all apps";
+    }
+
+    // 2. Meeting Stealth Tab Elements
+    const qEl = doc.getElementById("nohby-stealth-question");
+    const aEl = doc.getElementById("nohby-stealth-answer");
+    const badgeEl = doc.getElementById("meeting-badge");
+
+    const m = meetingSyncRef.current;
+    if (qEl) {
+      qEl.textContent = m.question || "Waiting for meeting questions...";
+    }
+    if (aEl) {
+      aEl.textContent =
+        m.answer ||
+        "Your first-person response based on your experience and skills will appear here.";
+    }
+    if (badgeEl) {
+      badgeEl.textContent = m.isListening ? "LISTENING" : "STANDBY";
+      badgeEl.style.color = m.isListening ? "#10B981" : "#00D4FF";
+    }
+
+    // 3. Tab visibility sync
+    const activeTab = activeOverlayTabRef.current;
+    const tabAssistant = doc.getElementById("tab-assistant");
+    const tabMeeting = doc.getElementById("tab-meeting");
+    const viewAssistant = doc.getElementById("view-assistant");
+    const viewMeeting = doc.getElementById("view-meeting");
+
+    if (tabAssistant && tabMeeting && viewAssistant && viewMeeting) {
+      if (activeTab === "meeting") {
+        tabAssistant.classList.remove("active");
+        tabMeeting.classList.add("active");
+        viewAssistant.classList.remove("active");
+        viewMeeting.classList.add("active");
+      } else {
+        tabMeeting.classList.remove("active");
+        tabAssistant.classList.add("active");
+        viewMeeting.classList.remove("active");
+        viewAssistant.classList.add("active");
+      }
     }
   }, [lastHeard, orbStyle.gif, orbStyle.still, speechDetected, status, wakePhrase]);
 
@@ -397,7 +451,11 @@ export function JarvisWakeEngine() {
     syncOverlayDom();
   }, [syncOverlayDom]);
 
-  const toggleDeviceDesktopOverlay = async () => {
+  const toggleDeviceDesktopOverlay = async (preferredMode?: "assistant" | "meeting") => {
+    if (preferredMode) {
+      activeOverlayTabRef.current = preferredMode;
+    }
+
     // 1. Native Tauri Desktop App Always-On-Top background mode
     if (typeof window !== "undefined" && window.__TAURI__?.core?.invoke) {
       try {
@@ -407,7 +465,7 @@ export function JarvisWakeEngine() {
         showToast(
           "success",
           next
-            ? "NohbyAI pinned on top of your device desktop background."
+            ? "NohbyAI pinned on top of your device desktop background (Invisible in Screen Share)."
             : "Unpinned from device desktop background."
         );
         return;
@@ -416,26 +474,34 @@ export function JarvisWakeEngine() {
       }
     }
 
-    // 2. Close existing floating OS overlay if already open
+    // 2. If already open and no mode switch requested, toggle off
     if (overlayWindowRef.current && !overlayWindowRef.current.closed) {
-      overlayWindowRef.current.close();
-      overlayWindowRef.current = null;
-      setDesktopPinned(false);
-      return;
+      if (!preferredMode || preferredMode === activeOverlayTabRef.current) {
+        overlayWindowRef.current.close();
+        overlayWindowRef.current = null;
+        setDesktopPinned(false);
+        return;
+      } else {
+        // Just switch mode and focus
+        activeOverlayTabRef.current = preferredMode;
+        syncOverlayDom();
+        overlayWindowRef.current.focus?.();
+        return;
+      }
     }
 
     try {
       let pipWin: Window | null = null;
       if (window.documentPictureInPicture?.requestWindow) {
         pipWin = await window.documentPictureInPicture.requestWindow({
-          width: 340,
-          height: 86,
+          width: 440,
+          height: 250,
         });
       } else {
         pipWin = window.open(
           "",
-          "NohbyJarvisDesktopWidget",
-          "width=350,height=105,menubar=no,toolbar=no,location=no,status=no,resizable=no"
+          "NohbyDeviceOverlay",
+          "width=440,height=260,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
         );
       }
 
@@ -449,53 +515,142 @@ export function JarvisWakeEngine() {
 
       const origin = window.location.origin;
       const initialOrb = `${origin}${orbStyle.still}`;
+      const activeTab = activeOverlayTabRef.current;
+      const initialQ = meetingSyncRef.current.question || "Waiting for meeting questions...";
+      const initialA =
+        meetingSyncRef.current.answer ||
+        "Your first-person response based on your experience and skills will appear here.";
+
       pipWin.document.open();
       pipWin.document.write(`<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>NohbyAI — Device Background Assistant</title>
+  <title>Nohby ONE — Device Background Stealth Assistant</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: #0B111E;
+      background: #0A0F1D;
       color: #F8FAFC;
-      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+      border: 1px solid rgba(0, 212, 255, 0.28);
+    }
+    .header-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      height: 100vh;
-      padding: 10px 14px;
-      overflow: hidden;
-      user-select: none;
+      padding: 6px 10px;
+      background: #070B14;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      gap: 8px;
     }
-    .pill {
+    .tab-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .tab-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: #94A3B8;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .tab-btn.active {
+      background: rgba(0, 212, 255, 0.15);
+      border-color: rgba(0, 212, 255, 0.35);
+      color: #00D4FF;
+    }
+    .tab-btn:hover:not(.active) {
+      color: #FFFFFF;
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .shield-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      color: #10B981;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      padding: 2px 6px;
+      border-radius: 999px;
+      text-transform: uppercase;
+    }
+    .btn-close {
+      background: transparent;
+      border: none;
+      color: #64748B;
+      cursor: pointer;
+      font-size: 13px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .btn-close:hover {
+      color: #EF4444;
+      background: rgba(239, 68, 68, 0.12);
+    }
+    .content-area {
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    .view-panel {
+      display: none;
+      flex-direction: column;
+      height: 100%;
+    }
+    .view-panel.active {
+      display: flex;
+    }
+
+    /* Assistant View */
+    .assistant-card {
       display: flex;
       align-items: center;
       gap: 12px;
-      width: 100%;
+      background: #0E1526;
+      border: 1px solid rgba(0, 212, 255, 0.2);
+      border-radius: 12px;
+      padding: 12px;
       cursor: pointer;
     }
-    .orb-wrap {
-      width: 46px;
-      height: 46px;
+    .orb-box {
+      width: 48px;
+      height: 48px;
       border-radius: 999px;
       overflow: hidden;
-      border: 1.5px solid rgba(0, 212, 255, 0.65);
-      box-shadow: 0 0 18px rgba(0, 212, 255, 0.4);
+      border: 1.5px solid rgba(0, 212, 255, 0.7);
+      box-shadow: 0 0 16px rgba(0, 212, 255, 0.35);
       flex-shrink: 0;
     }
-    .orb-wrap img {
+    .orb-box img {
       width: 100%;
       height: 100%;
       object-fit: cover;
-      transform: scale(1.25);
+      transform: scale(1.3);
     }
-    .meta {
-      min-width: 0;
+    .assistant-meta {
       flex: 1;
+      min-width: 0;
     }
-    .title {
+    .status-line {
       font-size: 13px;
       font-weight: 700;
       color: #FFFFFF;
@@ -503,44 +658,229 @@ export function JarvisWakeEngine() {
       align-items: center;
       gap: 6px;
     }
-    .dot {
-      width: 8px;
-      height: 8px;
+    .live-dot {
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
       background: #00D4FF;
-      box-shadow: 0 0 10px #00D4FF;
-      display: inline-block;
+      box-shadow: 0 0 8px #00D4FF;
     }
-    .sub {
-      font-size: 11px;
+    .heard-text {
+      font-size: 11.5px;
       color: #94A3B8;
-      white-space: nowrap;
+      margin-top: 4px;
+      line-height: 1.35;
+      max-height: 36px;
       overflow: hidden;
       text-overflow: ellipsis;
-      margin-top: 2px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+    .hint-bar {
+      margin-top: 10px;
+      font-size: 10.5px;
+      color: #64748B;
+      text-align: center;
+    }
+
+    /* Meeting Stealth View */
+    .meeting-box {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+    }
+    .card-block {
+      background: #0E1526;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    .card-label {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #64748B;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .q-text {
+      font-size: 12px;
+      color: #CBD5E1;
+      line-height: 1.4;
+      max-height: 48px;
+      overflow-y: auto;
+    }
+    .a-card {
+      flex: 1;
+      background: #111B30;
+      border: 1px solid rgba(0, 212, 255, 0.35);
+      border-radius: 8px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+    }
+    .a-text {
+      flex: 1;
+      font-size: 12.5px;
+      color: #FFFFFF;
+      line-height: 1.5;
+      overflow-y: auto;
+      max-height: 95px;
+    }
+    .meeting-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .btn-action {
+      background: rgba(0, 212, 255, 0.12);
+      border: 1px solid rgba(0, 212, 255, 0.3);
+      color: #00D4FF;
+      font-size: 10.5px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+    }
+    .btn-action:hover {
+      background: rgba(0, 212, 255, 0.25);
+    }
+    .btn-action.copied {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #10B981;
     }
   </style>
 </head>
 <body>
-  <div class="pill" id="nohby-overlay-trigger" title="Click to talk to NohbyAI">
-    <div class="orb-wrap">
-      <img id="nohby-overlay-orb" src="${initialOrb}" alt="NohbyAI" />
+  <div class="header-bar">
+    <div class="tab-group">
+      <button id="tab-assistant" class="tab-btn ${activeTab === "assistant" ? "active" : ""}">🎙️ Assistant</button>
+      <button id="tab-meeting" class="tab-btn ${activeTab === "meeting" ? "active" : ""}">🛡️ Meeting Stealth</button>
     </div>
-    <div class="meta">
-      <div class="title">
-        <span class="dot"></span>
-        <span id="nohby-overlay-status">Say "${wakePhrase}"</span>
+    <div style="display: flex; align-items: center; gap: 6px;">
+      <span class="shield-badge" title="Window excluded from screen share / recordings">🛡️ INVISIBLE IN SCREEN SHARE</span>
+      <button id="btn-close" class="btn-close" title="Close floating desktop overlay">✕</button>
+    </div>
+  </div>
+
+  <div class="content-area">
+    <!-- Assistant View -->
+    <div id="view-assistant" class="view-panel ${activeTab === "assistant" ? "active" : ""}">
+      <div class="assistant-card" id="assistant-trigger" title="Click to speak or say Hey Nohby">
+        <div class="orb-box">
+          <img id="nohby-overlay-orb" src="${initialOrb}" alt="NohbyAI" />
+        </div>
+        <div class="assistant-meta">
+          <div class="status-line">
+            <span class="live-dot" id="nohby-live-dot"></span>
+            <span id="nohby-overlay-status">Say "${wakePhrase}"</span>
+          </div>
+          <div class="heard-text" id="nohby-overlay-sub">Floating on device background across all apps</div>
+        </div>
       </div>
-      <div class="sub" id="nohby-overlay-sub">Floating on device background — click or speak</div>
+      <div class="hint-bar">Click orb or say "${wakePhrase}" • Controls active across all apps</div>
+    </div>
+
+    <!-- Meeting Stealth View -->
+    <div id="view-meeting" class="view-panel ${activeTab === "meeting" ? "active" : ""}">
+      <div class="meeting-box">
+        <div class="card-block">
+          <div class="card-label">
+            <span>Caught Question</span>
+            <span id="meeting-badge" style="color: #00D4FF;">WAITING</span>
+          </div>
+          <div class="q-text" id="nohby-stealth-question">${initialQ}</div>
+        </div>
+        <div class="a-card">
+          <div class="card-label">
+            <span>Your First-Person Response</span>
+            <span style="color: #10B981;">NohbyAI Core</span>
+          </div>
+          <div class="a-text" id="nohby-stealth-answer">${initialA}</div>
+          <div class="meeting-actions">
+            <button id="btn-copy-answer" class="btn-action">📋 Copy Answer</button>
+            <button id="btn-toggle-mic" class="btn-action">🎙️ Toggle Mic</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </body>
 </html>`);
       pipWin.document.close();
 
-      const triggerEl = pipWin.document.getElementById("nohby-overlay-trigger");
+      // Setup tab handlers
+      const tabAssistant = pipWin.document.getElementById("tab-assistant");
+      const tabMeeting = pipWin.document.getElementById("tab-meeting");
+      const viewAssistant = pipWin.document.getElementById("view-assistant");
+      const viewMeeting = pipWin.document.getElementById("view-meeting");
+
+      tabAssistant?.addEventListener("click", () => {
+        activeOverlayTabRef.current = "assistant";
+        tabAssistant.classList.add("active");
+        tabMeeting?.classList.remove("active");
+        viewAssistant?.classList.add("active");
+        viewMeeting?.classList.remove("active");
+      });
+
+      tabMeeting?.addEventListener("click", () => {
+        activeOverlayTabRef.current = "meeting";
+        tabMeeting.classList.add("active");
+        tabAssistant?.classList.remove("active");
+        viewMeeting?.classList.add("active");
+        viewAssistant?.classList.remove("active");
+      });
+
+      // Setup assistant trigger
+      const triggerEl = pipWin.document.getElementById("assistant-trigger");
       triggerEl?.addEventListener("click", () => {
         greetAndOpenListeningWindow();
+      });
+
+      // Setup copy answer
+      const copyBtn = pipWin.document.getElementById("btn-copy-answer");
+      copyBtn?.addEventListener("click", () => {
+        const text = pipWin?.document.getElementById("nohby-stealth-answer")?.textContent;
+        if (text && !text.startsWith("Your first-person response")) {
+          navigator.clipboard.writeText(text).then(() => {
+            if (copyBtn) {
+              copyBtn.textContent = "✓ Copied!";
+              copyBtn.classList.add("copied");
+              setTimeout(() => {
+                if (copyBtn) {
+                  copyBtn.textContent = "📋 Copy Answer";
+                  copyBtn.classList.remove("copied");
+                }
+              }, 1600);
+            }
+          }).catch(() => {});
+        }
+      });
+
+      // Setup mic toggle
+      const micBtn = pipWin.document.getElementById("btn-toggle-mic");
+      micBtn?.addEventListener("click", () => {
+        window.dispatchEvent(new CustomEvent("nohby-toggle-meeting-mic"));
+      });
+
+      // Setup close button
+      const closeBtn = pipWin.document.getElementById("btn-close");
+      closeBtn?.addEventListener("click", () => {
+        overlayWindowRef.current?.close();
+        overlayWindowRef.current = null;
+        setDesktopPinned(false);
       });
 
       pipWin.addEventListener("pagehide", () => {
@@ -551,12 +891,68 @@ export function JarvisWakeEngine() {
       syncOverlayDom();
       showToast(
         "success",
-        "NohbyAI is now floating on your device desktop background above other apps."
+        "Nohby ONE is now floating on your device background (Invisible in Screen Share)."
       );
     } catch {
       showToast("error", "Could not open floating desktop overlay window.");
     }
   };
+
+  useEffect(() => {
+    const onMeetingSync = (e: Event) => {
+      const detail = (e as CustomEvent<{
+        meetingTitle?: string;
+        isListening?: boolean;
+        question?: string;
+        answer?: string;
+        autoSwitchToMeeting?: boolean;
+      }>).detail;
+      if (!detail) return;
+      meetingSyncRef.current = {
+        meetingTitle: detail.meetingTitle ?? meetingSyncRef.current.meetingTitle,
+        isListening: detail.isListening ?? meetingSyncRef.current.isListening,
+        question: detail.question ?? meetingSyncRef.current.question,
+        answer: detail.answer ?? meetingSyncRef.current.answer,
+      };
+      if (detail.autoSwitchToMeeting || (detail.question && detail.question.length > 5)) {
+        activeOverlayTabRef.current = "meeting";
+      }
+      syncOverlayDom();
+    };
+
+    const onLaunchOverlay = (e: Event) => {
+      const detail = (e as CustomEvent<{ mode?: "assistant" | "meeting" }>).detail;
+      const targetMode = detail?.mode || "assistant";
+      activeOverlayTabRef.current = targetMode;
+      if (!overlayWindowRef.current || overlayWindowRef.current.closed) {
+        toggleDeviceDesktopOverlay(targetMode);
+      } else {
+        syncOverlayDom();
+        overlayWindowRef.current.focus?.();
+      }
+    };
+
+    window.addEventListener("nohby-meeting-stealth-sync", onMeetingSync);
+    window.addEventListener("nohby-launch-device-overlay", onLaunchOverlay);
+
+    // Auto-launch on startup if configured in settings
+    try {
+      if (
+        enabled &&
+        localStorage.getItem("nohby_device_overlay_auto_launch") === "true" &&
+        (!overlayWindowRef.current || overlayWindowRef.current.closed)
+      ) {
+        toggleDeviceDesktopOverlay("assistant");
+      }
+    } catch {
+      // ignore
+    }
+
+    return () => {
+      window.removeEventListener("nohby-meeting-stealth-sync", onMeetingSync);
+      window.removeEventListener("nohby-launch-device-overlay", onLaunchOverlay);
+    };
+  }, [enabled, syncOverlayDom]);
 
   useEffect(() => {
     if (!enabled || manualMicActive) {
@@ -768,20 +1164,23 @@ export function JarvisWakeEngine() {
 
       <button
         type="button"
-        onClick={toggleDeviceDesktopOverlay}
-        className={`rounded-full p-1 transition ${
+        onClick={() => toggleDeviceDesktopOverlay()}
+        className={`relative rounded-full p-1.5 transition ${
           desktopPinned
-            ? "bg-[#00D4FF]/20 text-[#00D4FF]"
+            ? "bg-[#00D4FF]/25 text-[#00D4FF] ring-1 ring-[#00D4FF]/70 shadow-[0_0_12px_rgba(0,212,255,0.4)]"
             : "text-zinc-400 hover:bg-black/[0.06] hover:text-[#00D4FF] dark:hover:bg-white/[0.08]"
         }`}
         title={
           desktopPinned
-            ? "Unpin from device desktop background"
-            : "Pin floating widget onto device desktop background (Always on top)"
+            ? "Desktop Background Active (Invisible in Screen Share) — Click to dock"
+            : "Float on Device Background (Always On Top across all apps • Invisible in Screen Share)"
         }
-        aria-label="Pin widget onto device desktop background"
+        aria-label="Float widget onto device desktop background"
       >
-        <PictureInPicture2 className="h-3.5 w-3.5" />
+        <ShieldCheck className={`h-4 w-4 ${desktopPinned ? "text-[#00D4FF]" : ""}`} />
+        {desktopPinned && (
+          <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-[#0A0F1D]" />
+        )}
       </button>
 
       <button

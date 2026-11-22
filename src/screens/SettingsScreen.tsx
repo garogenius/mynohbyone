@@ -2,15 +2,15 @@ import { useEffect, useState } from "react";
 import {
   CheckCircle2,
   Cpu,
-  EyeOff,
+  ExternalLink,
   Loader2,
   LogOut,
   Mic,
   Monitor,
   Moon,
-  Radio,
   Save,
   Shield,
+  ShieldCheck,
   Sun,
   UserRound,
   Volume2,
@@ -50,7 +50,6 @@ export function SettingsScreen() {
     loadVoiceSettings,
     updateVoiceSettings,
     setIsSpeaking,
-    setRoute,
     showToast,
     logout,
     busy,
@@ -92,6 +91,41 @@ export function SettingsScreen() {
     setThemePref(pref);
     applyTheme(pref);
     window.dispatchEvent(new Event("nohby-theme-change"));
+  };
+
+  const [deviceOverlayAutoLaunch, setDeviceOverlayAutoLaunch] = useState(() => {
+    try {
+      return localStorage.getItem("nohby_device_overlay_auto_launch") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const handleToggleAutoLaunch = (val: boolean) => {
+    setDeviceOverlayAutoLaunch(val);
+    try {
+      localStorage.setItem("nohby_device_overlay_auto_launch", val ? "true" : "false");
+      showToast(
+        "info",
+        val
+          ? "Always-on-top desktop overlay will automatically launch on startup."
+          : "Auto-launch on startup disabled."
+      );
+    } catch {}
+  };
+
+  const handleLaunchOverlay = (mode: "assistant" | "meeting") => {
+    window.dispatchEvent(
+      new CustomEvent("nohby-launch-device-overlay", {
+        detail: { mode },
+      })
+    );
+    showToast(
+      "success",
+      mode === "assistant"
+        ? "NohbyAI floating on device background (Invisible to Screen Share)."
+        : "Meeting Stealth Card floating on device background (Invisible to Screen Share)."
+    );
   };
 
   useEffect(() => {
@@ -254,40 +288,80 @@ export function SettingsScreen() {
 
   return (
     <div className="w-full max-w-5xl space-y-4">
-      {/* Hands-Free Jarvis Mode & Stealth Mode */}
+      {/* Device Background Floating Assistant & Screen-Share Stealth Privacy */}
       <section className="nohby-frame p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="font-display text-sm font-semibold text-white">
-              Background Jarvis Mode &amp; Stealth Privacy
-            </h2>
-            <p className="mt-0.5 text-xs text-zinc-400">
-              Enable hands-free &ldquo;{wakeWordPhrase || "Hey Nohby"}&rdquo; background listening or launch hidden stealth meeting mode.
-            </p>
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-2 text-emerald-400">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="font-display text-sm font-semibold text-white">
+                  Device Background Assistant &amp; Screen-Share Stealth Privacy
+                </h2>
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Invisible in Screen Share
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-zinc-400 max-w-2xl">
+                Configure NohbyAI and Meeting Stealth Q&amp;A to float over any application across your whole device (always-on-top). Hardware-level capture protection ensures zero visibility on Zoom, Teams, Google Meet, and screen recordings.
+              </p>
+            </div>
           </div>
+
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={handleToggleJarvis}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition ${
-                wakeWordEnabled
-                  ? "border-emerald-500/45 bg-emerald-500/15 text-emerald-300"
-                  : "border-[#00D4FF]/35 bg-[#00D4FF]/10 text-[#00D4FF] hover:bg-[#00D4FF]/20"
-              }`}
+              onClick={() => handleLaunchOverlay("assistant")}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#00D4FF]/35 bg-[#00D4FF]/10 px-3 text-xs font-medium text-[#00D4FF] transition hover:bg-[#00D4FF]/20"
             >
-              <Radio className={`h-3.5 w-3.5 ${wakeWordEnabled ? "animate-pulse text-emerald-400" : ""}`} />
-              <span>{wakeWordEnabled ? `"${wakeWordPhrase || "Hey Nohby"}" Active` : "Enable Hey Nohby (Jarvis)"}</span>
+              <ExternalLink className="h-3.5 w-3.5" />
+              <span>Float Assistant on Desktop</span>
             </button>
 
             <button
               type="button"
-              onClick={() => setRoute("meetings")}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.12] bg-[#0C121E] px-3 text-xs font-medium text-zinc-200 transition hover:border-[#00D4FF]/45 hover:text-white"
+              onClick={() => handleLaunchOverlay("meeting")}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-500/35 bg-emerald-500/10 px-3 text-xs font-medium text-emerald-400 transition hover:bg-emerald-500/20"
             >
-              <EyeOff className="h-3.5 w-3.5 text-[#00D4FF]" />
-              <span>Open Stealth Mode</span>
+              <ShieldCheck className="h-3.5 w-3.5" />
+              <span>Float Meeting Stealth Card</span>
             </button>
           </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 border-t border-white/[0.08] pt-4 sm:grid-cols-2">
+          <label className="flex items-center justify-between rounded-lg border border-white/[0.08] bg-[#0A0F1D] p-3 cursor-pointer hover:border-[#00D4FF]/30 transition">
+            <div className="pr-3">
+              <span className="text-xs font-medium text-white block">Auto-Float on Startup</span>
+              <span className="text-[11px] text-zinc-400 block mt-0.5">
+                Automatically float overlay on your device background when you launch Nohby ONE.
+              </span>
+            </div>
+            <input
+              type="checkbox"
+              checked={deviceOverlayAutoLaunch}
+              onChange={(e) => handleToggleAutoLaunch(e.target.checked)}
+              className="h-4 w-4 rounded border-zinc-700 text-[#00D4FF] focus:ring-0"
+            />
+          </label>
+
+          <label className="flex items-center justify-between rounded-lg border border-white/[0.08] bg-[#0A0F1D] p-3 cursor-pointer hover:border-emerald-500/30 transition">
+            <div className="pr-3">
+              <span className="text-xs font-medium text-white block">Hands-Free Hey Nohby (Jarvis Mode)</span>
+              <span className="text-[11px] text-zinc-400 block mt-0.5">
+                Background voice activation ({wakeWordPhrase || "Hey Nohby"}) without clicking.
+              </span>
+            </div>
+            <input
+              type="checkbox"
+              checked={wakeWordEnabled}
+              onChange={handleToggleJarvis}
+              className="h-4 w-4 rounded border-zinc-700 text-emerald-500 focus:ring-0"
+            />
+          </label>
         </div>
       </section>
 
