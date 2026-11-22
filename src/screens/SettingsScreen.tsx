@@ -1,9 +1,15 @@
 import { useEffect, useState } from "react";
-import { Loader2, LogOut, Mic, Monitor, Moon, Save, Shield, Sun, Volume2 } from "lucide-react";
+import { Loader2, LogOut, Mic, Monitor, Moon, Save, Shield, Sun, UserRound, Volume2 } from "lucide-react";
 
 import { applyTheme, getStoredTheme, type ThemePreference } from "../lib/theme";
-import { speakText, stopSpeaking } from "../lib/voice";
+import {
+  SUPPORTED_LANGUAGES,
+  VOICE_PERSONA_PRESETS,
+  speakText,
+  stopSpeaking,
+} from "../lib/voice";
 import { useAppStore } from "../store/useAppStore";
+import type { VoicePersonaId } from "../types/api";
 
 export function SettingsScreen() {
   const {
@@ -32,6 +38,8 @@ export function SettingsScreen() {
   const [wakeWordPhrase, setWakeWordPhrase] = useState("Hey Nohby");
   const [sttStrategy, setSttStrategy] = useState<"local" | "cloud">("local");
   const [ttsStrategy, setTtsStrategy] = useState<"local" | "cloud">("local");
+  const [voiceType, setVoiceType] = useState<VoicePersonaId>("female");
+  const [ttsPitch, setTtsPitch] = useState(1.08);
   const [ttsRate, setTtsRate] = useState(1.0);
   const [autoSpeakResponses, setAutoSpeakResponses] = useState(false);
   const [inputLanguage, setInputLanguage] = useState("en-US");
@@ -65,6 +73,8 @@ export function SettingsScreen() {
     setWakeWordPhrase(voiceSettings.wakeWordPhrase);
     setSttStrategy(voiceSettings.sttStrategy);
     setTtsStrategy(voiceSettings.ttsStrategy);
+    setVoiceType(voiceSettings.voiceType || "female");
+    setTtsPitch(voiceSettings.ttsPitch ?? 1.08);
     setTtsRate(voiceSettings.ttsRate);
     setAutoSpeakResponses(voiceSettings.autoSpeakResponses);
     setInputLanguage(voiceSettings.inputLanguage);
@@ -85,6 +95,15 @@ export function SettingsScreen() {
     }
   };
 
+  const handleSelectPersona = (presetId: VoicePersonaId) => {
+    setVoiceType(presetId);
+    const preset = VOICE_PERSONA_PRESETS.find((p) => p.id === presetId);
+    if (preset) {
+      setTtsPitch(preset.pitch);
+      setTtsRate(preset.rate);
+    }
+  };
+
   const handleSaveVoice = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -94,6 +113,8 @@ export function SettingsScreen() {
         wakeWordPhrase: wakeWordPhrase.trim() || "Hey Nohby",
         sttStrategy,
         ttsStrategy,
+        voiceType,
+        ttsPitch,
         ttsRate,
         autoSpeakResponses,
         inputLanguage,
@@ -103,10 +124,18 @@ export function SettingsScreen() {
     }
   };
 
-  const handleTestVoice = () => {
+  const handleTestVoice = (overridePersona?: VoicePersonaId) => {
     stopSpeaking();
-    speakText("Nohby ONE voice output is active and ready.", {
-      rate: ttsRate,
+    const activePersona = overridePersona || voiceType;
+    const preset = VOICE_PERSONA_PRESETS.find((p) => p.id === activePersona);
+    const langSpec = SUPPORTED_LANGUAGES.find((l) => l.code === inputLanguage);
+    const sampleText =
+      langSpec?.sample || "Nohby ONE voice output is active and ready.";
+
+    speakText(sampleText, {
+      voiceType: activePersona,
+      pitch: overridePersona ? preset?.pitch : ttsPitch,
+      rate: overridePersona ? preset?.rate : ttsRate,
       language: inputLanguage,
       onStart: () => setIsSpeaking(true),
       onEnd: () => setIsSpeaking(false),
@@ -116,16 +145,16 @@ export function SettingsScreen() {
   return (
     <div className="w-full max-w-5xl space-y-4">
       {/* Appearance */}
-      <section className="rounded-2xl border border-white/[0.08] bg-[#111318] p-5 sm:p-6">
-        <h2 className="text-sm font-semibold text-white">Appearance</h2>
+      <section className="nohby-frame p-5">
+        <h2 className="font-display text-sm font-semibold text-white">Appearance</h2>
         <p className="mt-1 text-xs text-zinc-400">
-          Choose Light, Dark, or follow your operating system theme across all screens.
+          Choose Dark, Light, or follow your operating system theme across all screens.
         </p>
         <div className="mt-4 grid grid-cols-3 gap-2.5">
           {(
             [
-              { id: "light", label: "Light", icon: Sun },
               { id: "dark", label: "Dark", icon: Moon },
+              { id: "light", label: "Light", icon: Sun },
               { id: "system", label: "System", icon: Monitor },
             ] as const
           ).map((opt) => {
@@ -136,10 +165,10 @@ export function SettingsScreen() {
                 key={opt.id}
                 type="button"
                 onClick={() => handleSelectTheme(opt.id)}
-                className={`flex min-h-[44px] items-center justify-center gap-2 rounded-xl border text-xs font-medium transition ${
+                className={`flex min-h-[40px] items-center justify-center gap-2 rounded-xl border text-xs font-medium transition ${
                   selected
-                    ? "btn-ivory border-transparent"
-                    : "border-white/[0.1] bg-[#0A0B0E] text-zinc-300 hover:border-white/[0.2]"
+                    ? "nohby-nav-active text-white"
+                    : "border-white/[0.1] bg-[#0C121E] text-zinc-300 hover:border-white/[0.2]"
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -150,9 +179,218 @@ export function SettingsScreen() {
         </div>
       </section>
 
+      {/* Voice, Language (Hausa + Multilingual) & Voice Persona Type */}
+      <section className="nohby-frame p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <Mic className="h-4 w-4 text-[#00D4FF]" />
+            <div>
+              <h2 className="font-display text-sm font-semibold text-white">
+                Voice Persona, Language &amp; Wake Word
+              </h2>
+              <p className="text-xs text-zinc-400">
+                Choose Hausa or any supported language and configure Male, Female, Girl, Boy, or Young voice types.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => handleTestVoice()}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#00D4FF]/40 bg-[#00D4FF]/10 px-3 text-xs font-medium text-[#00D4FF] transition hover:bg-[#00D4FF]/20"
+          >
+            <Volume2 className="h-3.5 w-3.5" />
+            Test Voice ({inputLanguage === "ha-NG" ? "Hausa" : inputLanguage})
+          </button>
+        </div>
+
+        <form onSubmit={handleSaveVoice} className="mt-5 space-y-5">
+          {/* Voice Persona / Type Grid */}
+          <div>
+            <label className="mb-2 block text-xs font-medium text-zinc-300">
+              Assistant Voice Type (Male, Female, Girl, Boy, Young)
+            </label>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {VOICE_PERSONA_PRESETS.map((preset) => {
+                const selected = voiceType === preset.id;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => {
+                      handleSelectPersona(preset.id);
+                      handleTestVoice(preset.id);
+                    }}
+                    className={`rounded-xl border p-3 text-left transition ${
+                      selected
+                        ? "nohby-nav-active text-white"
+                        : "border-white/[0.08] bg-[#0C121E] text-zinc-300 hover:border-[#00D4FF]/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className="text-xs font-semibold text-white">{preset.label}</span>
+                      <UserRound
+                        className={`h-3.5 w-3.5 ${
+                          selected ? "text-[#00D4FF]" : "text-zinc-500"
+                        }`}
+                      />
+                    </div>
+                    <p className="mt-0.5 text-[10px] text-zinc-400">{preset.tag}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Language & Wake Word */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-zinc-300">
+                Voice &amp; Assistant Language
+              </label>
+              <select
+                value={inputLanguage}
+                onChange={(e) => setInputLanguage(e.target.value)}
+                className="studio-input h-9 w-full rounded-lg px-3 text-xs"
+              >
+                {SUPPORTED_LANGUAGES.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-zinc-300">
+                Wake Word Phrase
+              </label>
+              <input
+                type="text"
+                value={wakeWordPhrase}
+                onChange={(e) => setWakeWordPhrase(e.target.value)}
+                placeholder="Hey Nohby / Sannu Nohby"
+                className="studio-input h-9 w-full rounded-lg px-3 text-xs"
+              />
+            </div>
+          </div>
+
+          {/* Pitch, Rate & Engines */}
+          <div className="grid gap-4 sm:grid-cols-4">
+            <div>
+              <div className="mb-1.5 flex items-center justify-between text-xs font-medium text-zinc-300">
+                <label>Voice Pitch</label>
+                <span className="font-mono text-[#00D4FF]">{ttsPitch.toFixed(2)}x</span>
+              </div>
+              <input
+                type="range"
+                min={0.5}
+                max={2.0}
+                step={0.02}
+                value={ttsPitch}
+                onChange={(e) => setTtsPitch(parseFloat(e.target.value))}
+                className="mt-2 w-full accent-[#0066FF]"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1.5 flex items-center justify-between text-xs font-medium text-zinc-300">
+                <label>Speech Speed</label>
+                <span className="font-mono text-[#00D4FF]">{ttsRate.toFixed(2)}x</span>
+              </div>
+              <input
+                type="range"
+                min={0.5}
+                max={2.0}
+                step={0.05}
+                value={ttsRate}
+                onChange={(e) => setTtsRate(parseFloat(e.target.value))}
+                className="mt-2 w-full accent-[#0066FF]"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-zinc-300">STT Engine</label>
+              <select
+                value={sttStrategy}
+                onChange={(e) => setSttStrategy(e.target.value as "local" | "cloud")}
+                className="studio-input h-9 w-full rounded-lg px-3 text-xs"
+              >
+                <option value="local">Local-First</option>
+                <option value="cloud">Cloud Whisper</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-zinc-300">TTS Engine</label>
+              <select
+                value={ttsStrategy}
+                onChange={(e) => setTtsStrategy(e.target.value as "local" | "cloud")}
+                className="studio-input h-9 w-full rounded-lg px-3 text-xs"
+              >
+                <option value="local">Local Speech</option>
+                <option value="cloud">Cloud TTS</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="flex cursor-pointer items-center justify-between rounded-xl border border-white/[0.08] bg-[#0C121E] p-3">
+              <div>
+                <p className="text-xs font-medium text-white">Voice Interaction</p>
+                <p className="text-[10px] text-zinc-500">Enable mic commands</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={voiceEnabled}
+                onChange={(e) => setVoiceEnabled(e.target.checked)}
+                className="h-4 w-4 accent-[#0066FF]"
+              />
+            </label>
+
+            <label className="flex cursor-pointer items-center justify-between rounded-xl border border-white/[0.08] bg-[#0C121E] p-3">
+              <div>
+                <p className="text-xs font-medium text-white">Wake-Word Filter</p>
+                <p className="text-[10px] text-zinc-500">Require wake phrase</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={wakeWordEnabled}
+                onChange={(e) => setWakeWordEnabled(e.target.checked)}
+                className="h-4 w-4 accent-[#0066FF]"
+              />
+            </label>
+
+            <label className="flex cursor-pointer items-center justify-between rounded-xl border border-white/[0.08] bg-[#0C121E] p-3">
+              <div>
+                <p className="text-xs font-medium text-white">Auto-Speak Replies</p>
+                <p className="text-[10px] text-zinc-500">Read answers aloud</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={autoSpeakResponses}
+                onChange={(e) => setAutoSpeakResponses(e.target.checked)}
+                className="h-4 w-4 accent-[#0066FF]"
+              />
+            </label>
+          </div>
+
+          <div className="flex justify-end pt-1">
+            <button
+              type="submit"
+              disabled={busy}
+              className="btn-ivory inline-flex h-9 items-center gap-2 rounded-lg px-4 text-xs"
+            >
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              Save Voice Preferences
+            </button>
+          </div>
+        </form>
+      </section>
+
       {/* Account Profile */}
-      <section className="rounded-2xl border border-white/[0.08] bg-[#111318] p-5 sm:p-6">
-        <h2 className="text-sm font-semibold text-white">Account Profile</h2>
+      <section className="nohby-frame p-5">
+        <h2 className="font-display text-sm font-semibold text-white">Account Profile</h2>
         <p className="mt-1 text-xs text-zinc-400">
           Manage your display identity and regional preferences.
         </p>
@@ -163,7 +401,7 @@ export function SettingsScreen() {
           </div>
         )}
 
-        <form onSubmit={handleSaveProfile} className="mt-5 space-y-4">
+        <form onSubmit={handleSaveProfile} className="mt-4 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-zinc-300">Full Name</label>
@@ -172,7 +410,7 @@ export function SettingsScreen() {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-lg border border-white/[0.1] bg-[#0A0B0E] px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                className="studio-input h-9 w-full rounded-lg px-3 text-xs"
               />
             </div>
 
@@ -184,7 +422,7 @@ export function SettingsScreen() {
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                className="w-full rounded-lg border border-white/[0.1] bg-[#0A0B0E] px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                className="studio-input h-9 w-full rounded-lg px-3 text-xs"
               />
             </div>
           </div>
@@ -196,7 +434,7 @@ export function SettingsScreen() {
                 type="text"
                 value={timezone}
                 onChange={(e) => setTimezone(e.target.value)}
-                className="w-full rounded-lg border border-white/[0.1] bg-[#0A0B0E] px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                className="studio-input h-9 w-full rounded-lg px-3 text-xs"
               />
             </div>
 
@@ -206,18 +444,29 @@ export function SettingsScreen() {
                 type="text"
                 value={locale}
                 onChange={(e) => setLocale(e.target.value)}
-                className="w-full rounded-lg border border-white/[0.1] bg-[#0A0B0E] px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                className="studio-input h-9 w-full rounded-lg px-3 text-xs"
               />
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-zinc-300">Language</label>
-              <input
-                type="text"
+              <label className="mb-1.5 block text-xs font-medium text-zinc-300">
+                Preferred Language
+              </label>
+              <select
                 value={preferredLanguage}
                 onChange={(e) => setPreferredLanguage(e.target.value)}
-                className="w-full rounded-lg border border-white/[0.1] bg-[#0A0B0E] px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
-              />
+                className="studio-input h-9 w-full rounded-lg px-3 text-xs"
+              >
+                <option value="ha">Hausa</option>
+                <option value="en">English</option>
+                <option value="ar">Arabic</option>
+                <option value="fr">French</option>
+                <option value="yo">Yoruba</option>
+                <option value="ig">Igbo</option>
+                <option value="sw">Swahili</option>
+                <option value="es">Spanish</option>
+                <option value="de">German</option>
+              </select>
             </div>
           </div>
 
@@ -225,7 +474,7 @@ export function SettingsScreen() {
             <button
               type="submit"
               disabled={busy}
-              className="btn-ivory inline-flex min-h-[38px] items-center gap-2 rounded-lg px-4 py-2 text-xs"
+              className="btn-ivory inline-flex h-9 items-center gap-2 rounded-lg px-4 text-xs"
             >
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
               Save Profile
@@ -234,169 +483,11 @@ export function SettingsScreen() {
         </form>
       </section>
 
-      {/* Voice & Wake Word Settings (Phase 3) */}
-      <section className="rounded-2xl border border-white/[0.08] bg-[#111318] p-5 sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5">
-            <Mic className="h-4 w-4 text-indigo-400" />
-            <div>
-              <h2 className="text-sm font-semibold text-white">Voice &amp; Wake Word</h2>
-              <p className="text-xs text-zinc-400">
-                Microphone activation is always explicit and visibly indicated.
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleTestVoice}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.1] bg-[#171A21] px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:bg-white/[0.08]"
-          >
-            <Volume2 className="h-3.5 w-3.5 text-indigo-400" />
-            Test Voice Output
-          </button>
-        </div>
-
-        <form onSubmit={handleSaveVoice} className="mt-5 space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="flex cursor-pointer items-center justify-between rounded-xl border border-white/[0.08] bg-[#0A0B0E] p-3.5">
-              <div>
-                <p className="text-xs font-medium text-white">Voice Interaction</p>
-                <p className="text-[11px] text-zinc-500">Allow microphone commands in Assistant</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={voiceEnabled}
-                onChange={(e) => setVoiceEnabled(e.target.checked)}
-                className="h-4 w-4 accent-indigo-600"
-              />
-            </label>
-
-            <label className="flex cursor-pointer items-center justify-between rounded-xl border border-white/[0.08] bg-[#0A0B0E] p-3.5">
-              <div>
-                <p className="text-xs font-medium text-white">Wake-Word Filter</p>
-                <p className="text-[11px] text-zinc-500">Require wake phrase before sending</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={wakeWordEnabled}
-                onChange={(e) => setWakeWordEnabled(e.target.checked)}
-                className="h-4 w-4 accent-indigo-600"
-              />
-            </label>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-zinc-300">
-                Wake Word Phrase
-              </label>
-              <input
-                type="text"
-                value={wakeWordPhrase}
-                onChange={(e) => setWakeWordPhrase(e.target.value)}
-                placeholder="Hey Nohby"
-                className="w-full rounded-lg border border-white/[0.1] bg-[#0A0B0E] px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
-              />
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-zinc-300">
-                Recognition Language
-              </label>
-              <select
-                value={inputLanguage}
-                onChange={(e) => setInputLanguage(e.target.value)}
-                className="w-full rounded-lg border border-white/[0.1] bg-[#0A0B0E] px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
-              >
-                <option value="en-US">English (US)</option>
-                <option value="en-GB">English (UK)</option>
-                <option value="fr-FR">French</option>
-                <option value="es-ES">Spanish</option>
-                <option value="de-DE">German</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-zinc-300">
-                STT Engine
-              </label>
-              <select
-                value={sttStrategy}
-                onChange={(e) => setSttStrategy(e.target.value as "local" | "cloud")}
-                className="w-full rounded-lg border border-white/[0.1] bg-[#0A0B0E] px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
-              >
-                <option value="local">Local-First</option>
-                <option value="cloud">Cloud Whisper</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-zinc-300">
-                TTS Engine
-              </label>
-              <select
-                value={ttsStrategy}
-                onChange={(e) => setTtsStrategy(e.target.value as "local" | "cloud")}
-                className="w-full rounded-lg border border-white/[0.1] bg-[#0A0B0E] px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
-              >
-                <option value="local">Local Speech</option>
-                <option value="cloud">Cloud TTS</option>
-              </select>
-            </div>
-
-            <div>
-              <div className="mb-1.5 flex items-center justify-between text-xs font-medium text-zinc-300">
-                <label>Speech Rate</label>
-                <span className="font-mono text-zinc-400">{ttsRate.toFixed(2)}x</span>
-              </div>
-              <input
-                type="range"
-                min={0.5}
-                max={2.0}
-                step={0.05}
-                value={ttsRate}
-                onChange={(e) => setTtsRate(parseFloat(e.target.value))}
-                className="mt-2 w-full accent-indigo-600"
-              />
-            </div>
-          </div>
-
-          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-white/[0.08] bg-[#0A0B0E] p-3.5">
-            <div>
-              <p className="text-xs font-medium text-white">Auto-Speak Assistant Responses</p>
-              <p className="text-[11px] text-zinc-500">
-                Read replies aloud automatically when a voice command is sent
-              </p>
-            </div>
-            <input
-              type="checkbox"
-              checked={autoSpeakResponses}
-              onChange={(e) => setAutoSpeakResponses(e.target.checked)}
-              className="h-4 w-4 accent-indigo-600"
-            />
-          </label>
-
-          <div className="flex justify-end pt-1">
-            <button
-              type="submit"
-              disabled={busy}
-              className="inline-flex min-h-[38px] items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50"
-            >
-              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-              Save Voice Preferences
-            </button>
-          </div>
-        </form>
-      </section>
-
       {/* Session Security */}
-      <section className="rounded-2xl border border-white/[0.08] bg-[#111318] p-5 sm:p-6">
+      <section className="nohby-frame p-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-start gap-3">
-            <Shield className="mt-0.5 h-4 w-4 text-indigo-400" />
+            <Shield className="mt-0.5 h-4 w-4 text-[#00D4FF]" />
             <div>
               <h3 className="text-sm font-semibold text-white">Session Security</h3>
               <p className="mt-1 text-xs text-zinc-400">
@@ -410,7 +501,7 @@ export function SettingsScreen() {
             type="button"
             onClick={logout}
             disabled={busy}
-            className="inline-flex min-h-[38px] items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20 disabled:opacity-50"
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20 disabled:opacity-50"
           >
             <LogOut className="h-3.5 w-3.5" />
             Sign Out

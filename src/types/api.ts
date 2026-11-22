@@ -129,6 +129,17 @@ export interface SendMessageResponseData {
   interpretation: InterpretationResult;
 }
 
+export type VoicePersonaId =
+  | "default"
+  | "female"
+  | "male"
+  | "girl"
+  | "boy"
+  | "young_woman"
+  | "young_man"
+  | "calm_female"
+  | "deep_male";
+
 export interface VoiceSettings {
   voiceEnabled: boolean;
   wakeWordEnabled: boolean;
@@ -136,6 +147,8 @@ export interface VoiceSettings {
   sttStrategy: "local" | "cloud";
   ttsStrategy: "local" | "cloud";
   ttsVoice: string;
+  voiceType?: VoicePersonaId;
+  ttsPitch?: number;
   ttsRate: number;
   autoSpeakResponses: boolean;
   inputLanguage: string;

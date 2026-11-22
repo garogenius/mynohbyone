@@ -180,10 +180,67 @@ export async function startMicLevelMonitor(
   };
 }
 
+export const SUPPORTED_LANGUAGES = [
+  { code: "ha-NG", label: "Hausa (Nijeriya)", sample: "Sannu! Nohby ONE yana aiki kuma a shirye yake ya taimake ka." },
+  { code: "en-US", label: "English (US)", sample: "Hello! Nohby ONE voice output is active and ready." },
+  { code: "en-GB", label: "English (UK)", sample: "Hello! Nohby ONE voice output is active and ready." },
+  { code: "en-NG", label: "English (Nigeria)", sample: "Hello! Nohby ONE voice output is active and ready." },
+  { code: "ar-SA", label: "Arabic (العربية)", sample: "مرحباً! نوهبي وان جاهز لمساعدتك الآن." },
+  { code: "fr-FR", label: "French (Français)", sample: "Bonjour ! Nohby ONE est actif et prêt à vous aider." },
+  { code: "yo-NG", label: "Yoruba (Yorùbá)", sample: "Bawo ni! Nohby ONE ti ṣetan lati ran ọ lọwọ." },
+  { code: "ig-NG", label: "Igbo (Nigeria)", sample: "Ndewo! Nohby ONE dị njikere inyere gị aka." },
+  { code: "sw-KE", label: "Swahili (Kiswahili)", sample: "Habari! Nohby ONE iko tayari kukusaidia." },
+  { code: "es-ES", label: "Spanish (Español)", sample: "¡Hola! Nohby ONE está activo y listo para ayudarte." },
+  { code: "de-DE", label: "German (Deutsch)", sample: "Hallo! Nohby ONE ist aktiv und bereit zu helfen." },
+] as const;
+
+export interface VoicePersonaPreset {
+  id: "female" | "male" | "girl" | "boy" | "young_woman" | "young_man" | "calm_female" | "deep_male";
+  label: string;
+  tag: string;
+  genderHint: "female" | "male";
+  pitch: number;
+  rate: number;
+}
+
+export const VOICE_PERSONA_PRESETS: VoicePersonaPreset[] = [
+  { id: "female", label: "Female", tag: "Warm & Clear", genderHint: "female", pitch: 1.08, rate: 1.0 },
+  { id: "male", label: "Male", tag: "Confident & Natural", genderHint: "male", pitch: 0.86, rate: 0.98 },
+  { id: "girl", label: "Girl", tag: "Bright & Youthful", genderHint: "female", pitch: 1.42, rate: 1.06 },
+  { id: "boy", label: "Boy", tag: "Energetic & Young", genderHint: "male", pitch: 1.28, rate: 1.05 },
+  { id: "young_woman", label: "Young Woman", tag: "Modern & Crisp", genderHint: "female", pitch: 1.18, rate: 1.03 },
+  { id: "young_man", label: "Young Man", tag: "Friendly & Dynamic", genderHint: "male", pitch: 0.95, rate: 1.02 },
+  { id: "calm_female", label: "Calm Female", tag: "Soft Assistant", genderHint: "female", pitch: 1.02, rate: 0.94 },
+  { id: "deep_male", label: "Deep Male", tag: "Executive Tone", genderHint: "male", pitch: 0.74, rate: 0.93 },
+];
+
+const FEMALE_VOICE_HINTS = ["female", "samantha", "victoria", "zira", "aria", "jenny", "sara", "susan", "karen", "moira", "tessa", "veena", "google uk english female"];
+const MALE_VOICE_HINTS = ["male", "david", "mark", "guy", "daniel", "alex", "fred", "george", "ryan", "christopher", "google uk english male"];
+
+function pickBestSpeechVoice(language: string, voiceType?: string): SpeechSynthesisVoice | null {
+  if (!isSpeechSynthesisSupported()) return null;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+
+  const langPrefix = (language || "en-US").toLowerCase().split("-")[0];
+  const preset = VOICE_PERSONA_PRESETS.find((p) => p.id === voiceType);
+  const genderHints = preset?.genderHint === "male" ? MALE_VOICE_HINTS : FEMALE_VOICE_HINTS;
+
+  const langMatches = voices.filter((v) => v.lang.toLowerCase().startsWith(langPrefix));
+  const pool = langMatches.length > 0 ? langMatches : voices;
+
+  const genderMatch = pool.find((v) =>
+    genderHints.some((hint) => v.name.toLowerCase().includes(hint))
+  );
+  return genderMatch || pool[0] || null;
+}
+
 export function speakText(
   text: string,
   options: {
     rate?: number;
+    pitch?: number;
+    voiceType?: string;
     language?: string;
     onStart?: () => void;
     onEnd?: () => void;
@@ -195,9 +252,17 @@ export function speakText(
   }
 
   window.speechSynthesis.cancel();
+  const preset = VOICE_PERSONA_PRESETS.find((p) => p.id === options.voiceType);
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = options.rate ?? 1.0;
+  utterance.rate = options.rate ?? preset?.rate ?? 1.0;
+  utterance.pitch = options.pitch ?? preset?.pitch ?? 1.0;
   utterance.lang = options.language || "en-US";
+
+  const matchedVoice = pickBestSpeechVoice(utterance.lang, options.voiceType);
+  if (matchedVoice) {
+    utterance.voice = matchedVoice;
+  }
+
   utterance.onstart = () => options.onStart?.();
   utterance.onend = () => options.onEnd?.();
   utterance.onerror = () => options.onEnd?.();

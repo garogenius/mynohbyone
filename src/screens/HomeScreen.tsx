@@ -32,7 +32,8 @@ function formatTimeAgo(iso: string | null | undefined): string {
 }
 
 export function HomeScreen() {
-  const { user, devices, currentDeviceId, health, setRoute, showToast } = useAppStore();
+  const { user, devices, currentDeviceId, health, voiceSettings, loadVoiceSettings, setRoute, showToast } =
+    useAppStore();
 
   // Real live telemetry & data
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
@@ -82,12 +83,15 @@ export function HomeScreen() {
   }, []);
 
   useEffect(() => {
+    if (!voiceSettings) {
+      loadVoiceSettings();
+    }
     loadLiveDashboardData();
     return () => {
       voiceHandleRef.current?.cancel();
       stopSpeaking();
     };
-  }, [loadLiveDashboardData]);
+  }, [loadLiveDashboardData, loadVoiceSettings, voiceSettings]);
 
   const sendToActiveSession = useCallback(
     async (content: string, inputType: "voice" | "text") => {
@@ -119,8 +123,13 @@ export function HomeScreen() {
         ]);
         setTextDraft("");
 
-        if (inputType === "voice" && res.data.assistantMessage.content) {
-          speakText(res.data.assistantMessage.content.slice(0, 260), { rate: 1.05 });
+        if ((inputType === "voice" || voiceSettings?.autoSpeakResponses) && res.data.assistantMessage.content) {
+          speakText(res.data.assistantMessage.content.slice(0, 260), {
+            language: voiceSettings?.inputLanguage || "en-US",
+            voiceType: voiceSettings?.voiceType || "female",
+            pitch: voiceSettings?.ttsPitch,
+            rate: voiceSettings?.ttsRate ?? 1.0,
+          });
         }
 
         // Refresh tasks in case execution was triggered
@@ -134,7 +143,7 @@ export function HomeScreen() {
         setSending(false);
       }
     },
-    [conversationId, currentDeviceId, sending, showToast]
+    [conversationId, currentDeviceId, sending, showToast, voiceSettings]
   );
 
   const toggleVoiceMic = () => {
@@ -155,7 +164,7 @@ export function HomeScreen() {
     setVoiceActive(true);
     setInterimTranscript("");
     voiceHandleRef.current = startLocalVoiceRecognition({
-      language: "en-US",
+      language: voiceSettings?.inputLanguage || "en-US",
       onInterim: (text: string) => setInterimTranscript(text),
       onFinal: (text: string) => {
         if (text.trim()) {
