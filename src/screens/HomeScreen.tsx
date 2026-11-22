@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { ApiError, apiClient } from "../lib/api";
+import { cleanDisplayText } from "../lib/formatText";
 import { getSelectedOrbStyle, type OrbStyleOption } from "../lib/orbStyle";
 import {
   isSpeechRecognitionSupported,
@@ -512,7 +513,7 @@ export function HomeScreen() {
                           <Loader2 className="h-3 w-3 animate-spin" /> Thinking...
                         </span>
                       ) : latestAssistantMsg ? (
-                        <p className="line-clamp-2">{latestAssistantMsg.content}</p>
+                        <p className="line-clamp-2">{cleanDisplayText(latestAssistantMsg.content)}</p>
                       ) : (
                         <p className="line-clamp-2">
                           Hello {user?.profile?.displayName || user?.name}. Tap the mic or type a command to begin.
@@ -530,7 +531,7 @@ export function HomeScreen() {
                         {interimTranscript ? (
                           <p className="line-clamp-2 italic text-[#00D4FF]">{interimTranscript}</p>
                         ) : (
-                          <p className="line-clamp-2">{latestUserMsg?.content}</p>
+                          <p className="line-clamp-2">{cleanDisplayText(latestUserMsg?.content)}</p>
                         )}
                       </div>
                     </div>

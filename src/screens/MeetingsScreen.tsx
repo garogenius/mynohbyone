@@ -17,6 +17,7 @@ import {
 
 import { EmptyState, LoadingState } from "../components/StateViews";
 import { ApiError, apiClient } from "../lib/api";
+import { cleanDisplayText } from "../lib/formatText";
 import {
   isSpeechRecognitionSupported,
   startLocalVoiceRecognition,
@@ -679,12 +680,15 @@ export function MeetingsScreen() {
                         })}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs leading-relaxed text-zinc-200">{seg.content}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-zinc-200">
+                      {cleanDisplayText(seg.content)}
+                    </p>
                     {seg.aiHint && (
                       <p className="mt-2 flex items-start gap-1.5 border-t border-white/[0.06] pt-2 text-[11px] text-zinc-400">
                         <Sparkles className="mt-0.5 h-3 w-3 shrink-0 text-[#00D4FF]" />
                         <span>
-                          <strong className="text-[#00D4FF]">Private Hint:</strong> {seg.aiHint}
+                          <strong className="text-[#00D4FF]">Private Hint:</strong>{" "}
+                          {cleanDisplayText(seg.aiHint)}
                         </span>
                       </p>
                     )}
@@ -695,7 +699,9 @@ export function MeetingsScreen() {
           ) : activeTab === "summary" ? (
             <div className="rounded-xl border border-white/[0.08] bg-[#101624] p-4">
               {selected.summary ? (
-                <p className="text-xs leading-relaxed text-zinc-200">{selected.summary}</p>
+                <p className="text-xs leading-relaxed text-zinc-200">
+                  {cleanDisplayText(selected.summary)}
+                </p>
               ) : (
                 <p className="text-xs text-zinc-400">
                   Click &ldquo;End &amp; Summarise&rdquo; above to generate an AI summary for this session.

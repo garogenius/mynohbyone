@@ -1,3 +1,5 @@
+import { cleanDisplayText } from "./formatText";
+
 export interface SpeechRecognitionResultEvent {
   resultIndex: number;
   results: {
@@ -366,8 +368,9 @@ export function speakText(
     options.onEnd?.();
   };
 
+  const spokenText = cleanDisplayText(text);
   const preset = VOICE_PERSONA_PRESETS.find((p) => p.id === options.voiceType);
-  const utterance = new SpeechSynthesisUtterance(text);
+  const utterance = new SpeechSynthesisUtterance(spokenText);
   activeUtterance = utterance;
   utterance.rate = options.rate ?? preset?.rate ?? 1.0;
   utterance.pitch = options.pitch ?? preset?.pitch ?? 1.0;
@@ -384,7 +387,7 @@ export function speakText(
   utterance.onerror = () => finishOnce();
 
   // Safety watchdog in case browser TTS is muted or drops onend event
-  const maxDurationMs = Math.max(3500, Math.min(24000, text.length * 85));
+  const maxDurationMs = Math.max(3500, Math.min(24000, spokenText.length * 85));
   activeSpeechTimer = window.setTimeout(finishOnce, maxDurationMs);
 
   try {

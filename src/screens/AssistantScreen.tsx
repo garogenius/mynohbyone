@@ -36,6 +36,7 @@ import {
   type ChatWorkspaceMeta,
 } from "../lib/chatWorkspace";
 import { RealtimeClient } from "../lib/realtime";
+import { cleanDisplayText } from "../lib/formatText";
 import {
   isSpeechRecognitionSupported,
   speakText,
@@ -397,7 +398,7 @@ export function AssistantScreen() {
 
   const handleCopy = async (msg: Message) => {
     try {
-      await navigator.clipboard.writeText(msg.content);
+      await navigator.clipboard.writeText(cleanDisplayText(msg.content));
       setCopiedId(msg.id);
       setTimeout(() => setCopiedId((cur) => (cur === msg.id ? null : cur)), 1800);
     } catch {
@@ -1100,7 +1101,7 @@ export function AssistantScreen() {
                           : "nohby-bubble-ai rounded-tl-sm text-zinc-100"
                       }`}
                     >
-                      {msg.content}
+                      {cleanDisplayText(msg.content)}
                     </div>
 
                     {!isUser && (
@@ -1157,7 +1158,7 @@ export function AssistantScreen() {
                   <div className="nohby-bubble-ai max-w-[85%] rounded-2xl rounded-tl-sm px-4 py-2.5 text-[13px] leading-relaxed whitespace-pre-wrap text-zinc-100">
                     {streamingText ? (
                       <>
-                        {streamingText}
+                        {cleanDisplayText(streamingText)}
                         <span className="ml-1 inline-block h-3.5 w-1.5 animate-pulse bg-[#00D4FF] align-middle" />
                       </>
                     ) : (
