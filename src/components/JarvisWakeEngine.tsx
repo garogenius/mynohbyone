@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronRight, Radio, ShieldCheck, X } from "lucide-react";
 
 import { apiClient } from "../lib/api";
+import { cleanFirstPersonAnswer } from "../lib/formatText";
 import {
   executeClientAction,
   finalizeAssistantExecution,
@@ -88,17 +89,27 @@ export function JarvisWakeEngine() {
   const convIdRef = useRef<string | null>(null);
   const overlayWindowRef = useRef<Window | null>(null);
   const meetingSyncRef = useRef<{
+    meetingId?: string;
     meetingTitle?: string;
     isListening?: boolean;
     question?: string;
     answer?: string;
   }>({
+    meetingId: "",
     meetingTitle: "",
     isListening: false,
     question: "",
     answer: "",
   });
   const activeOverlayTabRef = useRef<"assistant" | "meeting">("assistant");
+  const overlayVoiceHandleRef = useRef<VoiceSessionHandle | null>(null);
+  const overlayMicActiveRef = useRef<boolean>(true);
+  const overlayMeetingSessionIdRef = useRef<string | null>(null);
+  const overlayGeneratingRef = useRef<boolean>(false);
+  const overlayDebounceTimerRef = useRef<number | null>(null);
+  const overlayCurrentQuestionRef = useRef<string>("");
+  const overlayCurrentAnswerRef = useRef<string>("");
+  const overlayRestartTimerRef = useRef<number | null>(null);
 
   const enabled = phase === "ready" && Boolean(voiceSettings?.wakeWordEnabled);
   const wakePhrase = voiceSettings?.wakeWordPhrase || "Hey Nohby";
@@ -374,6 +385,234 @@ export function JarvisWakeEngine() {
     [greetAndOpenListeningWindow, processCommand, wakePhrase]
   );
 
+  // Autonomous Answer Generation for Device Overlay
+  const generateOverlayAnswer = useCallback(
+    async (questionText: string) => {
+      const cleanQ = questionText.trim();
+      if (!cleanQ || overlayGeneratingRef.current) return;
+      overlayGeneratingRef.current = true;
+
+      const doc = overlayWindowRef.current?.document;
+      const badgeEl = doc?.getElementById("meeting-badge");
+      const aEl = doc?.getElementById("nohby-stealth-answer");
+      const statusBadge = doc?.getElementById("overlay-status-badge");
+
+      if (badgeEl) {
+        badgeEl.textContent = "⚡ GENERATING FIRST-PERSON ANSWER...";
+        badgeEl.style.color = "#00D4FF";
+      }
+      if (statusBadge) {
+        statusBadge.textContent = "● THINKING...";
+        statusBadge.style.color = "#00D4FF";
+      }
+
+      try {
+        let answerText = "";
+        let activeMeetingId =
+          meetingSyncRef.current.meetingId || overlayMeetingSessionIdRef.current;
+
+        if (!activeMeetingId) {
+          try {
+            const newM = await apiClient.createMeeting({
+              title: "Stealth Background Copilot",
+              meetingType: "interview",
+              provider: "local_audio",
+              stealthMode: true,
+            });
+            activeMeetingId = newM.data.meeting.id;
+            overlayMeetingSessionIdRef.current = activeMeetingId;
+          } catch {
+            // Fall back to direct conversation
+          }
+        }
+
+        if (activeMeetingId) {
+          try {
+            const segRes = await apiClient.appendMeetingTranscript(activeMeetingId, {
+              speaker: "Interviewer",
+              content: cleanQ,
+            });
+            if (segRes.data.transcript?.aiHint) {
+              answerText = cleanFirstPersonAnswer(segRes.data.transcript.aiHint);
+            }
+          } catch {
+            // Fall back below
+          }
+        }
+
+        if (!answerText) {
+          if (!convIdRef.current) {
+            const list = await apiClient.listConversations({ limit: 1 }).catch(() => null);
+            if (list && list.data.conversations.length > 0) {
+              convIdRef.current = list.data.conversations[0].id;
+            } else {
+              const created = await apiClient.createConversation({
+                title: "Stealth Q&A Session",
+                mode: "assistant",
+              });
+              convIdRef.current = created.data.conversation.id;
+            }
+          }
+          const prompt = `Interview Question: "${cleanQ}". Provide a direct, confident 2-3 sentence first-person response suitable for the candidate to read aloud immediately. Do not include markdown headers, asterisks, pleasantries, or preamble.`;
+          const res = await apiClient.sendMessage(convIdRef.current, {
+            content: prompt,
+            inputType: "text",
+            deviceId: currentDeviceId,
+          });
+          answerText = cleanFirstPersonAnswer(res.data.assistantMessage.content);
+        }
+
+        overlayCurrentAnswerRef.current = answerText;
+        meetingSyncRef.current.answer = answerText;
+        meetingSyncRef.current.question = cleanQ;
+
+        if (aEl) {
+          aEl.textContent = answerText;
+          aEl.scrollTop = 0;
+        }
+        if (badgeEl) {
+          badgeEl.textContent = "✓ READY TO SPEAK";
+          badgeEl.style.color = "#10B981";
+        }
+        if (statusBadge) {
+          statusBadge.textContent = "● ANSWER READY";
+          statusBadge.style.color = "#10B981";
+        }
+
+        // Broadcast sync to dashboard
+        window.dispatchEvent(
+          new CustomEvent("nohby-meeting-stealth-sync", {
+            detail: {
+              meetingId: activeMeetingId,
+              isListening: overlayMicActiveRef.current,
+              question: cleanQ,
+              answer: answerText,
+            },
+          })
+        );
+      } catch {
+        if (badgeEl) {
+          badgeEl.textContent = "COULD NOT GENERATE";
+          badgeEl.style.color = "#EF4444";
+        }
+        if (statusBadge) {
+          statusBadge.textContent = "● LISTENING";
+          statusBadge.style.color = "#10B981";
+        }
+      } finally {
+        overlayGeneratingRef.current = false;
+      }
+    },
+    [currentDeviceId]
+  );
+
+  // Autonomous Overlay Speech Recognition Loop
+  const startOverlayListeningLoop = useCallback(() => {
+    if (!overlayWindowRef.current || overlayWindowRef.current.closed) return;
+    if (!overlayMicActiveRef.current) return;
+    if (!isSpeechRecognitionSupported()) return;
+
+    if (overlayVoiceHandleRef.current) {
+      overlayVoiceHandleRef.current.cancel();
+      overlayVoiceHandleRef.current = null;
+    }
+
+    const doc = overlayWindowRef.current.document;
+    const qEl = doc.getElementById("nohby-stealth-question");
+    const badgeEl = doc.getElementById("meeting-badge");
+    const statusBadge = doc.getElementById("overlay-status-badge");
+    const subEl = doc.getElementById("nohby-overlay-sub");
+
+    overlayVoiceHandleRef.current = startLocalVoiceRecognition({
+      language: lang,
+      onInterim: (text: string) => {
+        if (!overlayWindowRef.current || overlayWindowRef.current.closed) return;
+        const clean = text.trim();
+        if (!clean) return;
+
+        if (activeOverlayTabRef.current === "meeting") {
+          if (qEl) qEl.textContent = clean;
+          overlayCurrentQuestionRef.current = clean;
+          if (badgeEl && !overlayGeneratingRef.current) {
+            badgeEl.textContent = "● LISTENING (LIVE STT)";
+            badgeEl.style.color = "#00D4FF";
+          }
+          if (statusBadge && !overlayGeneratingRef.current) {
+            statusBadge.textContent = "● LIVE LISTENING";
+            statusBadge.style.color = "#10B981";
+          }
+
+          if (overlayDebounceTimerRef.current) {
+            window.clearTimeout(overlayDebounceTimerRef.current);
+          }
+          const words = clean.split(/\s+/).length;
+          if (words >= 4 && !overlayGeneratingRef.current) {
+            overlayDebounceTimerRef.current = window.setTimeout(() => {
+              void generateOverlayAnswer(clean);
+            }, 1400);
+          }
+        } else {
+          if (subEl) subEl.textContent = clean;
+        }
+      },
+      onFinal: (fullText: string) => {
+        if (!overlayWindowRef.current || overlayWindowRef.current.closed) return;
+        if (overlayDebounceTimerRef.current) {
+          window.clearTimeout(overlayDebounceTimerRef.current);
+          overlayDebounceTimerRef.current = null;
+        }
+        const clean = fullText.trim();
+        if (!clean) return;
+
+        if (activeOverlayTabRef.current === "meeting") {
+          if (qEl) qEl.textContent = clean;
+          overlayCurrentQuestionRef.current = clean;
+          const words = clean.split(/\s+/).length;
+          if (words >= 3) {
+            void generateOverlayAnswer(clean);
+          }
+        } else {
+          const check = extractWakeWordCommand(clean, wakePhrase);
+          const alt = !check.matched ? extractWakeWordCommand(clean, "Sannu Nohby") : check;
+          if (alt.matched && alt.command) {
+            processCommand(alt.command);
+          } else if (alt.matched) {
+            greetAndOpenListeningWindow();
+          } else {
+            processCommand(clean);
+          }
+        }
+      },
+      onError: (err: string) => {
+        if (!overlayWindowRef.current || overlayWindowRef.current.closed) return;
+        if (badgeEl) {
+          if (err === "not-allowed" || err === "service-not-allowed") {
+            badgeEl.textContent = "MIC PERMISSION REQUIRED";
+            badgeEl.style.color = "#EF4444";
+          }
+        }
+      },
+      onEnd: () => {
+        if (
+          overlayWindowRef.current &&
+          !overlayWindowRef.current.closed &&
+          overlayMicActiveRef.current
+        ) {
+          if (overlayRestartTimerRef.current) {
+            window.clearTimeout(overlayRestartTimerRef.current);
+          }
+          overlayRestartTimerRef.current = window.setTimeout(startOverlayListeningLoop, 300);
+        }
+      },
+    });
+  }, [
+    generateOverlayAnswer,
+    greetAndOpenListeningWindow,
+    lang,
+    processCommand,
+    wakePhrase,
+  ]);
+
   // Sync Always-On-Top OS Desktop Overlay Window (Document Picture-in-Picture or Companion Popup)
   const syncOverlayDom = useCallback(() => {
     const win = overlayWindowRef.current;
@@ -410,19 +649,38 @@ export function JarvisWakeEngine() {
     const qEl = doc.getElementById("nohby-stealth-question");
     const aEl = doc.getElementById("nohby-stealth-answer");
     const badgeEl = doc.getElementById("meeting-badge");
+    const statusBadge = doc.getElementById("overlay-status-badge");
+    const waveEl = doc.getElementById("overlay-audio-wave");
 
     const m = meetingSyncRef.current;
-    if (qEl) {
-      qEl.textContent = m.question || "Waiting for meeting questions...";
+    const activeQ = m.question || overlayCurrentQuestionRef.current;
+    const activeA = m.answer || overlayCurrentAnswerRef.current;
+
+    if (qEl && activeQ) {
+      qEl.textContent = activeQ;
     }
-    if (aEl) {
-      aEl.textContent =
-        m.answer ||
-        "Your first-person response based on your experience and skills will appear here.";
+    if (aEl && activeA) {
+      aEl.textContent = activeA;
     }
-    if (badgeEl) {
-      badgeEl.textContent = m.isListening ? "LISTENING" : "STANDBY";
-      badgeEl.style.color = m.isListening ? "#10B981" : "#00D4FF";
+    if (badgeEl && !overlayGeneratingRef.current) {
+      if (activeA) {
+        badgeEl.textContent = "✓ READY TO SPEAK";
+        badgeEl.style.color = "#10B981";
+      } else {
+        badgeEl.textContent = overlayMicActiveRef.current ? "● LISTENING" : "⏸ STANDBY";
+        badgeEl.style.color = overlayMicActiveRef.current ? "#10B981" : "#F59E0B";
+      }
+    }
+    if (statusBadge && !overlayGeneratingRef.current) {
+      statusBadge.textContent = overlayMicActiveRef.current ? "● LIVE LISTENING" : "⏸ MIC PAUSED";
+      statusBadge.style.color = overlayMicActiveRef.current ? "#10B981" : "#F59E0B";
+    }
+    if (waveEl) {
+      if (overlayMicActiveRef.current) {
+        waveEl.classList.add("active");
+      } else {
+        waveEl.classList.remove("active");
+      }
     }
 
     // 3. Tab visibility sync
@@ -477,12 +735,14 @@ export function JarvisWakeEngine() {
     // 2. If already open and no mode switch requested, toggle off
     if (overlayWindowRef.current && !overlayWindowRef.current.closed) {
       if (!preferredMode || preferredMode === activeOverlayTabRef.current) {
+        overlayVoiceHandleRef.current?.cancel();
+        overlayVoiceHandleRef.current = null;
         overlayWindowRef.current.close();
         overlayWindowRef.current = null;
         setDesktopPinned(false);
+        window.dispatchEvent(new CustomEvent("nohby-manual-mic", { detail: { active: false } }));
         return;
       } else {
-        // Just switch mode and focus
         activeOverlayTabRef.current = preferredMode;
         syncOverlayDom();
         overlayWindowRef.current.focus?.();
@@ -494,14 +754,14 @@ export function JarvisWakeEngine() {
       let pipWin: Window | null = null;
       if (window.documentPictureInPicture?.requestWindow) {
         pipWin = await window.documentPictureInPicture.requestWindow({
-          width: 440,
-          height: 250,
+          width: 520,
+          height: 340,
         });
       } else {
         pipWin = window.open(
           "",
           "NohbyDeviceOverlay",
-          "width=440,height=260,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
+          "width=520,height=340,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
         );
       }
 
@@ -511,26 +771,32 @@ export function JarvisWakeEngine() {
       }
 
       overlayWindowRef.current = pipWin;
+      overlayMicActiveRef.current = true;
       setDesktopPinned(true);
+      window.dispatchEvent(new CustomEvent("nohby-manual-mic", { detail: { active: true } }));
 
       const origin = window.location.origin;
       const initialOrb = `${origin}${orbStyle.still}`;
       const activeTab = activeOverlayTabRef.current;
-      const initialQ = meetingSyncRef.current.question || "Waiting for meeting questions...";
+      const initialQ =
+        meetingSyncRef.current.question ||
+        overlayCurrentQuestionRef.current ||
+        "Listening to interviewer / speaker... speak now";
       const initialA =
         meetingSyncRef.current.answer ||
-        "Your first-person response based on your experience and skills will appear here.";
+        overlayCurrentAnswerRef.current ||
+        "Your first-person response will generate automatically here.";
 
       pipWin.document.open();
       pipWin.document.write(`<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Nohby ONE — Device Background Stealth Assistant</title>
+  <title>Nohby ONE — Device Stealth Copilot</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: #0A0F1D;
+      background: #070B14;
       color: #F8FAFC;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
       height: 100vh;
@@ -544,8 +810,8 @@ export function JarvisWakeEngine() {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 6px 10px;
-      background: #070B14;
+      padding: 6px 12px;
+      background: #05080F;
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       gap: 8px;
     }
@@ -560,7 +826,7 @@ export function JarvisWakeEngine() {
       color: #94A3B8;
       font-size: 11px;
       font-weight: 600;
-      padding: 3px 8px;
+      padding: 4px 10px;
       border-radius: 6px;
       cursor: pointer;
       transition: all 0.15s ease;
@@ -570,12 +836,48 @@ export function JarvisWakeEngine() {
     }
     .tab-btn.active {
       background: rgba(0, 212, 255, 0.15);
-      border-color: rgba(0, 212, 255, 0.35);
+      border-color: rgba(0, 212, 255, 0.4);
       color: #00D4FF;
     }
     .tab-btn:hover:not(.active) {
       color: #FFFFFF;
       background: rgba(255, 255, 255, 0.05);
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .audio-wave {
+      display: flex;
+      align-items: center;
+      gap: 2.5px;
+      height: 14px;
+    }
+    .audio-bar {
+      width: 2.5px;
+      height: 4px;
+      background: #00D4FF;
+      border-radius: 2px;
+      transition: height 0.1s ease;
+    }
+    .audio-wave.active .audio-bar:nth-child(1) { animation: wave 0.8s ease-in-out infinite 0.1s; }
+    .audio-wave.active .audio-bar:nth-child(2) { animation: wave 0.7s ease-in-out infinite 0.2s; }
+    .audio-wave.active .audio-bar:nth-child(3) { animation: wave 0.9s ease-in-out infinite 0.05s; }
+    .audio-wave.active .audio-bar:nth-child(4) { animation: wave 0.6s ease-in-out infinite 0.25s; }
+    .audio-wave.active .audio-bar:nth-child(5) { animation: wave 0.85s ease-in-out infinite 0.15s; }
+    .audio-wave.active .audio-bar:nth-child(6) { animation: wave 0.75s ease-in-out infinite 0.3s; }
+    .audio-wave.active .audio-bar:nth-child(7) { animation: wave 0.95s ease-in-out infinite 0.1s; }
+    .audio-wave.active .audio-bar:nth-child(8) { animation: wave 0.65s ease-in-out infinite 0.2s; }
+    @keyframes wave {
+      0%, 100% { height: 4px; opacity: 0.4; }
+      50% { height: 14px; opacity: 1; }
+    }
+    .status-badge {
+      font-size: 10px;
+      font-weight: 700;
+      color: #10B981;
+      letter-spacing: 0.02em;
     }
     .shield-badge {
       display: inline-flex;
@@ -587,7 +889,7 @@ export function JarvisWakeEngine() {
       color: #10B981;
       background: rgba(16, 185, 129, 0.12);
       border: 1px solid rgba(16, 185, 129, 0.25);
-      padding: 2px 6px;
+      padding: 2px 7px;
       border-radius: 999px;
       text-transform: uppercase;
     }
@@ -625,15 +927,15 @@ export function JarvisWakeEngine() {
       display: flex;
       align-items: center;
       gap: 12px;
-      background: #0E1526;
-      border: 1px solid rgba(0, 212, 255, 0.2);
+      background: #0D1424;
+      border: 1px solid rgba(0, 212, 255, 0.22);
       border-radius: 12px;
-      padding: 12px;
+      padding: 14px;
       cursor: pointer;
     }
     .orb-box {
-      width: 48px;
-      height: 48px;
+      width: 52px;
+      height: 52px;
       border-radius: 999px;
       overflow: hidden;
       border: 1.5px solid rgba(0, 212, 255, 0.7);
@@ -662,26 +964,26 @@ export function JarvisWakeEngine() {
       width: 7px;
       height: 7px;
       border-radius: 50%;
-      background: #00D4FF;
-      box-shadow: 0 0 8px #00D4FF;
+      background: #10B981;
+      box-shadow: 0 0 8px #10B981;
     }
     .heard-text {
       font-size: 11.5px;
       color: #94A3B8;
       margin-top: 4px;
       line-height: 1.35;
-      max-height: 36px;
+      max-height: 40px;
       overflow: hidden;
       text-overflow: ellipsis;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
     }
-    .hint-bar {
+    .assistant-quick-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
       margin-top: 10px;
-      font-size: 10.5px;
-      color: #64748B;
-      text-align: center;
     }
 
     /* Meeting Stealth View */
@@ -692,7 +994,7 @@ export function JarvisWakeEngine() {
       flex: 1;
     }
     .card-block {
-      background: #0E1526;
+      background: #0D1424;
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 8px;
       padding: 8px 10px;
@@ -709,15 +1011,15 @@ export function JarvisWakeEngine() {
       justify-content: space-between;
     }
     .q-text {
-      font-size: 12px;
+      font-size: 12.5px;
       color: #CBD5E1;
-      line-height: 1.4;
-      max-height: 48px;
+      line-height: 1.45;
+      max-height: 52px;
       overflow-y: auto;
     }
     .a-card {
       flex: 1;
-      background: #111B30;
+      background: #0F182C;
       border: 1px solid rgba(0, 212, 255, 0.35);
       border-radius: 8px;
       padding: 8px 10px;
@@ -726,18 +1028,19 @@ export function JarvisWakeEngine() {
     }
     .a-text {
       flex: 1;
-      font-size: 12.5px;
+      font-size: 13px;
       color: #FFFFFF;
       line-height: 1.5;
       overflow-y: auto;
-      max-height: 95px;
+      max-height: 115px;
     }
     .meeting-actions {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 8px;
-      margin-top: 6px;
+      gap: 6px;
+      margin-top: 8px;
+      flex-wrap: wrap;
     }
     .btn-action {
       background: rgba(0, 212, 255, 0.12);
@@ -745,7 +1048,7 @@ export function JarvisWakeEngine() {
       color: #00D4FF;
       font-size: 10.5px;
       font-weight: 600;
-      padding: 4px 10px;
+      padding: 5px 10px;
       border-radius: 6px;
       cursor: pointer;
       display: inline-flex;
@@ -767,10 +1070,21 @@ export function JarvisWakeEngine() {
   <div class="header-bar">
     <div class="tab-group">
       <button id="tab-assistant" class="tab-btn ${activeTab === "assistant" ? "active" : ""}">🎙️ Assistant</button>
-      <button id="tab-meeting" class="tab-btn ${activeTab === "meeting" ? "active" : ""}">🛡️ Meeting Stealth</button>
+      <button id="tab-meeting" class="tab-btn ${activeTab === "meeting" ? "active" : ""}">🛡️ Stealth Q&A</button>
     </div>
-    <div style="display: flex; align-items: center; gap: 6px;">
-      <span class="shield-badge" title="Window excluded from screen share / recordings">🛡️ INVISIBLE IN SCREEN SHARE</span>
+    <div class="header-right">
+      <div class="audio-wave active" id="overlay-audio-wave" title="Live audio activity">
+        <span class="audio-bar"></span>
+        <span class="audio-bar"></span>
+        <span class="audio-bar"></span>
+        <span class="audio-bar"></span>
+        <span class="audio-bar"></span>
+        <span class="audio-bar"></span>
+        <span class="audio-bar"></span>
+        <span class="audio-bar"></span>
+      </div>
+      <span class="status-badge" id="overlay-status-badge">● LIVE LISTENING</span>
+      <span class="shield-badge" title="Window excluded from screen share / recordings">🛡️ STEALTH</span>
       <button id="btn-close" class="btn-close" title="Close floating desktop overlay">✕</button>
     </div>
   </div>
@@ -785,12 +1099,16 @@ export function JarvisWakeEngine() {
         <div class="assistant-meta">
           <div class="status-line">
             <span class="live-dot" id="nohby-live-dot"></span>
-            <span id="nohby-overlay-status">Say "${wakePhrase}"</span>
+            <span id="nohby-overlay-status">Say "${wakePhrase}" or tap to speak</span>
           </div>
           <div class="heard-text" id="nohby-overlay-sub">Floating on device background across all apps</div>
         </div>
       </div>
-      <div class="hint-bar">Click orb or say "${wakePhrase}" • Controls active across all apps</div>
+      <div class="assistant-quick-actions">
+        <button id="btn-assistant-speak" class="btn-action">🎙️ Tap to Speak</button>
+        <button id="btn-assistant-tasks" class="btn-action">📋 Tasks</button>
+        <button id="btn-assistant-notes" class="btn-action">📝 Notes</button>
+      </div>
     </div>
 
     <!-- Meeting Stealth View -->
@@ -798,20 +1116,22 @@ export function JarvisWakeEngine() {
       <div class="meeting-box">
         <div class="card-block">
           <div class="card-label">
-            <span>Caught Question</span>
-            <span id="meeting-badge" style="color: #00D4FF;">WAITING</span>
+            <span>Caught Question (Live)</span>
+            <span style="color: #64748B;">INTERVIEWER / SPEAKER</span>
           </div>
           <div class="q-text" id="nohby-stealth-question">${initialQ}</div>
         </div>
         <div class="a-card">
           <div class="card-label">
             <span>Your First-Person Response</span>
-            <span style="color: #10B981;">NohbyAI Core</span>
+            <span id="meeting-badge" style="color: #10B981;">NohbyAI Core</span>
           </div>
           <div class="a-text" id="nohby-stealth-answer">${initialA}</div>
           <div class="meeting-actions">
+            <button id="btn-whisper" class="btn-action">🔊 Whisper Answer</button>
             <button id="btn-copy-answer" class="btn-action">📋 Copy Answer</button>
-            <button id="btn-toggle-mic" class="btn-action">🎙️ Toggle Mic</button>
+            <button id="btn-clear-qa" class="btn-action">🔄 Clear / Next</button>
+            <button id="btn-toggle-mic" class="btn-action">🎙️ Pause Mic</button>
           </div>
         </div>
       </div>
@@ -843,55 +1163,150 @@ export function JarvisWakeEngine() {
         viewAssistant?.classList.remove("active");
       });
 
-      // Setup assistant trigger
+      // Setup assistant triggers
       const triggerEl = pipWin.document.getElementById("assistant-trigger");
       triggerEl?.addEventListener("click", () => {
         greetAndOpenListeningWindow();
+      });
+      const speakBtn = pipWin.document.getElementById("btn-assistant-speak");
+      speakBtn?.addEventListener("click", () => {
+        greetAndOpenListeningWindow();
+      });
+      const tasksBtn = pipWin.document.getElementById("btn-assistant-tasks");
+      tasksBtn?.addEventListener("click", () => {
+        setRoute("tasks");
+      });
+      const notesBtn = pipWin.document.getElementById("btn-assistant-notes");
+      notesBtn?.addEventListener("click", () => {
+        setRoute("meetings");
+      });
+
+      // Setup Whisper / Read Aloud
+      const whisperBtn = pipWin.document.getElementById("btn-whisper");
+      whisperBtn?.addEventListener("click", () => {
+        const text =
+          overlayCurrentAnswerRef.current ||
+          pipWin?.document.getElementById("nohby-stealth-answer")?.textContent;
+        if (text && !text.startsWith("Your first-person response")) {
+          if (whisperBtn) whisperBtn.textContent = "🔊 Whispering...";
+          speakText(text, {
+            language: lang,
+            voiceType: voiceSettings?.voiceType || "female",
+            pitch: voiceSettings?.ttsPitch,
+            rate: voiceSettings?.ttsRate ?? 1.0,
+            onEnd: () => {
+              if (whisperBtn) whisperBtn.textContent = "🔊 Whisper Answer";
+            },
+          });
+        }
       });
 
       // Setup copy answer
       const copyBtn = pipWin.document.getElementById("btn-copy-answer");
       copyBtn?.addEventListener("click", () => {
-        const text = pipWin?.document.getElementById("nohby-stealth-answer")?.textContent;
+        const text =
+          overlayCurrentAnswerRef.current ||
+          pipWin?.document.getElementById("nohby-stealth-answer")?.textContent;
         if (text && !text.startsWith("Your first-person response")) {
-          navigator.clipboard.writeText(text).then(() => {
-            if (copyBtn) {
-              copyBtn.textContent = "✓ Copied!";
-              copyBtn.classList.add("copied");
-              setTimeout(() => {
-                if (copyBtn) {
-                  copyBtn.textContent = "📋 Copy Answer";
-                  copyBtn.classList.remove("copied");
-                }
-              }, 1600);
-            }
-          }).catch(() => {});
+          navigator.clipboard
+            .writeText(text)
+            .then(() => {
+              if (copyBtn) {
+                copyBtn.textContent = "✓ Copied!";
+                copyBtn.classList.add("copied");
+                setTimeout(() => {
+                  if (copyBtn) {
+                    copyBtn.textContent = "📋 Copy Answer";
+                    copyBtn.classList.remove("copied");
+                  }
+                }, 1600);
+              }
+            })
+            .catch(() => {});
+        }
+      });
+
+      // Setup clear / next
+      const clearBtn = pipWin.document.getElementById("btn-clear-qa");
+      clearBtn?.addEventListener("click", () => {
+        overlayCurrentQuestionRef.current = "";
+        overlayCurrentAnswerRef.current = "";
+        meetingSyncRef.current.question = "";
+        meetingSyncRef.current.answer = "";
+        const qEl = pipWin?.document.getElementById("nohby-stealth-question");
+        const aEl = pipWin?.document.getElementById("nohby-stealth-answer");
+        const badgeEl = pipWin?.document.getElementById("meeting-badge");
+        if (qEl) qEl.textContent = "Listening to interviewer / speaker... speak now";
+        if (aEl)
+          aEl.textContent = "Your first-person response will generate automatically here.";
+        if (badgeEl) {
+          badgeEl.textContent = "● LISTENING";
+          badgeEl.style.color = "#10B981";
         }
       });
 
       // Setup mic toggle
       const micBtn = pipWin.document.getElementById("btn-toggle-mic");
       micBtn?.addEventListener("click", () => {
-        window.dispatchEvent(new CustomEvent("nohby-toggle-meeting-mic"));
+        overlayMicActiveRef.current = !overlayMicActiveRef.current;
+        const statusBadge = pipWin?.document.getElementById("overlay-status-badge");
+        const waveEl = pipWin?.document.getElementById("overlay-audio-wave");
+        const badgeEl = pipWin?.document.getElementById("meeting-badge");
+
+        if (overlayMicActiveRef.current) {
+          startOverlayListeningLoop();
+          if (micBtn) micBtn.textContent = "🎙️ Pause Mic";
+          if (statusBadge) {
+            statusBadge.textContent = "● LIVE LISTENING";
+            statusBadge.style.color = "#10B981";
+          }
+          if (badgeEl && !overlayCurrentAnswerRef.current) {
+            badgeEl.textContent = "● LISTENING";
+            badgeEl.style.color = "#10B981";
+          }
+          waveEl?.classList.add("active");
+        } else {
+          overlayVoiceHandleRef.current?.cancel();
+          overlayVoiceHandleRef.current = null;
+          if (micBtn) micBtn.textContent = "🎙️ Resume Mic";
+          if (statusBadge) {
+            statusBadge.textContent = "⏸ MIC PAUSED";
+            statusBadge.style.color = "#F59E0B";
+          }
+          if (badgeEl && !overlayCurrentAnswerRef.current) {
+            badgeEl.textContent = "⏸ PAUSED";
+            badgeEl.style.color = "#F59E0B";
+          }
+          waveEl?.classList.remove("active");
+        }
       });
 
       // Setup close button
       const closeBtn = pipWin.document.getElementById("btn-close");
       closeBtn?.addEventListener("click", () => {
+        overlayVoiceHandleRef.current?.cancel();
+        overlayVoiceHandleRef.current = null;
         overlayWindowRef.current?.close();
         overlayWindowRef.current = null;
         setDesktopPinned(false);
+        window.dispatchEvent(new CustomEvent("nohby-manual-mic", { detail: { active: false } }));
       });
 
       pipWin.addEventListener("pagehide", () => {
+        overlayVoiceHandleRef.current?.cancel();
+        overlayVoiceHandleRef.current = null;
         overlayWindowRef.current = null;
         setDesktopPinned(false);
+        window.dispatchEvent(new CustomEvent("nohby-manual-mic", { detail: { active: false } }));
       });
 
+      // Immediately launch live speech recognition loop for the overlay window
+      startOverlayListeningLoop();
       syncOverlayDom();
+
       showToast(
         "success",
-        "Nohby ONE is now floating on your device background (Invisible in Screen Share)."
+        "Nohby ONE is actively listening and floating on your device background (Invisible in Screen Share)."
       );
     } catch {
       showToast("error", "Could not open floating desktop overlay window.");
