@@ -9,8 +9,11 @@ import type {
   Conversation,
   Device,
   DevicePlatform,
+  FileExtractionResult,
+  FileItem,
   HealthData,
   InterpretationResult,
+  KnowledgeSearchMatch,
   Message,
   Permission,
   SendMessageResponseData,
@@ -542,6 +545,87 @@ export const apiClient = {
     }
   ) {
     return request<{ task: Task }>(`/agent/tasks/${taskId}/fail`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Phase 6: Files & Document Intelligence
+  async uploadFile(file: File | Blob, filename?: string) {
+    const form = new FormData();
+    const resolvedName = filename || (file instanceof File ? file.name : "document.txt");
+    form.append("file", file, resolvedName);
+
+    const { accessToken } = tokenStorage.getSession();
+    const response = await fetch(`${API_BASE_URL}/files/upload`, {
+      method: "POST",
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      body: form,
+    });
+    const json = (await response.json()) as
+      | ApiSuccessResponse<{ file: FileItem }>
+      | ApiErrorResponse;
+    if (!response.ok || !json.success) {
+      const err = json as ApiErrorResponse;
+      throw new ApiError(
+        err.message || "File upload failed.",
+        err.error?.code || "INTERNAL_ERROR",
+        response.status,
+        err.error?.details || [],
+        err.meta?.requestId || ""
+      );
+    }
+    return json as ApiSuccessResponse<{ file: FileItem }>;
+  },
+
+  listFiles(params: { page?: number; limit?: number; search?: string } = {}) {
+    const qs = new URLSearchParams();
+    if (params.page) qs.set("page", String(params.page));
+    if (params.limit) qs.set("limit", String(params.limit));
+    if (params.search) qs.set("search", params.search);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return request<{
+      files: FileItem[];
+      pagination: { page: number; limit: number; total: number };
+    }>(`/files${suffix}`, { method: "GET" });
+  },
+
+  getFile(fileId: string) {
+    return request<{ file: FileItem }>(`/files/${fileId}`, { method: "GET" });
+  },
+
+  deleteFile(fileId: string) {
+    return request<{ deleted: boolean; id: string }>(`/files/${fileId}`, {
+      method: "DELETE",
+    });
+  },
+
+  summariseFile(fileId: string, focus?: string) {
+    return request<{ fileId: string; summary: string; file: FileItem }>(
+      `/files/${fileId}/summarise`,
+      {
+        method: "POST",
+        body: JSON.stringify(focus ? { focus } : {}),
+      }
+    );
+  },
+
+  extractFile(fileId: string, prompt?: string) {
+    return request<{ fileId: string; filename: string; extraction: FileExtractionResult }>(
+      `/files/${fileId}/extract`,
+      {
+        method: "POST",
+        body: JSON.stringify(prompt ? { prompt } : {}),
+      }
+    );
+  },
+
+  searchKnowledge(payload: { query: string; limit?: number; fileId?: string }) {
+    return request<{
+      query: string;
+      totalMatches: number;
+      results: KnowledgeSearchMatch[];
+    }>("/knowledge/search", {
       method: "POST",
       body: JSON.stringify(payload),
     });

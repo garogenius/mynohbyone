@@ -249,6 +249,43 @@ export interface AgentRegistrationInfo {
   status: string;
 }
 
+export interface FileItem {
+  id: string;
+  userId: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  checksum: string;
+  processingStatus: string;
+  metadata: Record<string, unknown>;
+  summary: string | null;
+  indexingStatus: string;
+  chunkCount: number;
+  createdAt: string;
+  extractedText?: string;
+}
+
+export interface FileExtractionResult {
+  wordCount: number;
+  lineCount: number;
+  keywords: string[];
+  headings: string[];
+  actionItems: string[];
+  emails: string[];
+  urls: string[];
+  dates: string[];
+  promptMatches: string[];
+}
+
+export interface KnowledgeSearchMatch {
+  chunkId: string;
+  fileId: string;
+  filename: string;
+  chunkIndex: number;
+  score: number;
+  excerpt: string;
+}
+
 export type NavRoute =
   | "home"
   | "assistant"

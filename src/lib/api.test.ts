@@ -212,11 +212,38 @@ describe("Nohby ONE Frontend -> Backend E2E Integration (Phase 0, 1 & 2)", () =>
     expect(completed.data.task.status).toBe("completed");
     expect(completed.data.task.result?.executedByDeviceId).toBe(deviceId);
 
+    // Phase 6: File upload, indexing, summarise, extract, knowledge search, delete
+    const docBlob = new Blob(
+      [
+        "# Release Checklist\n- Ship Nohby ONE Phase 6 on 2026-12-20\n- Contact ops@example.com\nhttps://docs.nohby.com/files\n",
+      ],
+      { type: "text/markdown" }
+    );
+    const uploadedFile = await apiClient.uploadFile(docBlob, "release-checklist.md");
+    const fileId = uploadedFile.data.file.id;
+    expect(uploadedFile.data.file.processingStatus).toBe("indexed");
+    expect(uploadedFile.data.file.chunkCount).toBeGreaterThanOrEqual(1);
+
+    const listedFiles = await apiClient.listFiles();
+    expect(listedFiles.data.files.some((f) => f.id === fileId)).toBe(true);
+
+    const summarised = await apiClient.summariseFile(fileId, "Phase 6");
+    expect(summarised.data.summary).toContain("release-checklist.md");
+
+    const extracted = await apiClient.extractFile(fileId, "Release");
+    expect(extracted.data.extraction.emails).toContain("ops@example.com");
+
+    const kSearch = await apiClient.searchKnowledge({ query: "Nohby ONE Phase 6" });
+    expect(kSearch.data.results.some((r) => r.fileId === fileId)).toBe(true);
+
+    const deletedFile = await apiClient.deleteFile(fileId);
+    expect(deletedFile.data.deleted).toBe(true);
+
     // Revoke device & logout
     const revoked = await apiClient.revokeDevice(deviceId);
     expect(revoked.data.device.status).toBe("revoked");
 
     const out = await apiClient.logout(tokenStorage.getSession().refreshToken);
     expect(out.data.revokedSessions).toBe(1);
-  }, 30000);
+  }, 35000);
 });
