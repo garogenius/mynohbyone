@@ -20,6 +20,7 @@ import { ApiError, apiClient } from "../lib/api";
 import {
   isSpeechRecognitionSupported,
   startLocalVoiceRecognition,
+  startMicLevelMonitor,
   type VoiceSessionHandle,
 } from "../lib/voice";
 import { useAppStore } from "../store/useAppStore";
@@ -68,12 +69,34 @@ export function MeetingsScreen() {
   const [stealthEnabled, setStealthEnabled] = useState(true);
   const [hiddenOverlay, setHiddenOverlay] = useState(false);
 
-  // Background listening
+  // Background listening & real-time 30-bar sound frequency monitor
   const [isListening, setIsListening] = useState(false);
   const [liveCaption, setLiveCaption] = useState("");
   const [manualInput, setManualInput] = useState("");
+  const [waveLevels, setWaveLevels] = useState<number[]>(() =>
+    WAVE_BARS.map((h) => h / 24)
+  );
   const voiceHandleRef = useRef<VoiceSessionHandle | null>(null);
+  const stopMonitorRef = useRef<(() => void) | null>(null);
+  const interimCommitTimerRef = useRef<number | null>(null);
   const lastSentFinalRef = useRef<string>("");
+
+  const stopAudioCapture = useCallback(() => {
+    if (interimCommitTimerRef.current) {
+      window.clearTimeout(interimCommitTimerRef.current);
+      interimCommitTimerRef.current = null;
+    }
+    if (stopMonitorRef.current) {
+      stopMonitorRef.current();
+      stopMonitorRef.current = null;
+    }
+    voiceHandleRef.current?.stop();
+    voiceHandleRef.current = null;
+    setIsListening(false);
+    setLiveCaption("");
+    setWaveLevels(WAVE_BARS.map((h) => h / 24));
+    window.dispatchEvent(new CustomEvent("nohby-manual-mic", { detail: { active: false } }));
+  }, []);
 
   const loadMeetings = useCallback(async () => {
     setLoading(true);
@@ -100,9 +123,9 @@ export function MeetingsScreen() {
   useEffect(() => {
     loadMeetings();
     return () => {
-      voiceHandleRef.current?.cancel();
+      stopAudioCapture();
     };
-  }, []);
+  }, [loadMeetings, stopAudioCapture]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -172,7 +195,7 @@ export function MeetingsScreen() {
   };
 
   const sendTranscriptSegment = useCallback(
-    async (meetingId: string, content: string, speaker = "Interviewer") => {
+    async (meetingId: string, content: string, speaker = "Speaker") => {
       if (!content.trim()) return;
       try {
         const res = await apiClient.appendMeetingTranscript(meetingId, {
@@ -201,10 +224,7 @@ export function MeetingsScreen() {
       return;
     }
     if (isListening) {
-      voiceHandleRef.current?.stop();
-      voiceHandleRef.current = null;
-      setIsListening(false);
-      setLiveCaption("");
+      stopAudioCapture();
       return;
     }
     if (!isSpeechRecognitionSupported()) {
@@ -214,10 +234,42 @@ export function MeetingsScreen() {
     const activeMeetingId = selected.id;
     lastSentFinalRef.current = "";
     setIsListening(true);
+    window.dispatchEvent(new CustomEvent("nohby-manual-mic", { detail: { active: true } }));
+
+    // Start 60fps real-time high/low sound frequency analyser across all 30 bars
+    startMicLevelMonitor((levels) => {
+      setWaveLevels(levels);
+    }, WAVE_BARS.length).then((stopFn) => {
+      stopMonitorRef.current = stopFn;
+    });
+
     voiceHandleRef.current = startLocalVoiceRecognition({
       language: voiceSettings?.inputLanguage || "en-US",
-      onInterim: (text: string) => setLiveCaption(text),
+      onInterim: (fullText: string) => {
+        const prevSent = lastSentFinalRef.current;
+        const pendingDelta = fullText.startsWith(prevSent)
+          ? fullText.slice(prevSent.length).trim()
+          : fullText.trim();
+
+        setLiveCaption(pendingDelta);
+
+        if (interimCommitTimerRef.current) {
+          window.clearTimeout(interimCommitTimerRef.current);
+        }
+        if (pendingDelta) {
+          // Commit phrase after 850ms pause so speaker segments and AI hints appear sub-second
+          interimCommitTimerRef.current = window.setTimeout(() => {
+            lastSentFinalRef.current = fullText;
+            setLiveCaption("");
+            sendTranscriptSegment(activeMeetingId, pendingDelta, "Speaker");
+          }, 850);
+        }
+      },
       onFinal: (fullText: string) => {
+        if (interimCommitTimerRef.current) {
+          window.clearTimeout(interimCommitTimerRef.current);
+          interimCommitTimerRef.current = null;
+        }
         const prevSent = lastSentFinalRef.current;
         const delta = fullText.startsWith(prevSent)
           ? fullText.slice(prevSent.length).trim()
@@ -229,18 +281,20 @@ export function MeetingsScreen() {
         }
       },
       onError: (msg: string) => {
-        showToast("error", `Mic error: ${msg}`);
-        setIsListening(false);
+        if (msg !== "no-speech" && msg !== "aborted") {
+          showToast("error", `Mic error: ${msg}`);
+        }
+        stopAudioCapture();
       },
-      onEnd: () => setIsListening(false),
+      onEnd: () => {
+        stopAudioCapture();
+      },
     });
   };
 
   const handleStopAndSummarise = async () => {
     if (!selected) return;
-    voiceHandleRef.current?.stop();
-    voiceHandleRef.current = null;
-    setIsListening(false);
+    stopAudioCapture();
     try {
       const res = await apiClient.stopMeeting(selected.id);
       setSelected(res.data.meeting);
@@ -471,21 +525,42 @@ export function MeetingsScreen() {
 
             <div className="min-w-0 flex-1">
               <div className="mb-1.5 flex items-center justify-between font-mono text-[10px] text-zinc-500">
-                <span>{isListening ? "LIVE CAPTURE" : `${selected.transcriptCount} SEGMENTS`}</span>
+                <span className="flex items-center gap-2">
+                  <span>{isListening ? "LIVE CAPTURE" : `${selected.transcriptCount} SEGMENTS`}</span>
+                  {isListening && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[#00D4FF]/15 px-2 py-0.2 text-[9px] font-semibold text-[#00D4FF]">
+                      <span className="h-1.5 w-1.5 animate-ping rounded-full bg-[#00D4FF]" />
+                      {Math.max(...waveLevels) > 0.45
+                        ? "SOUND: HIGH"
+                        : Math.max(...waveLevels) > 0.22
+                          ? "SOUND: ACTIVE"
+                          : "SOUND: LOW"}
+                    </span>
+                  )}
+                </span>
                 <span>{selected.status.toUpperCase()}</span>
               </div>
-              <div className="flex h-6 items-center gap-1.5 overflow-hidden">
-                {WAVE_BARS.map((h, i) => {
-                  const activeBar = isListening ? true : i < Math.min(WAVE_BARS.length, Math.max(6, selected.transcriptCount * 3));
+              <div className="flex h-7 items-center gap-1.5 overflow-hidden">
+                {WAVE_BARS.map((baseH, i) => {
+                  const activeBar = isListening
+                    ? true
+                    : i < Math.min(WAVE_BARS.length, Math.max(6, selected.transcriptCount * 3));
+                  const level = waveLevels[i] ?? 0.16;
+                  const liveHeight = isListening
+                    ? Math.max(5, Math.min(28, Math.round(4 + level * 24)))
+                    : baseH;
+                  const isLoudPeak = isListening && level > 0.42;
                   return (
                     <span
                       key={i}
-                      style={{ height: `${h}px` }}
-                      className={`w-2 flex-1 rounded-full transition-all ${
+                      style={{ height: `${liveHeight}px` }}
+                      className={`w-2 flex-1 rounded-full transition-all duration-75 ${
                         activeBar
-                          ? "bg-[#00D4FF]"
+                          ? isLoudPeak
+                            ? "bg-gradient-to-t from-[#0094E8] to-[#00E5FF] shadow-[0_0_10px_rgba(0,212,255,0.65)]"
+                            : "bg-[#00D4FF]"
                           : "bg-slate-600/40"
-                      } ${isListening ? "animate-pulse" : ""}`}
+                      }`}
                     />
                   );
                 })}

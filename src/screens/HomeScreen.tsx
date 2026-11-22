@@ -298,7 +298,7 @@ export function HomeScreen() {
         if (text.trim()) {
           interimTimerRef.current = window.setTimeout(() => {
             commitVoiceText(text);
-          }, 1400);
+          }, 850);
         }
       },
       onFinal: (text: string) => {

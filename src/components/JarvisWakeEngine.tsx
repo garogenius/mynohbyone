@@ -373,12 +373,12 @@ export function JarvisWakeEngine() {
             if (interimCommitTimerRef.current) {
               window.clearTimeout(interimCommitTimerRef.current);
             }
-            // If Chrome STT pauses for 1.3s without emitting isFinal, commit immediately
+            // If Chrome STT pauses for 850ms without emitting isFinal, commit immediately
             interimCommitTimerRef.current = window.setTimeout(() => {
               if (unmounted || busyRef.current) return;
               lastProcessedRef.current = text;
               handleUtteranceChunk(pendingDelta);
-            }, 1300);
+            }, 850);
           }
         },
         onFinal: (fullText: string) => {

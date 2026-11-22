@@ -212,42 +212,56 @@ export function startLocalVoiceRecognition(options: {
 }
 
 export async function startMicLevelMonitor(
-  onLevels: (bars: number[]) => void
+  onLevels: (bars: number[]) => void,
+  barCount = 12
 ): Promise<() => void> {
   if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
     return () => {};
   }
 
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-  const audioCtx = new AudioCtx();
-  const source = audioCtx.createMediaStreamSource(stream);
-  const analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 64;
-  source.connect(analyser);
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const audioCtx = new AudioCtx();
+    const source = audioCtx.createMediaStreamSource(stream);
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 128;
+    analyser.smoothingTimeConstant = 0.65;
+    source.connect(analyser);
 
-  const data = new Uint8Array(analyser.frequencyBinCount);
-  let rafId = 0;
-  let active = true;
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    let rafId = 0;
+    let active = true;
 
-  const loop = () => {
-    if (!active) return;
-    analyser.getByteFrequencyData(data);
-    const bars = Array.from({ length: 12 }, (_, i) => {
-      const raw = data[i + 1] ?? 0;
-      return Math.max(0.12, Math.min(1, raw / 180));
-    });
-    onLevels(bars);
-    rafId = window.requestAnimationFrame(loop);
-  };
-  loop();
+    const loop = () => {
+      if (!active) return;
+      analyser.getByteFrequencyData(data);
+      const binCount = Math.max(8, Math.min(data.length - 2, 36));
+      const bars = Array.from({ length: barCount }, (_, i) => {
+        // Mirror across center for a natural symmetrical voice equalizer wave
+        const distFromCenter = Math.abs(i - (barCount - 1) / 2) / Math.max(1, (barCount - 1) / 2);
+        const binIndex = 1 + Math.floor(distFromCenter * (binCount - 2));
+        const raw = data[binIndex] ?? 0;
+        const neighbor = data[Math.min(data.length - 1, binIndex + 1)] ?? raw;
+        const avg = (raw * 0.65 + neighbor * 0.35) / 155;
+        return Math.max(0.14, Math.min(1, avg));
+      });
+      onLevels(bars);
+      rafId = window.requestAnimationFrame(loop);
+    };
+    loop();
 
-  return () => {
-    active = false;
-    if (rafId) window.cancelAnimationFrame(rafId);
-    stream.getTracks().forEach((t) => t.stop());
-    audioCtx.close().catch(() => {});
-  };
+    return () => {
+      active = false;
+      if (rafId) window.cancelAnimationFrame(rafId);
+      stream.getTracks().forEach((t) => t.stop());
+      audioCtx.close().catch(() => {});
+    };
+  } catch {
+    return () => {};
+  }
 }
 
 export const SUPPORTED_LANGUAGES = [
