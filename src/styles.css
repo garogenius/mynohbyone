@@ -316,3 +316,83 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 118, 150, 0.42);
 }
+
+/* ============================================================
+   Nohby ONE Luminous Design System (Matching Reference UI)
+   ============================================================ */
+.nohby-frame {
+  position: relative;
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(16, 22, 36, 0.96) 0%, rgba(11, 15, 25, 0.98) 100%) padding-box,
+    linear-gradient(135deg, rgba(0, 212, 255, 0.45), rgba(0, 102, 255, 0.28) 50%, rgba(139, 92, 246, 0.45)) border-box;
+  border: 1px solid transparent;
+  box-shadow: 0 12px 34px -16px rgba(0, 102, 255, 0.28);
+}
+
+[data-theme="light"] .nohby-frame {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f8fafd 100%) padding-box,
+    linear-gradient(135deg, rgba(0, 148, 232, 0.35), rgba(0, 92, 230, 0.25) 50%, rgba(124, 58, 237, 0.32)) border-box;
+  box-shadow: 0 10px 26px -14px rgba(8, 20, 46, 0.12);
+}
+
+.nohby-stage {
+  position: relative;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(0, 140, 255, 0.16) 0%, rgba(139, 92, 246, 0.08) 34%, rgba(10, 14, 24, 0.98) 70%) padding-box,
+    linear-gradient(135deg, rgba(0, 212, 255, 0.42), rgba(0, 102, 255, 0.22) 50%, rgba(139, 92, 246, 0.42)) border-box;
+  border: 1px solid transparent;
+  box-shadow: 0 20px 50px -24px rgba(0, 102, 255, 0.35);
+}
+
+[data-theme="light"] .nohby-stage {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(0, 148, 232, 0.1) 0%, rgba(124, 58, 237, 0.05) 38%, #ffffff 74%) padding-box,
+    linear-gradient(135deg, rgba(0, 148, 232, 0.4), rgba(0, 92, 230, 0.22) 50%, rgba(124, 58, 237, 0.36)) border-box;
+  box-shadow: 0 16px 36px -18px rgba(8, 20, 46, 0.14);
+}
+
+.nohby-dock {
+  background:
+    linear-gradient(180deg, rgba(17, 24, 39, 0.92) 0%, rgba(10, 15, 26, 0.96) 100%) padding-box,
+    linear-gradient(90deg, rgba(0, 212, 255, 0.55), rgba(0, 102, 255, 0.35), rgba(168, 85, 247, 0.55)) border-box;
+  border: 1px solid transparent;
+  box-shadow: 0 12px 32px -12px rgba(0, 180, 255, 0.32);
+}
+
+[data-theme="light"] .nohby-dock {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f1f5fb 100%) padding-box,
+    linear-gradient(90deg, rgba(0, 148, 232, 0.45), rgba(0, 92, 230, 0.32), rgba(124, 58, 237, 0.45)) border-box;
+  box-shadow: 0 10px 26px -12px rgba(8, 20, 46, 0.16);
+}
+
+.nohby-bubble-ai {
+  background:
+    linear-gradient(135deg, rgba(16, 48, 72, 0.85) 0%, rgba(44, 34, 78, 0.85) 100%) padding-box,
+    linear-gradient(135deg, rgba(0, 212, 255, 0.65), rgba(168, 85, 247, 0.65)) border-box;
+  border: 1px solid transparent;
+}
+
+[data-theme="light"] .nohby-bubble-ai {
+  background:
+    linear-gradient(135deg, rgba(224, 244, 255, 0.95) 0%, rgba(238, 232, 255, 0.95) 100%) padding-box,
+    linear-gradient(135deg, rgba(0, 148, 232, 0.5), rgba(124, 58, 237, 0.45)) border-box;
+}
+
+.nohby-nav-active {
+  background:
+    linear-gradient(90deg, rgba(0, 212, 255, 0.22) 0%, rgba(0, 102, 255, 0.16) 55%, rgba(168, 85, 247, 0.24) 100%) padding-box,
+    linear-gradient(90deg, rgba(0, 212, 255, 0.6), rgba(168, 85, 247, 0.55)) border-box;
+  border: 1px solid transparent;
+  box-shadow: 0 6px 20px -10px rgba(0, 212, 255, 0.45);
+}
+
+[data-theme="light"] .nohby-nav-active {
+  background:
+    linear-gradient(90deg, rgba(0, 148, 232, 0.14) 0%, rgba(0, 92, 230, 0.1) 55%, rgba(124, 58, 237, 0.14) 100%) padding-box,
+    linear-gradient(90deg, rgba(0, 148, 232, 0.45), rgba(124, 58, 237, 0.4)) border-box;
+}
+

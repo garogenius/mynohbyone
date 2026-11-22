@@ -179,12 +179,35 @@ fn execute_local_step(
     }
 }
 
+#[tauri::command]
+fn set_stealth_mode(window: tauri::WebviewWindow, enabled: bool) -> Result<bool, String> {
+    // Exclude window from OS screen capture / Zoom / Teams / Google Meet screen sharing
+    window
+        .set_content_protected(enabled)
+        .map_err(|e| format!("Failed to update screen-capture protection: {}", e))?;
+    // Hide window from OS taskbar / switcher while in stealth meeting mode
+    let _ = window.set_skip_taskbar(enabled);
+    // Keep floating discreetly on top when enabled so user can read hints without switching windows
+    let _ = window.set_always_on_top(enabled);
+    Ok(enabled)
+}
+
+#[tauri::command]
+fn hide_to_background(window: tauri::WebviewWindow) -> Result<bool, String> {
+    window
+        .hide()
+        .map_err(|e| format!("Failed to hide window to background: {}", e))?;
+    Ok(true)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             get_local_device_identity,
-            execute_local_step
+            execute_local_step,
+            set_stealth_mode,
+            hide_to_background
         ])
         .run(tauri::generate_context!())
         .expect("error while running Nohby ONE desktop application");

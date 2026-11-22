@@ -286,6 +286,69 @@ export interface KnowledgeSearchMatch {
   excerpt: string;
 }
 
+export interface IntegrationProviderSpec {
+  provider: string;
+  displayName: string;
+  category: "email" | "meetings" | "social" | "calendar" | "plugins" | string;
+  description: string;
+  defaultScopes: string[];
+  authType: string;
+  accountPlaceholder: string;
+}
+
+export interface IntegrationItem {
+  id: string;
+  userId: string;
+  provider: string;
+  category: string;
+  displayName: string;
+  accountLabel: string | null;
+  grantedScopes: string[];
+  status: "connected" | "disconnected" | string;
+  connectedAt: string;
+  lastSyncedAt: string | null;
+  disconnectedAt: string | null;
+}
+
+export interface MeetingTranscriptItem {
+  id: string;
+  speaker: string;
+  content: string;
+  aiHint: string | null;
+  createdAt: string;
+}
+
+export interface MeetingItem {
+  id: string;
+  userId: string;
+  title: string;
+  meetingType: "interview" | "meeting" | "standup" | "client_call" | string;
+  provider: string;
+  status: "scheduled" | "listening" | "completed" | string;
+  stealthMode: boolean;
+  consentStatus: string;
+  summary: string | null;
+  actionItems: string[];
+  transcriptCount: number;
+  startedAt: string;
+  endedAt: string | null;
+  createdAt: string;
+  transcripts?: MeetingTranscriptItem[];
+}
+
+export interface MemoryItem {
+  id: string;
+  userId: string;
+  category: "preference" | "project" | "fact" | "contact" | "workflow" | string;
+  title: string;
+  content: string;
+  tags: string[];
+  source: string;
+  userConfirmed: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type NavRoute =
   | "home"
   | "assistant"

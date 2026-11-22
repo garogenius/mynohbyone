@@ -239,11 +239,50 @@ describe("Nohby ONE Frontend -> Backend E2E Integration (Phase 0, 1 & 2)", () =>
     const deletedFile = await apiClient.deleteFile(fileId);
     expect(deletedFile.data.deleted).toBe(true);
 
+    // Phase 7-9: Integrations, Meetings Stealth Mode, and Personal Memory
+    const availIntegs = await apiClient.listAvailableIntegrations();
+    expect(availIntegs.data.providers.length).toBeGreaterThanOrEqual(12);
+
+    const connInteg = await apiClient.connectIntegration("gmail", {
+      accountLabel: "e2e@gmail.com",
+    });
+    const integId = connInteg.data.integration.id;
+    expect(connInteg.data.integration.status).toBe("connected");
+    await apiClient.syncIntegration(integId);
+    await apiClient.disconnectIntegration(integId);
+
+    const meeting = await apiClient.createMeeting({
+      title: "E2E Stealth Interview",
+      meetingType: "interview",
+      provider: "zoom",
+      stealthMode: true,
+    });
+    const meetingId = meeting.data.meeting.id;
+    expect(meeting.data.meeting.stealthMode).toBe(true);
+    const seg = await apiClient.appendMeetingTranscript(meetingId, {
+      speaker: "Interviewer",
+      content: "Tell me about yourself and system design experience.",
+    });
+    expect(seg.data.transcript.aiHint).toBeTruthy();
+    const stoppedM = await apiClient.stopMeeting(meetingId);
+    expect(stoppedM.data.meeting.status).toBe("completed");
+    await apiClient.deleteMeeting(meetingId);
+
+    const mem = await apiClient.createMemory({
+      category: "project",
+      title: "Hydra Sync",
+      content: "Nohby ONE real-time workspace sync",
+      tags: ["Hydra", "Sync"],
+    });
+    const memSearch = await apiClient.searchMemories("Hydra");
+    expect(memSearch.data.results.some((m) => m.id === mem.data.memory.id)).toBe(true);
+    await apiClient.deleteMemory(mem.data.memory.id);
+
     // Revoke device & logout
     const revoked = await apiClient.revokeDevice(deviceId);
     expect(revoked.data.device.status).toBe("revoked");
 
     const out = await apiClient.logout(tokenStorage.getSession().refreshToken);
     expect(out.data.revokedSessions).toBe(1);
-  }, 35000);
+  }, 40000);
 });

@@ -13,9 +13,11 @@ import { DeviceOnboardingScreen } from "./screens/DeviceOnboardingScreen";
 import { DevicesScreen } from "./screens/DevicesScreen";
 import { FilesScreen } from "./screens/FilesScreen";
 import { HomeScreen } from "./screens/HomeScreen";
+import { IntegrationsScreen } from "./screens/IntegrationsScreen";
+import { MeetingsScreen } from "./screens/MeetingsScreen";
+import { MemoryScreen } from "./screens/MemoryScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { TasksScreen } from "./screens/TasksScreen";
-import { UpcomingModuleScreen } from "./screens/UpcomingModuleScreen";
 import { useAppStore } from "./store/useAppStore";
 
 export function App() {
@@ -141,14 +143,12 @@ export function App() {
             >
               {activeRoute === "home" && <HomeScreen />}
               {activeRoute === "tasks" && <TasksScreen />}
+              {activeRoute === "meetings" && <MeetingsScreen />}
+              {activeRoute === "integrations" && <IntegrationsScreen />}
               {activeRoute === "files" && <FilesScreen />}
+              {activeRoute === "memory" && <MemoryScreen />}
               {activeRoute === "devices" && <DevicesScreen />}
               {activeRoute === "settings" && <SettingsScreen />}
-              {activeRoute !== "home" &&
-                activeRoute !== "tasks" &&
-                activeRoute !== "files" &&
-                activeRoute !== "devices" &&
-                activeRoute !== "settings" && <UpcomingModuleScreen route={activeRoute} />}
             </motion.div>
           </AnimatePresence>
         </main>

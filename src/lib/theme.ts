@@ -4,10 +4,10 @@ export type ResolvedTheme = "light" | "dark";
 const STORAGE_KEY = "nohbyone.theme";
 
 export function getStoredTheme(): ThemePreference {
-  if (typeof window === "undefined") return "light";
+  if (typeof window === "undefined") return "dark";
   const val = localStorage.getItem(STORAGE_KEY);
   if (val === "light" || val === "dark" || val === "system") return val;
-  return "light";
+  return "dark";
 }
 
 export function resolveTheme(pref: ThemePreference): ResolvedTheme {

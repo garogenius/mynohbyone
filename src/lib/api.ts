@@ -12,8 +12,13 @@ import type {
   FileExtractionResult,
   FileItem,
   HealthData,
+  IntegrationItem,
+  IntegrationProviderSpec,
   InterpretationResult,
   KnowledgeSearchMatch,
+  MeetingItem,
+  MeetingTranscriptItem,
+  MemoryItem,
   Message,
   Permission,
   SendMessageResponseData,
@@ -628,6 +633,120 @@ export const apiClient = {
     }>("/knowledge/search", {
       method: "POST",
       body: JSON.stringify(payload),
+    });
+  },
+
+  // Phase 7: Integrations (Social Media, Meetings, Email, Calendar, Plugins)
+  listAvailableIntegrations() {
+    return request<{ providers: IntegrationProviderSpec[] }>("/integrations/available", {
+      method: "GET",
+    });
+  },
+
+  listIntegrations() {
+    return request<{ integrations: IntegrationItem[] }>("/integrations", { method: "GET" });
+  },
+
+  connectIntegration(
+    provider: string,
+    payload: { accountLabel: string; scopes?: string[]; config?: Record<string, unknown> }
+  ) {
+    return request<{ integration: IntegrationItem }>(`/integrations/${provider}/connect`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  syncIntegration(integrationId: string) {
+    return request<{ integration: IntegrationItem }>(`/integrations/${integrationId}/sync`, {
+      method: "POST",
+    });
+  },
+
+  disconnectIntegration(integrationId: string) {
+    return request<{ disconnected: boolean; id: string }>(`/integrations/${integrationId}`, {
+      method: "DELETE",
+    });
+  },
+
+  // Phase 8: Meetings & Stealth Background Interview Assistant
+  listMeetings() {
+    return request<{ meetings: MeetingItem[] }>("/meetings", { method: "GET" });
+  },
+
+  createMeeting(payload: {
+    title: string;
+    meetingType?: "interview" | "meeting" | "standup" | "client_call";
+    provider?: string;
+    stealthMode?: boolean;
+  }) {
+    return request<{ meeting: MeetingItem }>("/meetings", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  getMeeting(meetingId: string) {
+    return request<{ meeting: MeetingItem }>(`/meetings/${meetingId}`, { method: "GET" });
+  },
+
+  toggleMeetingStealth(meetingId: string, stealthMode: boolean) {
+    return request<{ meeting: MeetingItem }>(`/meetings/${meetingId}/stealth`, {
+      method: "POST",
+      body: JSON.stringify({ stealthMode }),
+    });
+  },
+
+  appendMeetingTranscript(
+    meetingId: string,
+    payload: { speaker?: string; content: string }
+  ) {
+    return request<{ transcript: MeetingTranscriptItem }>(`/meetings/${meetingId}/transcript`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  stopMeeting(meetingId: string) {
+    return request<{ meeting: MeetingItem }>(`/meetings/${meetingId}/stop`, {
+      method: "POST",
+    });
+  },
+
+  deleteMeeting(meetingId: string) {
+    return request<{ deleted: boolean; id: string }>(`/meetings/${meetingId}`, {
+      method: "DELETE",
+    });
+  },
+
+  // Phase 9: Personal Memory & Context
+  listMemories(category?: string) {
+    const suffix = category ? `?category=${encodeURIComponent(category)}` : "";
+    return request<{ memories: MemoryItem[] }>(`/memory${suffix}`, { method: "GET" });
+  },
+
+  createMemory(payload: {
+    category: "preference" | "project" | "fact" | "contact" | "workflow";
+    title: string;
+    content: string;
+    tags?: string[];
+  }) {
+    return request<{ memory: MemoryItem }>("/memory", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteMemory(memoryId: string) {
+    return request<{ deleted: boolean; id: string }>(`/memory/${memoryId}`, {
+      method: "DELETE",
+    });
+  },
+
+  searchMemories(query: string, limit = 10) {
+    return request<{ query: string; results: MemoryItem[] }>("/memory/search", {
+      method: "POST",
+      body: JSON.stringify({ query, limit }),
     });
   },
 };
