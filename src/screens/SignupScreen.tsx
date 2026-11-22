@@ -66,7 +66,7 @@ export function SignupScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
         poster="/nohby-studio-2.jpg"
         className="pointer-events-none fixed inset-0 h-full w-full object-cover object-center opacity-80"
       >
-        <source src="/nohby-signup-bg.mp4" type="video/mp4" />
+        <source src="/signup-video.mp4" type="video/mp4" />
       </video>
 
       {/* NohbyOne Cobalt Blue & Deep Navy atmospheric color overlay */}
