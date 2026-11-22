@@ -49,7 +49,7 @@ function SidebarContent({
   return (
     <div className="flex h-full w-48 flex-col border-r border-white/[0.08] bg-[#0B101B]">
       {/* Compact Logo Header */}
-      <div className="flex h-12 items-center justify-between px-3">
+      <div className="flex h-14 items-center justify-between px-3">
         <button
           type="button"
           onClick={() => {
@@ -59,7 +59,7 @@ function SidebarContent({
           className="flex items-center focus:outline-none"
           aria-label="NohbyOne Home"
         >
-          <BrandMark variant="logo" size="md" />
+          <BrandMark variant="logo" size="lg" />
         </button>
 
         {onClose && (

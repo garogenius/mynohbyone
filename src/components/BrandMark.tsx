@@ -26,8 +26,17 @@ export function BrandMark({
   const isDark = forceDark || resolved === "dark";
 
   if (variant === "logo") {
-    const heightClass =
-      size === "sm" ? "h-6" : size === "lg" ? "h-9" : "h-7";
+    const heightClass = isDark
+      ? size === "sm"
+        ? "h-6"
+        : size === "lg"
+          ? "h-9"
+          : "h-7"
+      : size === "sm"
+        ? "h-8"
+        : size === "lg"
+          ? "h-12"
+          : "h-10";
     return (
       <img
         src={isDark ? "/logo-white.png" : "/logo-black.png"}

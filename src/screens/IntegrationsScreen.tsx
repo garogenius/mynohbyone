@@ -161,7 +161,7 @@ export function IntegrationsScreen() {
       {loading && providers.length === 0 ? (
         <LoadingState message="Loading integrations catalog..." />
       ) : (
-        <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-3 gap-2.5 sm:gap-3 lg:grid-cols-4">
           {filteredProviders.map((spec) => {
             const activeConn = connectedByProvider.get(spec.provider);
             const isConnected = Boolean(activeConn);
@@ -169,22 +169,24 @@ export function IntegrationsScreen() {
             return (
               <div
                 key={spec.provider}
-                className="nohby-frame flex flex-col justify-between p-4 transition hover:-translate-y-0.5"
+                className="nohby-frame flex flex-col justify-between p-2.5 sm:p-3.5 transition hover:-translate-y-0.5"
               >
                 <div>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <ProviderLogo provider={spec.provider} className="h-10 w-10 shrink-0 rounded-xl shadow" />
-                      <div>
-                        <h3 className="text-sm font-semibold text-white">{spec.displayName}</h3>
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+                  <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-start">
+                    <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
+                      <ProviderLogo provider={spec.provider} className="h-8 w-8 shrink-0 rounded-lg shadow sm:h-9 sm:w-9" />
+                      <div className="min-w-0">
+                        <h3 className="truncate text-xs font-semibold text-white sm:text-[13px]">
+                          {spec.displayName}
+                        </h3>
+                        <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">
                           {spec.category}
                         </span>
                       </div>
                     </div>
 
                     <span
-                      className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-medium ${
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-medium ${
                         isConnected
                           ? "bg-emerald-500/15 text-emerald-400"
                           : "bg-white/[0.06] text-zinc-400"
@@ -194,44 +196,43 @@ export function IntegrationsScreen() {
                     </span>
                   </div>
 
-                  <p className="mt-3 text-xs leading-relaxed text-zinc-400">{spec.description}</p>
+                  <p className="mt-2 hidden text-[11px] leading-relaxed text-zinc-400 sm:line-clamp-2 sm:block">
+                    {spec.description}
+                  </p>
 
                   {activeConn && (
-                    <div className="mt-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-[11px]">
-                      <p className="truncate font-medium text-emerald-300">
-                        Account: {activeConn.accountLabel}
-                      </p>
-                      <p className="mt-0.5 text-[10px] text-zinc-500">
-                        Scopes: {activeConn.grantedScopes.join(", ")}
+                    <div className="mt-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-2 py-1.5 text-[10px]">
+                      <p className="truncate font-medium text-emerald-400">
+                        {activeConn.accountLabel}
                       </p>
                     </div>
                   )}
                 </div>
 
-                <div className="mt-4 flex items-center gap-2 border-t border-white/[0.06] pt-3">
+                <div className="mt-2.5 flex items-center gap-1.5 border-t border-white/[0.06] pt-2.5 sm:mt-3">
                   {activeConn ? (
                     <>
                       <button
                         type="button"
                         disabled={actingId === activeConn.id}
                         onClick={() => handleSync(activeConn)}
-                        className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#00D4FF]/35 bg-[#00D4FF]/10 px-3 text-xs font-medium text-[#00D4FF] transition hover:bg-[#00D4FF]/20"
+                        className="inline-flex h-7 flex-1 items-center justify-center gap-1 rounded-lg border border-[#00D4FF]/35 bg-[#00D4FF]/10 px-2 text-[11px] font-medium text-[#00D4FF] transition hover:bg-[#00D4FF]/20"
                       >
                         {actingId === activeConn.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <Loader2 className="h-3 w-3 animate-spin" />
                         ) : (
-                          <RefreshCw className="h-3.5 w-3.5" />
+                          <RefreshCw className="h-3 w-3" />
                         )}
-                        Sync Now
+                        <span className="hidden sm:inline">Sync</span>
                       </button>
                       <button
                         type="button"
                         disabled={actingId === activeConn.id}
                         onClick={() => handleDisconnect(activeConn)}
-                        className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 text-xs text-rose-400 transition hover:bg-rose-500/20"
+                        className="inline-flex h-7 items-center justify-center gap-1 rounded-lg border border-rose-500/30 bg-rose-500/10 px-2 text-[11px] text-rose-400 transition hover:bg-rose-500/20"
+                        title="Disconnect"
                       >
-                        <Unplug className="h-3.5 w-3.5" />
-                        Disconnect
+                        <Unplug className="h-3 w-3" />
                       </button>
                     </>
                   ) : (
@@ -241,10 +242,10 @@ export function IntegrationsScreen() {
                         setConnectingProvider(spec);
                         setAccountLabel("");
                       }}
-                      className="btn-ivory inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg px-3 text-xs"
+                      className="btn-ivory inline-flex h-7 w-full items-center justify-center gap-1 rounded-lg px-2 text-[11px]"
                     >
-                      <Plug className="h-3.5 w-3.5" />
-                      Connect {spec.displayName}
+                      <Plug className="h-3 w-3 shrink-0" />
+                      <span className="truncate">Connect</span>
                     </button>
                   )}
                 </div>
