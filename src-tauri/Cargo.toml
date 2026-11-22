@@ -1,0 +1,18 @@
+[package]
+name = "nohby-one-desktop"
+version = "0.1.0"
+description = "Nohby ONE Desktop Application — Local-First Personal AI Operating Assistant"
+authors = ["Nohby Technologies Limited"]
+edition = "2021"
+
+[lib]
+name = "nohby_one_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
