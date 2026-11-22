@@ -94,7 +94,7 @@ export function HomeScreen() {
   ).length;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
+    <div className="w-full space-y-4">
       {/* Greeting & Quick Command Bar */}
       <section className="rounded-xl border border-white/[0.08] bg-[#111318] p-5">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">

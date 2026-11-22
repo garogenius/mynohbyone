@@ -214,7 +214,7 @@ export function TasksScreen() {
     statusFilter === "all" ? tasks : tasks.filter((t) => t.status === statusFilter);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="w-full space-y-4">
       {/* Top tabs + refresh */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="inline-flex rounded-lg border border-white/[0.08] bg-[#111318] p-1">

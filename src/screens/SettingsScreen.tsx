@@ -114,7 +114,7 @@ export function SettingsScreen() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div className="w-full max-w-5xl space-y-4">
       {/* Appearance */}
       <section className="rounded-2xl border border-white/[0.08] bg-[#111318] p-5 sm:p-6">
         <h2 className="text-sm font-semibold text-white">Appearance</h2>

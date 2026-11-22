@@ -28,7 +28,7 @@ export function DevicesScreen() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="w-full space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-slate-100">Authorised Desktop Devices</h2>
