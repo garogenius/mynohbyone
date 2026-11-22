@@ -814,6 +814,21 @@ export const apiClient = {
     });
   },
 
+  updateMemory(
+    memoryId: string,
+    payload: {
+      category?: "preference" | "project" | "fact" | "contact" | "workflow";
+      title?: string;
+      content?: string;
+      tags?: string[];
+    }
+  ) {
+    return request<{ memory: MemoryItem }>(`/memory/${memoryId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+
   deleteMemory(memoryId: string) {
     return request<{ deleted: boolean; id: string }>(`/memory/${memoryId}`, {
       method: "DELETE",
