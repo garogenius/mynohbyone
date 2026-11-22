@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  AlertTriangle,
   CheckCircle2,
   Clock,
+  Cpu,
   Loader2,
   Pause,
   Play,
@@ -15,6 +17,7 @@ import {
 
 import { EmptyState, LoadingState } from "../components/StateViews";
 import { ApiError, apiClient } from "../lib/api";
+import { executeTaskLocally } from "../lib/localAgent";
 import { useAppStore } from "../store/useAppStore";
 import type { Approval, Permission, Task, TaskEvent } from "../types/api";
 
@@ -149,6 +152,36 @@ export function TasksScreen() {
       await selectTask(taskId);
     } catch (err) {
       showToast("error", err instanceof ApiError ? err.message : `Failed to ${action} task.`);
+    } finally {
+      setActingId(null);
+    }
+  };
+
+  const handleRunLocally = async (task: Task) => {
+    if (!currentDeviceId) {
+      showToast("error", "No active local device registered. Open Devices to register this machine.");
+      return;
+    }
+    setActingId(task.id);
+    try {
+      const completed = await executeTaskLocally(task, currentDeviceId, (updated) => {
+        setSelectedTask(updated);
+        setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      });
+      showToast("success", "Task executed and verified on this device.");
+      await loadAll();
+      await selectTask(completed.id);
+    } catch (err) {
+      showToast(
+        "error",
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Local execution failed."
+      );
+      await loadAll();
+      await selectTask(task.id);
     } finally {
       setActingId(null);
     }
@@ -290,7 +323,7 @@ export function TasksScreen() {
 
           {/* Status filters */}
           <div className="flex flex-wrap gap-1.5">
-            {["all", "awaiting_approval", "queued", "paused", "completed", "cancelled"].map((st) => (
+            {["all", "awaiting_approval", "queued", "running", "paused", "completed", "failed", "cancelled"].map((st) => (
               <button
                 key={st}
                 type="button"
@@ -375,7 +408,28 @@ export function TasksScreen() {
                         </h3>
                       </div>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {selectedTask.status === "queued" &&
+                          !selectedTask.approvals.some((a) => a.status === "pending") && (
+                            <button
+                              type="button"
+                              disabled={actingId === selectedTask.id || !currentDeviceId}
+                              onClick={() => handleRunLocally(selectedTask)}
+                              className="btn-ivory inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs"
+                              title={
+                                currentDeviceId
+                                  ? "Claim and execute this task on your local device"
+                                  : "Register a device first to execute tasks locally"
+                              }
+                            >
+                              {actingId === selectedTask.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Cpu className="h-3.5 w-3.5" />
+                              )}
+                              Run on This Device
+                            </button>
+                          )}
                         {(selectedTask.status === "queued" ||
                           selectedTask.status === "awaiting_approval" ||
                           selectedTask.status === "running") && (
@@ -398,7 +452,7 @@ export function TasksScreen() {
                             <Play className="h-3 w-3" /> Resume
                           </button>
                         )}
-                        {!["completed", "cancelled"].includes(selectedTask.status) && (
+                        {!["completed", "cancelled", "failed"].includes(selectedTask.status) && (
                           <button
                             type="button"
                             disabled={actingId === selectedTask.id}
@@ -410,6 +464,53 @@ export function TasksScreen() {
                         )}
                       </div>
                     </div>
+
+                    {/* Verified Execution Result & Evidence (Phase 5) */}
+                    {selectedTask.status === "completed" && selectedTask.result && (
+                      <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5">
+                        <div className="flex items-start gap-2.5">
+                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <p className="text-xs font-semibold text-white">
+                              Verified Execution Result
+                            </p>
+                            <p className="text-xs text-zinc-300">
+                              {String(selectedTask.result.summary || "Task completed successfully.")}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 font-mono text-[10px] text-zinc-400">
+                              {selectedTask.result.executedByDeviceName ? (
+                                <span>
+                                  Device: {String(selectedTask.result.executedByDeviceName)}
+                                </span>
+                              ) : null}
+                              {selectedTask.result.verifiedAt ? (
+                                <span>
+                                  Verified: {formatTimestamp(String(selectedTask.result.verifiedAt))}
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Execution Failure Banner */}
+                    {selectedTask.status === "failed" && (
+                      <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3.5">
+                        <div className="flex items-start gap-2.5">
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <p className="text-xs font-semibold text-white">
+                              Execution Failed
+                              {selectedTask.errorCode ? ` (${selectedTask.errorCode})` : ""}
+                            </p>
+                            <p className="text-xs text-rose-300">
+                              {selectedTask.errorMessage || "An error occurred during local execution."}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Inline pending approvals for this task */}
                     {selectedTask.approvals
@@ -464,26 +565,33 @@ export function TasksScreen() {
                         {selectedTask.steps.map((step) => (
                           <li
                             key={step.id}
-                            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/[0.07] bg-[#171A21] px-3 py-2 text-xs"
+                            className="rounded-lg border border-white/[0.07] bg-[#171A21] px-3 py-2 text-xs"
                           >
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-[11px] text-zinc-500">
-                                {step.sequenceNumber}.
-                              </span>
-                              <code className="text-indigo-400">
-                                {step.toolName}.{step.action}
-                              </code>
-                              <span className="text-zinc-300">
-                                {String(step.inputData.description || "")}
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-[11px] text-zinc-500">
+                                  {step.sequenceNumber}.
+                                </span>
+                                <code className="text-indigo-400">
+                                  {step.toolName}.{step.action}
+                                </code>
+                                <span className="text-zinc-300">
+                                  {String(step.inputData.description || "")}
+                                </span>
+                              </div>
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${
+                                  STATUS_BADGE[step.status] || "bg-zinc-500/15 text-zinc-400"
+                                }`}
+                              >
+                                {step.status.replace("_", " ")}
                               </span>
                             </div>
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${
-                                STATUS_BADGE[step.status] || "bg-zinc-500/15 text-zinc-400"
-                              }`}
-                            >
-                              {step.status.replace("_", " ")}
-                            </span>
+                            {step.outputData && typeof step.outputData.summary === "string" && (
+                              <p className="mt-1.5 border-t border-white/[0.06] pt-1.5 text-[11px] text-emerald-400">
+                                {step.outputData.summary}
+                              </p>
+                            )}
                           </li>
                         ))}
                       </ol>

@@ -229,6 +229,26 @@ export interface Task {
   approvals: Approval[];
 }
 
+export interface ToolDefinition {
+  name: string;
+  resource: string;
+  action: string;
+  riskLevel: "low" | "medium" | "high" | string;
+  executionTarget: "local_agent" | "cloud_backend" | string;
+  requiredCapability: string;
+  requiresApproval: boolean;
+  description: string;
+}
+
+export interface AgentRegistrationInfo {
+  deviceId: string;
+  deviceName: string;
+  platform: string;
+  agentVersion: string;
+  capabilities: string[];
+  status: string;
+}
+
 export type NavRoute =
   | "home"
   | "assistant"

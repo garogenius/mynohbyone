@@ -1,5 +1,6 @@
 import { tokenStorage } from "./storage";
 import type {
+  AgentRegistrationInfo,
   ApiErrorDetail,
   ApiErrorResponse,
   ApiSuccessResponse,
@@ -16,6 +17,7 @@ import type {
   SpeechSynthesisResult,
   Task,
   TaskEvent,
+  ToolDefinition,
   TranscriptionResult,
   User,
   VoiceSettings,
@@ -456,6 +458,92 @@ export const apiClient = {
     return request<{ approval: Approval; task: Task }>(`/approvals/${approvalId}/reject`, {
       method: "POST",
       body: JSON.stringify({ reason }),
+    });
+  },
+
+  // Phase 5: Local Agent Execution Protocol & Automation
+  getAgentTools() {
+    return request<{ tools: ToolDefinition[] }>("/agent/tools", { method: "GET" });
+  },
+
+  registerAgent(payload: {
+    deviceId: string;
+    agentVersion?: string;
+    capabilities?: string[];
+  }) {
+    return request<{ agent: AgentRegistrationInfo; tools: ToolDefinition[] }>("/agent/register", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  agentHeartbeat(payload: {
+    deviceId: string;
+    agentVersion?: string;
+    status?: "idle" | "busy" | "paused";
+  }) {
+    return request<{ deviceId: string; status: string; lastSeenAt: string }>("/agent/heartbeat", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  getNextAgentTask(deviceId: string) {
+    return request<{ task: Task | null }>(
+      `/agent/tasks/next?deviceId=${encodeURIComponent(deviceId)}`,
+      { method: "GET" }
+    );
+  },
+
+  claimAgentTask(taskId: string, deviceId: string) {
+    return request<{ task: Task }>(`/agent/tasks/${taskId}/claim`, {
+      method: "POST",
+      body: JSON.stringify({ deviceId }),
+    });
+  },
+
+  reportAgentStepEvent(
+    taskId: string,
+    payload: {
+      deviceId: string;
+      stepId?: string | null;
+      eventType: "task.step.started" | "task.step.completed" | "task.step.failed" | "task.log";
+      outputData?: Record<string, unknown> | null;
+      message?: string | null;
+    }
+  ) {
+    return request<{ task: Task }>(`/agent/tasks/${taskId}/events`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  completeAgentTask(
+    taskId: string,
+    payload: {
+      deviceId: string;
+      summary: string;
+      evidence?: Record<string, unknown>;
+    }
+  ) {
+    return request<{ task: Task }>(`/agent/tasks/${taskId}/complete`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  failAgentTask(
+    taskId: string,
+    payload: {
+      deviceId: string;
+      errorCode?: string;
+      errorMessage: string;
+      stepId?: string | null;
+    }
+  ) {
+    return request<{ task: Task }>(`/agent/tasks/${taskId}/fail`, {
+      method: "POST",
+      body: JSON.stringify(payload),
     });
   },
 };

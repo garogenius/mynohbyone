@@ -156,11 +156,67 @@ describe("Nohby ONE Frontend -> Backend E2E Integration (Phase 0, 1 & 2)", () =>
     const permRevoked = await apiClient.revokePermission(permRes.data.permission.id);
     expect(permRevoked.data.permission.active).toBe(false);
 
+    // Phase 5: Local Agent Protocol (tools, register, heartbeat, next, claim, step events, complete)
+    const toolsRes = await apiClient.getAgentTools();
+    expect(toolsRes.data.tools.length).toBeGreaterThanOrEqual(10);
+
+    const agentReg = await apiClient.registerAgent({
+      deviceId,
+      agentVersion: "0.5.0",
+      capabilities: ["local_agent", "browser_automation"],
+    });
+    expect(agentReg.data.agent.status).toBe("ready");
+
+    const agentHb = await apiClient.agentHeartbeat({
+      deviceId,
+      agentVersion: "0.5.0",
+      status: "idle",
+    });
+    expect(agentHb.data.status).toBe("idle");
+
+    const lowRiskTaskRes = await apiClient.createTask({
+      instruction: "Open Chrome and research TypeScript 5.8 release notes",
+      deviceId,
+    });
+    const execTaskId = lowRiskTaskRes.data.task.id;
+    expect(lowRiskTaskRes.data.task.status).toBe("queued");
+
+    const nextTask = await apiClient.getNextAgentTask(deviceId);
+    expect(nextTask.data.task?.id).toBe(execTaskId);
+
+    const claimed = await apiClient.claimAgentTask(execTaskId, deviceId);
+    expect(claimed.data.task.status).toBe("running");
+
+    const firstStep = claimed.data.task.steps[0];
+    if (firstStep) {
+      await apiClient.reportAgentStepEvent(execTaskId, {
+        deviceId,
+        stepId: firstStep.id,
+        eventType: "task.step.started",
+        message: "Starting local step",
+      });
+      await apiClient.reportAgentStepEvent(execTaskId, {
+        deviceId,
+        stepId: firstStep.id,
+        eventType: "task.step.completed",
+        message: "Completed local step",
+        outputData: { verified: true },
+      });
+    }
+
+    const completed = await apiClient.completeAgentTask(execTaskId, {
+      deviceId,
+      summary: "Verified local agent execution end-to-end.",
+      evidence: { runtime: "e2e_test" },
+    });
+    expect(completed.data.task.status).toBe("completed");
+    expect(completed.data.task.result?.executedByDeviceId).toBe(deviceId);
+
     // Revoke device & logout
     const revoked = await apiClient.revokeDevice(deviceId);
     expect(revoked.data.device.status).toBe("revoked");
 
     const out = await apiClient.logout(tokenStorage.getSession().refreshToken);
     expect(out.data.revokedSessions).toBe(1);
-  }, 20000);
+  }, 30000);
 });
