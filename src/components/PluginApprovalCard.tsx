@@ -142,37 +142,37 @@ export function PluginApprovalCard({ action, onExecuted }: PluginApprovalCardPro
   };
 
   return (
-    <div className="my-2.5 overflow-hidden rounded-xl border border-white/[0.12] bg-[#0c121e] shadow-xl backdrop-blur-md transition">
+    <div className="my-2.5 overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-md dark:border-white/[0.12] dark:bg-[#0c121e] dark:shadow-xl transition">
       {/* Card Header */}
-      <div className="flex items-center justify-between border-b border-white/[0.08] bg-[#121929]/90 px-3.5 py-2.5">
+      <div className="flex items-center justify-between border-b border-zinc-200/80 bg-zinc-50/90 px-3.5 py-2.5 dark:border-white/[0.08] dark:bg-[#121929]/90">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 p-1">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-200 bg-white p-1 dark:border-transparent dark:bg-white/5">
             <ProviderLogo provider={provider} className="h-5 w-5 object-contain" />
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-semibold text-white">{getProviderTitle()}</span>
+              <span className="text-xs font-semibold text-zinc-900 dark:text-white">{getProviderTitle()}</span>
               {status === "pending" && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.2 text-[9px] font-medium text-amber-300">
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.2 text-[9px] font-medium text-amber-600 dark:text-amber-300">
                   <ShieldAlert className="h-2.5 w-2.5" />
                   Requires Approval
                 </span>
               )}
               {status === "delivered" && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.2 text-[9px] font-medium text-emerald-300">
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.2 text-[9px] font-medium text-emerald-700 dark:text-emerald-300">
                   <CheckCircle2 className="h-2.5 w-2.5" />
                   {isDirect ? "Dispatched Directly" : "Dispatched"}
                 </span>
               )}
               {status === "rejected" && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-zinc-500/30 bg-zinc-500/10 px-2 py-0.2 text-[9px] font-medium text-zinc-400">
+                <span className="inline-flex items-center gap-1 rounded-full border border-zinc-400/40 bg-zinc-200/50 px-2 py-0.2 text-[9px] font-medium text-zinc-600 dark:border-zinc-500/30 dark:bg-zinc-500/10 dark:text-zinc-400">
                   <XCircle className="h-2.5 w-2.5" />
                   Dismissed
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-zinc-400">
-              Target: <span className="font-mono text-zinc-200">{recipient}</span>
+            <p className="text-[10px] text-zinc-500 dark:text-zinc-400">
+              Target: <span className="font-mono text-zinc-800 dark:text-zinc-200">{recipient}</span>
             </p>
           </div>
         </div>
@@ -182,7 +182,7 @@ export function PluginApprovalCard({ action, onExecuted }: PluginApprovalCardPro
             type="button"
             onClick={openDirectLink}
             title="Open in WhatsApp / Native App"
-            className="inline-flex items-center gap-1 rounded-lg border border-white/[0.1] bg-[#182136] px-2 py-1 text-[10px] font-medium text-[#00D4FF] transition hover:bg-[#1f2b45]"
+            className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[10px] font-medium text-zinc-800 hover:bg-zinc-100 dark:border-white/[0.1] dark:bg-[#182136] dark:text-[#00D4FF] dark:hover:bg-[#1f2b45]"
           >
             <ExternalLink className="h-3 w-3" />
             <span className="hidden sm:inline">Open</span>
@@ -192,20 +192,20 @@ export function PluginApprovalCard({ action, onExecuted }: PluginApprovalCardPro
 
       {/* Message Preview Body */}
       <div className="p-3.5">
-        <div className="mb-2 flex items-center gap-1.5 text-[11px] text-zinc-400">
-          <User className="h-3 w-3 text-zinc-500" />
+        <div className="mb-2 flex items-center gap-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+          <User className="h-3 w-3 text-zinc-400 dark:text-zinc-500" />
           <span>Message Content to be Sent:</span>
         </div>
 
-        <div className="rounded-lg border border-white/[0.08] bg-[#090d16] p-3 text-xs leading-relaxed text-zinc-100 font-sans shadow-inner">
-          <p className="italic text-zinc-200 whitespace-pre-wrap">"{content}"</p>
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50/80 p-3 text-xs leading-relaxed text-zinc-800 dark:border-white/[0.08] dark:bg-[#090d16] dark:text-zinc-100 font-sans shadow-xs dark:shadow-inner">
+          <p className="italic text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap">"{content}"</p>
         </div>
 
         {/* Evidence banner if delivered */}
         {status === "delivered" && evidence && (
-          <div className="mt-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-[11px] text-emerald-200">
+          <div className="mt-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-[11px] text-emerald-800 dark:text-emerald-200">
             <div className="flex flex-wrap items-center justify-between gap-1">
-              <span className="font-semibold text-emerald-300">
+              <span className="font-semibold text-emerald-700 dark:text-emerald-300">
                 {provider === "whatsapp" || provider === "whatsapp_business"
                   ? evidence.deliveryMethod === "meta_cloud_api"
                     ? "✓ Dispatched via Meta WhatsApp Cloud API"
@@ -221,7 +221,7 @@ export function PluginApprovalCard({ action, onExecuted }: PluginApprovalCardPro
                           : `✓ Action completed via ${provider}`}
               </span>
               {typeof evidence.messageId === "string" && (
-                <span className="font-mono text-[9px] text-emerald-400">ID: {evidence.messageId}</span>
+                <span className="font-mono text-[9px] text-emerald-600 dark:text-emerald-400">ID: {evidence.messageId}</span>
               )}
             </div>
 
@@ -231,7 +231,7 @@ export function PluginApprovalCard({ action, onExecuted }: PluginApprovalCardPro
                 <button
                   type="button"
                   onClick={openDirectLink}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/20 px-2 py-1 text-[10.5px] font-medium text-emerald-300 hover:bg-emerald-500/30"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/20 px-2 py-1 text-[10.5px] font-medium text-emerald-800 hover:bg-emerald-500/30 dark:text-emerald-300"
                 >
                   <ExternalLink className="h-3 w-3" />
                   Open Chat in WhatsApp
@@ -243,7 +243,7 @@ export function PluginApprovalCard({ action, onExecuted }: PluginApprovalCardPro
                   href={evidence.issueUrl as string}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-2 py-1 text-[10.5px] font-medium text-white hover:bg-white/20"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-zinc-200 px-2 py-1 text-[10.5px] font-medium text-zinc-900 hover:bg-zinc-300 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
                 >
                   <ExternalLink className="h-3 w-3" />
                   View Issue on GitHub
@@ -255,34 +255,34 @@ export function PluginApprovalCard({ action, onExecuted }: PluginApprovalCardPro
 
         {/* Error banner if execution failed */}
         {status === "error" && errorMessage && (
-          <div className="mt-2.5 rounded-lg border border-rose-500/30 bg-rose-500/10 p-2 text-[11px] text-rose-200">
+          <div className="mt-2.5 rounded-lg border border-rose-500/30 bg-rose-500/10 p-2 text-[11px] text-rose-700 dark:text-rose-200">
             <span className="font-medium">Execution Error:</span> {errorMessage}
           </div>
         )}
 
         {/* Action Controls */}
         {status === "pending" && (
-          <div className="mt-3 flex items-center justify-end gap-2 border-t border-white/[0.06] pt-2.5">
+          <div className="mt-3 flex items-center justify-end gap-2 border-t border-zinc-200/80 pt-2.5 dark:border-white/[0.06]">
             <button
               type="button"
               onClick={handleReject}
-              className="rounded-lg border border-white/[0.1] bg-transparent px-3 py-1.5 text-xs font-medium text-zinc-400 transition hover:bg-white/5 hover:text-white"
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:bg-zinc-100 hover:text-zinc-950 dark:border-white/[0.1] dark:bg-transparent dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-white"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleApprove}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-lg shadow-emerald-900/30 transition hover:bg-emerald-500 active:scale-95"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:bg-emerald-500 active:scale-95"
             >
               <Send className="h-3.5 w-3.5" />
-              Approve & Send Now
+              Approve &amp; Send Now
             </button>
           </div>
         )}
 
         {status === "executing" && (
-          <div className="mt-3 flex items-center justify-center gap-2 border-t border-white/[0.06] pt-2.5 text-xs text-[#00D4FF]">
+          <div className="mt-3 flex items-center justify-center gap-2 border-t border-zinc-200/80 pt-2.5 text-xs text-sky-600 dark:border-white/[0.06] dark:text-[#00D4FF]">
             <Loader2 className="h-4 w-4 animate-spin" />
             <span>Sending message via {provider}...</span>
           </div>

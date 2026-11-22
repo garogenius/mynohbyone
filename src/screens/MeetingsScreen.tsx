@@ -1128,15 +1128,15 @@ export function MeetingsScreen() {
           (Matches Scheduled Tasks clean layout)
           ============================================================ */}
       {leftSidebarOpen && (
-        <aside className="flex w-full shrink-0 flex-col border-b border-white/[0.08] pb-4 lg:h-full lg:w-64 lg:border-b-0 lg:border-r lg:pr-4 lg:pb-0">
+        <aside className="flex w-full shrink-0 flex-col border-b border-zinc-200/80 pb-4 dark:border-white/[0.08] lg:h-full lg:w-64 lg:border-b-0 lg:border-r lg:border-zinc-200/80 lg:pr-4 lg:pb-0 dark:lg:border-white/[0.08]">
           <div className="flex items-center justify-between px-2 py-1.5">
-            <h2 className="font-display text-sm font-semibold text-white">Meetings</h2>
+            <h2 className="font-display text-sm font-semibold text-zinc-900 dark:text-white">Meetings</h2>
             <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => setShowNewSessionForm((v) => !v)}
                 title="New session"
-                className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/[0.06] hover:text-white"
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
               >
                 <Plus className="h-4 w-4" />
               </button>
@@ -1144,7 +1144,7 @@ export function MeetingsScreen() {
                 type="button"
                 onClick={() => setLeftSidebarOpen(false)}
                 title="Hide Meetings sidebar"
-                className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/[0.06] hover:text-white"
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
               >
                 <PanelLeftClose className="h-3.5 w-3.5" />
               </button>
@@ -1155,16 +1155,16 @@ export function MeetingsScreen() {
           <button
             type="button"
             onClick={() => setShowNewSessionForm((v) => !v)}
-            className="mt-1 flex items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-medium text-white transition hover:bg-white/[0.06]"
+            className="mt-1 flex items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-medium text-zinc-800 transition hover:bg-zinc-100 dark:text-white dark:hover:bg-white/[0.06]"
           >
-            <Plus className="h-4 w-4 text-zinc-300" />
+            <Plus className="h-4 w-4 text-zinc-500 dark:text-zinc-300" />
             <span>New session</span>
           </button>
 
           {showNewSessionForm && (
             <form
               onSubmit={handleStartSession}
-              className="mt-2 space-y-2 rounded-xl border border-white/[0.08] bg-[#101624] p-2.5"
+              className="mt-2 space-y-2 rounded-xl border border-zinc-200/80 bg-white p-2.5 shadow-xs dark:border-white/[0.08] dark:bg-[#101624]"
             >
               <input
                 type="text"
@@ -1198,12 +1198,12 @@ export function MeetingsScreen() {
 
           {/* Sessions List */}
           <div className="mt-3 flex-1 overflow-y-auto px-1">
-            <p className="px-1.5 text-[11px] font-medium text-zinc-400">
+            <p className="px-1.5 text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
               Sessions ({meetings.length})
             </p>
             <div className="mt-1.5 space-y-1">
               {loading ? (
-                <div className="flex items-center gap-2 px-2 py-4 text-xs text-zinc-400">
+                <div className="flex items-center gap-2 px-2 py-4 text-xs text-zinc-500 dark:text-zinc-400">
                   <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-400" />
                   Loading...
                 </div>
@@ -1217,12 +1217,14 @@ export function MeetingsScreen() {
                       key={m.id}
                       onClick={() => handleSelectMeeting(m.id)}
                       className={`group flex cursor-pointer items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left transition ${
-                        isSelected ? "bg-white/[0.08] text-white" : "text-zinc-300 hover:bg-white/[0.04]"
+                        isSelected
+                          ? "bg-zinc-200/80 text-zinc-950 dark:bg-white/[0.08] dark:text-white font-medium"
+                          : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-white/[0.04]"
                       }`}
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs font-medium text-white">{m.title}</p>
-                        <p className="mt-0.5 truncate text-[11px] text-zinc-500">
+                        <p className="truncate text-xs font-medium text-zinc-900 dark:text-white">{m.title}</p>
+                        <p className="mt-0.5 truncate text-[11px] text-zinc-500 dark:text-zinc-400">
                           {new Date(m.startedAt).toLocaleDateString([], {
                             month: "short",
                             day: "numeric",
@@ -1259,7 +1261,7 @@ export function MeetingsScreen() {
             <button
               type="button"
               onClick={() => setLeftSidebarOpen(true)}
-              className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-white/[0.1] bg-[#141B2D]/80 px-2.5 text-[11px] font-medium text-zinc-300 hover:text-white"
+              className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-zinc-200 bg-zinc-100 px-2.5 text-[11px] font-medium text-zinc-700 hover:bg-zinc-200 dark:border-white/[0.1] dark:bg-[#141B2D]/80 dark:text-zinc-300 dark:hover:text-white"
             >
               <PanelLeftOpen className="h-3.5 w-3.5" />
               <span>Sessions</span>
@@ -1268,11 +1270,11 @@ export function MeetingsScreen() {
         )}
 
         {!selected ? (
-          <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-white/[0.08] bg-[#101624] p-8 text-center">
-            <h2 className="font-display text-base font-semibold text-white">
+          <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-zinc-200/80 bg-white p-8 text-center shadow-xs dark:border-white/[0.08] dark:bg-[#101624]">
+            <h2 className="font-display text-base font-semibold text-zinc-900 dark:text-white">
               Select or start a meeting session
             </h2>
-            <p className="mt-1 max-w-md text-xs text-zinc-400">
+            <p className="mt-1 max-w-md text-xs text-zinc-500 dark:text-zinc-400">
               Capture live questions, record session audio, save meeting notes, and generate structured documents.
             </p>
             <button
@@ -1285,14 +1287,14 @@ export function MeetingsScreen() {
             </button>
           </div>
         ) : (
-          <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#101624]">
+          <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-xs dark:border-white/[0.08] dark:bg-[#101624]">
             {/* Clean Standard Header Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] px-5 py-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200/80 px-5 py-3.5 dark:border-white/[0.08]">
               <div className="min-w-0">
-                <h1 className="font-display truncate text-base font-semibold text-white">
+                <h1 className="font-display truncate text-base font-semibold text-zinc-900 dark:text-white">
                   {selected.title}
                 </h1>
-                <p className="mt-0.5 text-xs text-zinc-400 capitalize">
+                <p className="mt-0.5 text-xs text-zinc-500 capitalize dark:text-zinc-400">
                   {selected.meetingType.replace("_", " ")} ·{" "}
                   {new Date(selected.startedAt).toLocaleTimeString([], {
                     hour: "2-digit",
@@ -1305,14 +1307,14 @@ export function MeetingsScreen() {
               {/* Standard Control Bar */}
               <div className="flex flex-wrap items-center gap-2">
                 {/* 1. Microphone Listen + Compact Sound Equalizer */}
-                <div className="flex items-center gap-2 rounded-lg border border-white/[0.1] bg-[#151C2C] px-2.5 py-1">
+                <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-1 dark:border-white/[0.1] dark:bg-[#151C2C]">
                   <button
                     type="button"
                     onClick={toggleBackgroundMic}
                     disabled={selected.status === "completed"}
                     className={`inline-flex h-6 items-center gap-1.5 rounded-md px-2 text-xs font-medium transition ${
                       isListening
-                        ? "bg-rose-500/20 text-rose-300"
+                        ? "bg-rose-500/20 text-rose-600 dark:text-rose-300"
                         : "bg-white/[0.08] text-white hover:bg-white/[0.14]"
                     }`}
                   >
@@ -1348,22 +1350,22 @@ export function MeetingsScreen() {
                 </div>
 
                 {/* 2. Audio & Screen Record Toggle */}
-                <div className="flex items-center rounded-lg border border-white/[0.1] bg-[#151C2C] p-0.5">
+                <div className="flex items-center rounded-lg border border-zinc-200 bg-zinc-50 p-0.5 dark:border-white/[0.1] dark:bg-[#151C2C]">
                   <button
                     type="button"
                     onClick={() => setRecordingMode(recordingMode === "screen" ? "audio" : "screen")}
                     title={`Mode: ${recordingMode === "screen" ? "Screen & Audio" : "Audio Only"}. Click to switch.`}
                     disabled={isRecordingAudio}
-                    className="flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-zinc-300 hover:text-white disabled:opacity-50"
+                    className="flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white disabled:opacity-50"
                   >
                     {recordingMode === "screen" ? (
                       <>
-                        <Monitor className="h-3 w-3 text-[#00D4FF]" />
+                        <Monitor className="h-3 w-3 text-sky-600 dark:text-[#00D4FF]" />
                         <span className="hidden sm:inline">Screen</span>
                       </>
                     ) : (
                       <>
-                        <Headphones className="h-3 w-3 text-emerald-400" />
+                        <Headphones className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
                         <span className="hidden sm:inline">Audio</span>
                       </>
                     )}
@@ -1376,11 +1378,11 @@ export function MeetingsScreen() {
                     className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition ${
                       isRecordingAudio
                         ? "bg-rose-500 text-white shadow-sm"
-                        : "bg-white/10 text-white hover:bg-white/15"
+                        : "bg-zinc-200/80 text-zinc-800 hover:bg-zinc-300 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
                     }`}
                   >
                     <Radio
-                      className={`h-3 w-3 ${isRecordingAudio ? "animate-pulse text-white" : "text-rose-400"}`}
+                      className={`h-3 w-3 ${isRecordingAudio ? "animate-pulse text-white" : "text-rose-500 dark:text-rose-400"}`}
                     />
                     <span>
                       {isRecordingAudio
@@ -1484,12 +1486,12 @@ export function MeetingsScreen() {
             </div>
 
             {/* Clean Standard Underline Tabs */}
-            <div className="flex items-center gap-6 border-b border-white/[0.08] px-5">
+            <div className="flex items-center gap-6 border-b border-zinc-200/80 px-5 dark:border-white/[0.08]">
               {(
                 [
                   { id: "transcript", label: "Transcript & Answers" },
                   { id: "notes", label: "Notes & Document" },
-                  { id: "audio", label: `Audio (${savedAudioClips.length})` },
+                  { id: "audio", label: `Recordings (${savedAudioClips.length})` },
                   { id: "calendar", label: `Calendar (${scheduledMeetings.length})` },
                 ] as const
               ).map((t) => (
@@ -1499,8 +1501,8 @@ export function MeetingsScreen() {
                   onClick={() => setActiveTab(t.id)}
                   className={`border-b-2 py-2.5 text-xs font-medium transition ${
                     activeTab === t.id
-                      ? "border-white text-white"
-                      : "border-transparent text-zinc-400 hover:text-zinc-200"
+                      ? "border-zinc-950 text-zinc-950 dark:border-white dark:text-white font-semibold"
+                      : "border-transparent text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
                   }`}
                 >
                   {t.label}
@@ -1514,7 +1516,7 @@ export function MeetingsScreen() {
               {activeTab === "transcript" && (
                 <div className="mx-auto max-w-3xl space-y-3">
                   {liveCaption && (
-                    <div className="rounded-xl border border-white/[0.1] bg-[#151C2C] px-4 py-2.5 text-xs text-zinc-300">
+                    <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-xs text-zinc-800 dark:border-white/[0.1] dark:bg-[#151C2C] dark:text-zinc-300">
                       Listening: &ldquo;{liveCaption}&rdquo;
                     </div>
                   )}
@@ -1552,14 +1554,14 @@ export function MeetingsScreen() {
                           </div>
                         </div>
 
-                        <p className="mt-1.5 text-xs leading-relaxed text-zinc-200">
+                        <p className="mt-1.5 text-xs leading-relaxed text-zinc-800 dark:text-zinc-200">
                           {cleanDisplayText(seg.content)}
                         </p>
 
                         {seg.aiHint && (
-                          <div className="mt-3 border-t border-white/[0.06] pt-3">
+                          <div className="mt-3 border-t border-zinc-200/80 pt-3 dark:border-white/[0.06]">
                             <div className="flex items-center justify-between">
-                              <span className="text-[11px] font-medium text-zinc-400">
+                              <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
                                 Suggested Response (First Person)
                               </span>
                               <div className="flex items-center gap-2">
@@ -1571,7 +1573,7 @@ export function MeetingsScreen() {
                                       .then(() => showToast("info", "Copied."))
                                       .catch(() => null);
                                   }}
-                                  className="inline-flex items-center gap-1 text-[11px] text-zinc-400 hover:text-white"
+                                  className="inline-flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
                                 >
                                   <Copy className="h-3 w-3" /> Copy
                                 </button>
@@ -1583,13 +1585,13 @@ export function MeetingsScreen() {
                                       voiceType: voiceSettings?.voiceType || "female",
                                     })
                                   }
-                                  className="inline-flex items-center gap-1 text-[11px] text-zinc-400 hover:text-white"
+                                  className="inline-flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
                                 >
                                   <Volume2 className="h-3 w-3" /> Speak
                                 </button>
                               </div>
                             </div>
-                            <p className="mt-1 text-xs leading-relaxed text-white">
+                            <p className="mt-1 text-xs leading-relaxed text-zinc-900 dark:text-white">
                               {cleanFirstPersonAnswer(seg.aiHint)}
                             </p>
                           </div>
@@ -1630,14 +1632,14 @@ export function MeetingsScreen() {
               {/* TAB 2: NOTES & DOCUMENT */}
               {activeTab === "notes" && (
                 <div className="mx-auto max-w-3xl space-y-4">
-                  <div className="rounded-xl border border-white/[0.08] bg-[#131926] p-4">
+                  <div className="rounded-xl border border-zinc-200/80 bg-white p-4 shadow-xs dark:border-white/[0.08] dark:bg-[#131926]">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="text-xs font-semibold text-white">Meeting Notes</h3>
+                      <h3 className="text-xs font-semibold text-zinc-900 dark:text-white">Meeting Notes</h3>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => updateCurrentNotes("")}
-                          className="h-7 rounded-lg border border-white/[0.08] px-2.5 text-[11px] text-zinc-400 hover:text-rose-400"
+                          className="h-7 rounded-lg border border-zinc-200 px-2.5 text-[11px] text-zinc-500 hover:text-rose-500 dark:border-white/[0.08] dark:text-zinc-400 dark:hover:text-rose-400"
                         >
                           Clear
                         </button>
@@ -1645,7 +1647,7 @@ export function MeetingsScreen() {
                           type="button"
                           disabled={savingNotes}
                           onClick={handleSaveNotes}
-                          className="inline-flex h-7 items-center gap-1 rounded-lg border border-white/[0.12] bg-[#182032] px-3 text-[11px] font-medium text-white"
+                          className="inline-flex h-7 items-center gap-1 rounded-lg border border-zinc-200 bg-zinc-100 px-3 text-[11px] font-medium text-zinc-800 hover:bg-zinc-200 dark:border-white/[0.12] dark:bg-[#182032] dark:text-white"
                         >
                           {savingNotes ? (
                             <Loader2 className="h-3 w-3 animate-spin" />
@@ -1679,20 +1681,20 @@ export function MeetingsScreen() {
                   </div>
 
                   {generatedDocText && (
-                    <div className="rounded-xl border border-white/[0.08] bg-[#131926] p-4">
+                    <div className="rounded-xl border border-zinc-200/80 bg-white p-4 shadow-xs dark:border-white/[0.08] dark:bg-[#131926]">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-white">
+                        <span className="text-xs font-semibold text-zinc-900 dark:text-white">
                           Generated Document ({generatedDocFilename})
                         </span>
                         <button
                           type="button"
                           onClick={() => setRoute("files")}
-                          className="text-xs text-zinc-300 underline hover:text-white"
+                          className="text-xs text-zinc-600 underline hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"
                         >
                           View in Library
                         </button>
                       </div>
-                      <pre className="mt-2.5 max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg border border-white/[0.06] bg-[#0D121C] p-3 font-sans text-xs leading-relaxed text-zinc-200">
+                      <pre className="mt-2.5 max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg border border-zinc-200 bg-zinc-50 p-3 font-sans text-xs leading-relaxed text-zinc-800 dark:border-white/[0.06] dark:bg-[#0D121C] dark:text-zinc-200">
                         {generatedDocText}
                       </pre>
                     </div>
@@ -1703,10 +1705,10 @@ export function MeetingsScreen() {
               {/* TAB 3: AUDIO & RECORDINGS */}
               {activeTab === "audio" && (
                 <div className="mx-auto max-w-3xl space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/[0.08] bg-[#131926] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-200/80 bg-white p-4 shadow-xs dark:border-white/[0.08] dark:bg-[#131926]">
                     <div>
-                      <h3 className="text-xs font-semibold text-white">Audio Recordings &amp; Exports</h3>
-                      <p className="mt-0.5 text-[11px] text-zinc-400">
+                      <h3 className="text-xs font-semibold text-zinc-900 dark:text-white">Audio Recordings &amp; Exports</h3>
+                      <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
                         Record live session audio or convert this meeting into an audio file.
                       </p>
                     </div>
@@ -1716,9 +1718,9 @@ export function MeetingsScreen() {
                         onClick={() =>
                           isRecordingAudio ? stopLiveRecording() : startLiveRecording(selected)
                         }
-                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.1] bg-[#182032] px-3 text-xs text-white"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-zinc-100 px-3 text-xs text-zinc-800 hover:bg-zinc-200 dark:border-white/[0.1] dark:bg-[#182032] dark:text-white"
                       >
-                        <Radio className="h-3.5 w-3.5 text-rose-400" />
+                        <Radio className="h-3.5 w-3.5 text-rose-500 dark:text-rose-400" />
                         {isRecordingAudio ? "Stop Recording" : "Record Session"}
                       </button>
                       <button
@@ -1738,17 +1740,17 @@ export function MeetingsScreen() {
                   </div>
 
                   {savedAudioClips.length === 0 ? (
-                    <div className="rounded-xl border border-white/[0.06] bg-[#131926] py-10 text-center text-xs text-zinc-500">
+                    <div className="rounded-xl border border-zinc-200/80 bg-white py-10 text-center text-xs text-zinc-500 shadow-xs dark:border-white/[0.06] dark:bg-[#131926]">
                       No audio files recorded or exported yet.
                     </div>
                   ) : (
                     savedAudioClips.map((clip) => (
                       <div
                         key={clip.id}
-                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-[#131926] px-4 py-3"
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200/80 bg-white px-4 py-3 shadow-xs dark:border-white/[0.08] dark:bg-[#131926]"
                       >
                         <div className="min-w-0">
-                          <p className="truncate text-xs font-medium text-white">{clip.title}</p>
+                          <p className="truncate text-xs font-medium text-zinc-900 dark:text-white">{clip.title}</p>
                           <p className="text-[11px] text-zinc-500">
                             {new Date(clip.createdAt).toLocaleTimeString()}
                           </p>
@@ -1772,14 +1774,14 @@ export function MeetingsScreen() {
                                   ? "webm"
                                   : "mp3"
                             }`}
-                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-white/[0.1] px-2.5 text-[11px] text-zinc-200 hover:bg-white/[0.06]"
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-zinc-200 px-2.5 text-[11px] text-zinc-700 hover:bg-zinc-100 dark:border-white/[0.1] dark:text-zinc-200 dark:hover:bg-white/[0.06]"
                           >
                             <Download className="h-3 w-3" /> Download
                           </a>
                           <button
                             type="button"
                             onClick={() => handleSaveRecordingToLibrary(clip)}
-                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-white/[0.1] px-2.5 text-[11px] text-zinc-200 hover:bg-white/[0.06]"
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-zinc-200 px-2.5 text-[11px] text-zinc-700 hover:bg-zinc-100 dark:border-white/[0.1] dark:text-zinc-200 dark:hover:bg-white/[0.06]"
                           >
                             <Save className="h-3 w-3" /> Save to Library
                           </button>
@@ -1802,10 +1804,10 @@ export function MeetingsScreen() {
               {/* TAB 4: CALENDAR & AUTO-JOIN */}
               {activeTab === "calendar" && (
                 <div className="mx-auto grid max-w-3xl gap-4 sm:grid-cols-2">
-                  <div className="rounded-xl border border-white/[0.08] bg-[#131926] p-4">
+                  <div className="rounded-xl border border-zinc-200/80 bg-white p-4 shadow-xs dark:border-white/[0.08] dark:bg-[#131926]">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-semibold text-white">Calendar Integration</h3>
-                      <span className="text-[11px] text-zinc-400">
+                      <h3 className="text-xs font-semibold text-zinc-900 dark:text-white">Calendar Integration</h3>
+                      <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
                         {calendarConnected ? "Connected" : "Not connected"}
                       </span>
                     </div>
@@ -1825,7 +1827,7 @@ export function MeetingsScreen() {
                       <button
                         type="button"
                         onClick={handleConnectCalendar}
-                        className="inline-flex h-8 items-center rounded-lg border border-white/[0.12] bg-[#182032] px-3 text-xs font-medium text-white"
+                        className="inline-flex h-8 items-center rounded-lg border border-zinc-200 bg-zinc-100 px-3 text-xs font-medium text-zinc-800 hover:bg-zinc-200 dark:border-white/[0.12] dark:bg-[#182032] dark:text-white"
                       >
                         {calendarConnected ? "Sync" : "Connect"}
                       </button>
@@ -1854,7 +1856,7 @@ export function MeetingsScreen() {
                         placeholder="Meeting URL (optional)..."
                         className="studio-input h-8 w-full rounded-lg px-2.5 text-xs"
                       />
-                      <label className="flex cursor-pointer items-center gap-2 pt-1 text-xs text-zinc-300">
+                      <label className="flex cursor-pointer items-center gap-2 pt-1 text-xs text-zinc-700 dark:text-zinc-300">
                         <input
                           type="checkbox"
                           checked={calAutoJoin}
@@ -1873,14 +1875,14 @@ export function MeetingsScreen() {
                     </form>
                   </div>
 
-                  <div className="rounded-xl border border-white/[0.08] bg-[#131926] p-4">
+                  <div className="rounded-xl border border-zinc-200/80 bg-white p-4 shadow-xs dark:border-white/[0.08] dark:bg-[#131926]">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-semibold text-white">Upcoming Scheduled Meetings</h3>
+                      <h3 className="text-xs font-semibold text-zinc-900 dark:text-white">Upcoming Scheduled Meetings</h3>
                       <button
                         type="button"
                         disabled={syncingCalendar}
                         onClick={fetchConnectedCalendarMeetings}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.1] bg-[#182032] px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:text-white disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-zinc-100 px-2.5 py-1 text-[11px] font-medium text-zinc-700 hover:bg-zinc-200 dark:border-white/[0.1] dark:bg-[#182032] dark:text-zinc-300 dark:hover:text-white disabled:opacity-50"
                       >
                         <RotateCw
                           className={`h-3 w-3 ${syncingCalendar ? "animate-spin text-[#00D4FF]" : ""}`}
@@ -1897,12 +1899,12 @@ export function MeetingsScreen() {
                         scheduledMeetings.map((item) => (
                           <div
                             key={item.id}
-                            className="rounded-lg border border-white/[0.07] bg-[#171E2E] p-3"
+                            className="rounded-lg border border-zinc-200/80 bg-zinc-50 p-3 shadow-xs dark:border-white/[0.07] dark:bg-[#171E2E]"
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div>
-                                <p className="text-xs font-medium text-white">{item.title}</p>
-                                <p className="mt-0.5 text-[11px] text-zinc-400">
+                                <p className="text-xs font-medium text-zinc-900 dark:text-white">{item.title}</p>
+                                <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
                                   {new Date(item.scheduledAt).toLocaleString([], {
                                     dateStyle: "medium",
                                     timeStyle: "short",
@@ -1918,13 +1920,13 @@ export function MeetingsScreen() {
                               </button>
                             </div>
                             <div className="mt-2 flex items-center justify-between">
-                              <span className="text-[10px] text-zinc-400">
+                              <span className="text-[10px] text-zinc-500 dark:text-zinc-400">
                                 {item.autoJoinAndRecord ? "Auto-Join & Record" : "Alert Only"}
                               </span>
                               <button
                                 type="button"
                                 onClick={() => handleTriggerScheduledMeetingNow(item)}
-                                className="inline-flex h-6 items-center gap-1 rounded border border-white/[0.1] px-2 text-[10px] text-white hover:bg-white/[0.06]"
+                                className="inline-flex h-6 items-center gap-1 rounded border border-zinc-200 bg-white px-2 text-[10px] text-zinc-800 hover:bg-zinc-100 dark:border-white/[0.1] dark:bg-transparent dark:text-white dark:hover:bg-white/[0.06]"
                               >
                                 <Play className="h-2.5 w-2.5 fill-current" /> Start Now
                               </button>
@@ -1955,7 +1957,7 @@ export function MeetingsScreen() {
             width: stealthCardMinimized ? "320px" : `${cardSize.width}px`,
             height: stealthCardMinimized ? "auto" : `${cardSize.height}px`,
           }}
-          className="dropdown-surface fixed z-50 flex flex-col justify-between rounded-2xl border border-white/[0.16] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.65)] backdrop-blur-xl"
+          className="fixed z-50 flex flex-col justify-between rounded-2xl border border-zinc-200 bg-white/95 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.18)] backdrop-blur-xl dark:border-white/[0.16] dark:bg-[#101624]/95 dark:shadow-[0_20px_60px_rgba(0,0,0,0.65)]"
         >
           {/* 360° Free-Drag Header Bar */}
           <div
@@ -1964,12 +1966,12 @@ export function MeetingsScreen() {
             onPointerUp={handleCardPointerUp}
             onPointerCancel={handleCardPointerUp}
             title="Drag to move anywhere in any direction"
-            className="flex cursor-move items-center justify-between gap-2 border-b border-white/[0.08] pb-2.5 select-none touch-none"
+            className="flex cursor-move items-center justify-between gap-2 border-b border-zinc-200 pb-2.5 select-none touch-none dark:border-white/[0.08]"
           >
             <div className="flex items-center gap-2">
               <GripHorizontal className="h-4 w-4 shrink-0 text-zinc-400" />
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-white">
-                <Shield className="h-3.5 w-3.5 text-emerald-400" />
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-900 dark:text-white">
+                <Shield className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400" />
                 Stealth Response Card
               </span>
               <span className="text-[10px] text-zinc-500">Screen-Share Protected</span>
@@ -1980,7 +1982,7 @@ export function MeetingsScreen() {
                 type="button"
                 onClick={toggleExternalStealthCardWindow}
                 title="Float outside browser on device background"
-                className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/[0.08] hover:text-white"
+                className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.08] dark:hover:text-white"
               >
                 <PictureInPicture2 className="h-3.5 w-3.5" />
               </button>
@@ -1995,7 +1997,7 @@ export function MeetingsScreen() {
                     )
                   }
                   title="Toggle Large / XL size"
-                  className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/[0.08] hover:text-white"
+                  className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.08] dark:hover:text-white"
                 >
                   <Maximize2 className="h-3.5 w-3.5" />
                 </button>
@@ -2004,7 +2006,7 @@ export function MeetingsScreen() {
                 type="button"
                 onClick={() => setStealthCardMinimized((v) => !v)}
                 title={stealthCardMinimized ? "Expand" : "Minimize"}
-                className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/[0.08] hover:text-white"
+                className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.08] dark:hover:text-white"
               >
                 <Minimize2 className="h-3.5 w-3.5" />
               </button>
@@ -2012,7 +2014,7 @@ export function MeetingsScreen() {
                 type="button"
                 onClick={() => setShowStealthCard(false)}
                 title="Close Stealth Card"
-                className="rounded-lg p-1.5 text-zinc-400 hover:bg-rose-500/15 hover:text-rose-400"
+                className="rounded-lg p-1.5 text-zinc-500 hover:bg-rose-500/15 hover:text-rose-500 dark:text-zinc-400 dark:hover:bg-rose-500/15 dark:hover:text-rose-400"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -2022,11 +2024,11 @@ export function MeetingsScreen() {
           {!stealthCardMinimized && (
             <div className="mt-3 flex flex-1 flex-col gap-3 overflow-hidden">
               {/* Caught Question */}
-              <div className="shrink-0 rounded-xl border border-white/[0.08] bg-[#0F1522] px-3.5 py-2.5">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+              <div className="shrink-0 rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 py-2.5 dark:border-white/[0.08] dark:bg-[#0F1522]">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                   Question ({isListening ? "Listening Live" : "Ready"})
                 </p>
-                <p className="mt-1 line-clamp-2 text-sm text-zinc-100">
+                <p className="mt-1 line-clamp-2 text-sm text-zinc-900 dark:text-zinc-100">
                   {liveCaption ||
                     (latestSegment
                       ? cleanDisplayText(latestSegment.content)
@@ -2035,14 +2037,14 @@ export function MeetingsScreen() {
               </div>
 
               {/* First-Person Suggested Response */}
-              <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-white/[0.12] bg-[#131B2C] px-4 py-3">
+              <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100/70 px-4 py-3 dark:border-white/[0.12] dark:bg-[#131B2C]">
                 <div className="flex shrink-0 items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                       Your Answer (First Person)
                     </p>
                     {answerLockedRef.current && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2 py-0.5 text-[9px] font-medium text-emerald-300">
+                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2 py-0.5 text-[9px] font-medium text-emerald-600 dark:text-emerald-300">
                         🔒 Locked (Read Freely)
                       </span>
                     )}
@@ -2055,7 +2057,7 @@ export function MeetingsScreen() {
                         setLiveCaption("");
                         showToast("info", "Answer unlocked. Listening for next question.");
                       }}
-                      className="inline-flex items-center gap-1 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 hover:bg-emerald-500/20"
+                      className="inline-flex items-center gap-1 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-300"
                     >
                       <RotateCw className="h-2.5 w-2.5" /> Next Question
                     </button>
@@ -2069,7 +2071,7 @@ export function MeetingsScreen() {
                               .then(() => showToast("info", "Copied."))
                               .catch(() => null);
                           }}
-                          className="inline-flex items-center gap-1 text-[11px] text-zinc-300 hover:text-white"
+                          className="inline-flex items-center gap-1 text-[11px] text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white"
                         >
                           <Copy className="h-3 w-3" /> Copy
                         </button>
@@ -2082,7 +2084,7 @@ export function MeetingsScreen() {
                               voiceType: voiceSettings?.voiceType || "female",
                             });
                           }}
-                          className="inline-flex items-center gap-1 text-[11px] text-zinc-300 hover:text-white"
+                          className="inline-flex items-center gap-1 text-[11px] text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white"
                         >
                           <Volume2 className="h-3.5 w-3.5" /> Speak
                         </button>
@@ -2090,7 +2092,7 @@ export function MeetingsScreen() {
                     )}
                   </div>
                 </div>
-                <div className="mt-1.5 flex-1 overflow-y-auto pr-1 text-[15px] leading-relaxed text-white">
+                <div className="mt-1.5 flex-1 overflow-y-auto pr-1 text-[15px] leading-relaxed text-zinc-900 dark:text-white">
                   {latestSegment?.aiHint
                     ? cleanFirstPersonAnswer(latestSegment.aiHint)
                     : "Your personalized first-person response will appear here as soon as a question is caught."}
