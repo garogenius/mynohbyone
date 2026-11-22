@@ -995,9 +995,9 @@ export function TasksScreen() {
               {/* 2-Column Layout: Visual Calendar Grid (Left) + Time & Recurrence Picker (Right) */}
               <div className="grid gap-4 sm:grid-cols-2">
                 {/* Interactive Monthly Calendar Display */}
-                <div className="rounded-xl border border-white/[0.09] bg-[#0E1422] p-3">
+                <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/90 p-3 dark:border-white/[0.09] dark:bg-[#0E1422]">
                   <div className="mb-2 flex items-center justify-between">
-                    <span className="text-xs font-semibold text-white">
+                    <span className="text-xs font-semibold text-zinc-900 dark:text-white">
                       {MONTH_NAMES[calendarMonth.getMonth()]} {calendarMonth.getFullYear()}
                     </span>
                     <div className="flex items-center gap-1">
@@ -1008,7 +1008,7 @@ export function TasksScreen() {
                             new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1)
                           )
                         }
-                        className="rounded-md p-1 text-zinc-400 hover:bg-white/[0.08] hover:text-white"
+                        className="rounded-md p-1 text-zinc-500 hover:bg-zinc-200/70 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.08] dark:hover:text-white"
                         title="Previous month"
                       >
                         <ChevronLeft className="h-3.5 w-3.5" />
@@ -1020,7 +1020,7 @@ export function TasksScreen() {
                             new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1)
                           )
                         }
-                        className="rounded-md p-1 text-zinc-400 hover:bg-white/[0.08] hover:text-white"
+                        className="rounded-md p-1 text-zinc-500 hover:bg-zinc-200/70 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.08] dark:hover:text-white"
                         title="Next month"
                       >
                         <ChevronRight className="h-3.5 w-3.5" />
@@ -1029,7 +1029,7 @@ export function TasksScreen() {
                   </div>
 
                   {/* Weekday Headers */}
-                  <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-semibold text-zinc-500">
+                  <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-semibold text-zinc-400 dark:text-zinc-500">
                     {WEEKDAYS.map((wd) => (
                       <div key={wd} className="py-1">
                         {wd}
@@ -1055,8 +1055,8 @@ export function TasksScreen() {
                             isSelected
                               ? "bg-gradient-to-br from-[#00D4FF] to-[#0066FF] font-bold text-white shadow-[0_0_12px_rgba(0,212,255,0.45)]"
                               : isToday
-                                ? "border border-[#00D4FF]/50 bg-[#00D4FF]/10 text-[#00D4FF]"
-                                : "text-zinc-300 hover:bg-white/[0.08] hover:text-white"
+                                ? "border border-[#00D4FF]/50 bg-[#00D4FF]/10 text-[#0066FF] dark:text-[#00D4FF]"
+                                : "text-zinc-700 hover:bg-zinc-200/70 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-white/[0.08] dark:hover:text-white"
                           }`}
                         >
                           {cell.day}
@@ -1068,7 +1068,7 @@ export function TasksScreen() {
                     })}
                   </div>
 
-                  <div className="mt-2.5 flex items-center justify-between border-t border-white/[0.06] pt-2 text-[10px] text-zinc-400">
+                  <div className="mt-2.5 flex items-center justify-between border-t border-zinc-200/70 pt-2 text-[10px] text-zinc-500 dark:border-white/[0.06] dark:text-zinc-400">
                     <span>Selected Date:</span>
                     <input
                       type="date"
@@ -1086,10 +1086,10 @@ export function TasksScreen() {
                 </div>
 
                 {/* Time & Recurrence Controls */}
-                <div className="flex flex-col justify-between rounded-xl border border-white/[0.09] bg-[#0E1422] p-3">
+                <div className="flex flex-col justify-between rounded-xl border border-zinc-200/80 bg-zinc-50/90 p-3 dark:border-white/[0.09] dark:bg-[#0E1422]">
                   <div className="space-y-3">
                     <div>
-                      <label className="mb-1 block text-[11px] font-medium text-zinc-300">
+                      <label className="mb-1 block text-[11px] font-medium text-zinc-700 dark:text-zinc-300">
                         Select Time
                       </label>
                       <input
@@ -1106,8 +1106,8 @@ export function TasksScreen() {
                             onClick={() => setSelectedTimeStr(qt.value)}
                             className={`rounded-lg border px-2 py-1 text-[10px] font-medium transition ${
                               selectedTimeStr === qt.value
-                                ? "border-[#00D4FF]/55 bg-[#00D4FF]/15 text-[#00D4FF]"
-                                : "border-white/[0.08] bg-[#141C2E] text-zinc-400 hover:text-white"
+                                ? "border-[#0066FF] bg-[#0066FF]/10 text-[#0066FF] dark:border-[#00D4FF]/55 dark:bg-[#00D4FF]/15 dark:text-[#00D4FF]"
+                                : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:border-white/[0.08] dark:bg-[#141C2E] dark:text-zinc-400 dark:hover:text-white"
                             }`}
                           >
                             {qt.label}

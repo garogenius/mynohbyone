@@ -1219,12 +1219,12 @@ export function MeetingsScreen() {
                   }
                   className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition ${
                     isRecordingAudio
-                      ? "border-rose-500/45 bg-rose-500/15 text-rose-300"
-                      : "border-white/[0.1] bg-[#151C2C] text-zinc-200 hover:text-white"
+                      ? "border-rose-500/45 bg-rose-500/15 text-rose-600 dark:text-rose-300"
+                      : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950 dark:border-white/[0.1] dark:bg-[#151C2C] dark:text-zinc-200 dark:hover:text-white"
                   }`}
                 >
                   <Radio
-                    className={`h-3 w-3 ${isRecordingAudio ? "animate-pulse text-rose-400" : "text-zinc-400"}`}
+                    className={`h-3 w-3 ${isRecordingAudio ? "animate-pulse text-rose-500 dark:text-rose-400" : "text-zinc-500 dark:text-zinc-400"}`}
                   />
                   <span>
                     {isRecordingAudio
@@ -1241,8 +1241,8 @@ export function MeetingsScreen() {
                   onClick={handleToggleStealthCard}
                   className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition ${
                     showStealthCard
-                      ? "border-white/25 bg-white text-zinc-950"
-                      : "border-white/[0.1] bg-[#151C2C] text-zinc-300 hover:text-white"
+                      ? "border-emerald-500 bg-emerald-500/15 text-emerald-700 dark:border-white/25 dark:bg-white dark:text-zinc-950"
+                      : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950 dark:border-white/[0.1] dark:bg-[#151C2C] dark:text-zinc-300 dark:hover:text-white"
                   }`}
                   title="Enable or hide the movable Stealth Answer Card"
                 >
@@ -1255,7 +1255,7 @@ export function MeetingsScreen() {
                   <button
                     type="button"
                     onClick={() => setActionsMenuOpen((v) => !v)}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.1] bg-[#151C2C] px-3 text-xs font-medium text-zinc-200 transition hover:text-white"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-700 transition hover:bg-zinc-50 hover:text-zinc-950 dark:border-white/[0.1] dark:bg-[#151C2C] dark:text-zinc-200 dark:hover:text-white"
                   >
                     <span>Actions</span>
                     <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />
@@ -1363,9 +1363,9 @@ export function MeetingsScreen() {
                   )}
 
                   {!selected.transcripts || selected.transcripts.length === 0 ? (
-                    <div className="rounded-xl border border-white/[0.06] bg-[#131926] px-5 py-10 text-center">
-                      <p className="text-xs font-medium text-zinc-300">No transcript segments yet</p>
-                      <p className="mt-1 text-xs text-zinc-500">
+                    <div className="rounded-xl border border-zinc-200/80 bg-zinc-50 px-5 py-10 text-center dark:border-white/[0.06] dark:bg-[#131926]">
+                      <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">No transcript segments yet</p>
+                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                         Click Listen above or type a question below. NohbyAI will generate a direct first-person response based on your experience.
                       </p>
                     </div>
@@ -1373,10 +1373,10 @@ export function MeetingsScreen() {
                     selected.transcripts.map((seg) => (
                       <div
                         key={seg.id}
-                        className="rounded-xl border border-white/[0.07] bg-[#131926] p-4"
+                        className="rounded-xl border border-zinc-200/80 bg-white p-4 shadow-xs dark:border-white/[0.07] dark:bg-[#131926]"
                       >
                         <div className="flex items-center justify-between text-xs">
-                          <span className="font-medium text-zinc-300">{seg.speaker}</span>
+                          <span className="font-semibold text-zinc-900 dark:text-zinc-200">{seg.speaker}</span>
                           <div className="flex items-center gap-2">
                             <span className="text-[11px] text-zinc-500">
                               {new Date(seg.createdAt).toLocaleTimeString([], {

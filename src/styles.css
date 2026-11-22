@@ -175,15 +175,27 @@
 }
 
 [data-theme="light"] .bg-\[\#0D0F13\],
-[data-theme="light"] .bg-\[\#0D0F13\]\/95 {
-  background-color: #ffffff !important;
-}
-
+[data-theme="light"] .bg-\[\#0D0F13\]\/95,
 [data-theme="light"] .bg-\[\#111318\],
 [data-theme="light"] .bg-\[\#131519\],
 [data-theme="light"] .bg-\[\#111622\],
 [data-theme="light"] .bg-\[\#121828\],
-[data-theme="light"] .bg-\[\#131117\] {
+[data-theme="light"] .bg-\[\#131117\],
+[data-theme="light"] .bg-\[\#0A0F1D\],
+[data-theme="light"] .bg-\[\#0C121E\],
+[data-theme="light"] .bg-\[\#0c121e\],
+[data-theme="light"] .bg-\[\#0E1422\],
+[data-theme="light"] .bg-\[\#0e1422\],
+[data-theme="light"] .bg-\[\#0c1322\],
+[data-theme="light"] .bg-\[\#131926\],
+[data-theme="light"] .bg-\[\#121929\],
+[data-theme="light"] .bg-\[\#101624\],
+[data-theme="light"] .bg-\[\#101726\],
+[data-theme="light"] .bg-\[\#090d16\],
+[data-theme="light"] .bg-\[\#090c12\],
+[data-theme="light"] .bg-\[\#0d121c\],
+[data-theme="light"] .bg-\[\#151B2B\],
+[data-theme="light"] .bg-\[\#151B2B\]\/90 {
   background-color: #ffffff !important;
 }
 
@@ -191,6 +203,17 @@
 [data-theme="light"] .bg-\[\#1A1D23\],
 [data-theme="light"] .bg-\[\#101216\],
 [data-theme="light"] .bg-\[\#1C1F28\],
+[data-theme="light"] .bg-\[\#141B2D\],
+[data-theme="light"] .bg-\[\#141B2D\]\/80,
+[data-theme="light"] .bg-\[\#141C2E\],
+[data-theme="light"] .bg-\[\#151C2C\],
+[data-theme="light"] .bg-\[\#161E30\],
+[data-theme="light"] .bg-\[\#182136\],
+[data-theme="light"] .bg-\[\#101A2E\],
+[data-theme="light"] .bg-\[\#1F2B45\],
+[data-theme="light"] .bg-\[\#131b2c\],
+[data-theme="light"] .bg-\[\#171e2e\],
+[data-theme="light"] .bg-\[\#182032\],
 [data-theme="light"] .bg-slate-900\/70,
 [data-theme="light"] .bg-slate-900\/90,
 [data-theme="light"] .bg-slate-800\/60,
