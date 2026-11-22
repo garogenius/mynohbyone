@@ -195,29 +195,53 @@ export function PluginApprovalCard({ action, onExecuted }: PluginApprovalCardPro
 
         {/* Evidence banner if delivered */}
         {status === "delivered" && evidence && (
-          <div className="mt-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2 text-[11px] text-emerald-200">
-            <div className="flex items-center justify-between">
-              <span className="font-medium">
-                {evidence.deliveryMethod === "meta_cloud_api"
-                  ? "✓ Dispatched via Meta WhatsApp Cloud API"
-                  : "✓ Prepared & dispatched via WhatsApp Web Bridge"}
+          <div className="mt-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-[11px] text-emerald-200">
+            <div className="flex flex-wrap items-center justify-between gap-1">
+              <span className="font-semibold text-emerald-300">
+                {provider === "whatsapp" || provider === "whatsapp_business"
+                  ? evidence.deliveryMethod === "meta_cloud_api"
+                    ? "✓ Dispatched via Meta WhatsApp Cloud API"
+                    : "✓ Dispatched via WhatsApp Web Bridge"
+                  : provider === "github"
+                    ? `✓ GitHub Issue #${evidence.issueNumber || "created"} created on ${evidence.repo || "repository"}`
+                    : ["email", "gmail", "outlook"].includes(provider)
+                      ? `✓ Email dispatched to ${evidence.recipient || recipient}`
+                      : ["google_calendar", "calendar"].includes(provider)
+                        ? `✓ Calendar event '${evidence.title || "Meeting"}' created`
+                        : provider === "slack"
+                          ? `✓ Slack message posted to ${evidence.channel || "#general"}`
+                          : `✓ Action completed via ${provider}`}
               </span>
               {typeof evidence.messageId === "string" && (
                 <span className="font-mono text-[9px] text-emerald-400">ID: {evidence.messageId}</span>
               )}
             </div>
-            {Boolean(evidence.directChatUrl) && (
-              <div className="mt-1.5 flex items-center gap-2">
+
+            {/* Direct Link Actions */}
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              {(provider === "whatsapp" || provider === "whatsapp_business") && Boolean(evidence.directChatUrl || directUrl) && (
                 <button
                   type="button"
                   onClick={openDirectLink}
-                  className="inline-flex items-center gap-1 text-[10px] text-[#00D4FF] underline hover:text-[#38e1ff]"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/20 px-2 py-1 text-[10.5px] font-medium text-emerald-300 hover:bg-emerald-500/30"
                 >
                   <ExternalLink className="h-3 w-3" />
-                  Open recipient chat in WhatsApp
+                  Open Chat in WhatsApp
                 </button>
-              </div>
-            )}
+              )}
+
+              {provider === "github" && Boolean(evidence.issueUrl) && (
+                <a
+                  href={evidence.issueUrl as string}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-2 py-1 text-[10.5px] font-medium text-white hover:bg-white/20"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  View Issue on GitHub
+                </a>
+              )}
+            </div>
           </div>
         )}
 

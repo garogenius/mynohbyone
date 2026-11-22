@@ -201,6 +201,17 @@ export function AssistantScreen() {
     loadConversations(true);
   }, [loadConversations]);
 
+  useEffect(() => {
+    const onPrefill = (e: Event) => {
+      const detail = (e as CustomEvent<{ prompt?: string }>).detail;
+      if (detail?.prompt) {
+        setComposer(detail.prompt);
+      }
+    };
+    window.addEventListener("nohby-prefill-chat", onPrefill);
+    return () => window.removeEventListener("nohby-prefill-chat", onPrefill);
+  }, []);
+
   // Realtime WebSocket for live token streaming
   useEffect(() => {
     const client = new RealtimeClient({
