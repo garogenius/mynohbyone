@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Check, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
 
 import { BrandMark } from "../components/BrandMark";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { useAppStore } from "../store/useAppStore";
 
 const ONBOARDING_STEPS = [
@@ -75,7 +76,8 @@ export function SignupScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
           </span>
         </div>
 
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex items-center gap-2.5 text-xs">
+          <ThemeToggle compact />
           <span className="hidden text-[#8E9199] sm:inline">Already have an account?</span>
           <button
             type="button"

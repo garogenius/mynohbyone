@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
 
 import { BrandMark } from "../components/BrandMark";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { useAppStore } from "../store/useAppStore";
 
 const EDITORIAL_SLIDES = [
@@ -62,7 +63,7 @@ export function LoginScreen({
   return (
     <div className="grid min-h-screen w-full bg-[#0B0C0E] lg:grid-cols-12">
       {/* Left: Full-bleed architectural studio showcase (Desktop lg+) */}
-      <section className="relative hidden overflow-hidden border-r border-white/[0.08] bg-[#090A0C] lg:col-span-6 lg:flex lg:flex-col lg:justify-between xl:col-span-7">
+      <section className="editorial-dark-panel relative hidden overflow-hidden border-r border-white/[0.08] bg-[#090A0C] lg:col-span-6 lg:flex lg:flex-col lg:justify-between xl:col-span-7">
         <motion.img
           src="/nohby-studio.jpg"
           alt="Nohby ONE architectural glass and brushed titanium sculpture"
@@ -129,7 +130,7 @@ export function LoginScreen({
 
       {/* Right: Distraction-free Sign In form */}
       <section className="flex min-h-screen flex-col justify-between lg:col-span-6 xl:col-span-5">
-        <div className="relative h-36 w-full overflow-hidden border-b border-white/[0.08] sm:h-44 lg:hidden">
+        <div className="editorial-dark-panel relative h-36 w-full overflow-hidden border-b border-white/[0.08] sm:h-44 lg:hidden">
           <img
             src="/nohby-studio.jpg"
             alt=""
@@ -143,10 +144,12 @@ export function LoginScreen({
                 Nohby ONE
               </span>
             </div>
-            <span className="font-mono text-[10px] tracking-widest text-[#D6C6A5] uppercase">
-              Local-First AI OS
-            </span>
+            <ThemeToggle compact />
           </div>
+        </div>
+
+        <div className="hidden items-center justify-end px-8 pt-6 lg:flex">
+          <ThemeToggle />
         </div>
 
         <div className="flex flex-1 items-center justify-center px-5 py-8 sm:px-10 lg:px-12">

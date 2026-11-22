@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Loader2, LogOut, Mic, Save, Shield, Volume2 } from "lucide-react";
+import { Loader2, LogOut, Mic, Monitor, Moon, Save, Shield, Sun, Volume2 } from "lucide-react";
 
+import { applyTheme, getStoredTheme, type ThemePreference } from "../lib/theme";
 import { speakText, stopSpeaking } from "../lib/voice";
 import { useAppStore } from "../store/useAppStore";
 
@@ -34,6 +35,13 @@ export function SettingsScreen() {
   const [ttsRate, setTtsRate] = useState(1.0);
   const [autoSpeakResponses, setAutoSpeakResponses] = useState(false);
   const [inputLanguage, setInputLanguage] = useState("en-US");
+  const [themePref, setThemePref] = useState<ThemePreference>(() => getStoredTheme());
+
+  const handleSelectTheme = (pref: ThemePreference) => {
+    setThemePref(pref);
+    applyTheme(pref);
+    window.dispatchEvent(new Event("nohby-theme-change"));
+  };
 
   useEffect(() => {
     if (!voiceSettings) {
@@ -107,6 +115,41 @@ export function SettingsScreen() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
+      {/* Appearance */}
+      <section className="rounded-2xl border border-white/[0.08] bg-[#111318] p-5 sm:p-6">
+        <h2 className="text-sm font-semibold text-white">Appearance</h2>
+        <p className="mt-1 text-xs text-zinc-400">
+          Choose Light, Dark, or follow your operating system theme across all screens.
+        </p>
+        <div className="mt-4 grid grid-cols-3 gap-2.5">
+          {(
+            [
+              { id: "light", label: "Light", icon: Sun },
+              { id: "dark", label: "Dark", icon: Moon },
+              { id: "system", label: "System", icon: Monitor },
+            ] as const
+          ).map((opt) => {
+            const Icon = opt.icon;
+            const selected = themePref === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => handleSelectTheme(opt.id)}
+                className={`flex min-h-[44px] items-center justify-center gap-2 rounded-xl border text-xs font-medium transition ${
+                  selected
+                    ? "btn-ivory border-transparent"
+                    : "border-white/[0.1] bg-[#0A0B0E] text-zinc-300 hover:border-white/[0.2]"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span>{opt.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       {/* Account Profile */}
       <section className="rounded-2xl border border-white/[0.08] bg-[#111318] p-5 sm:p-6">
         <h2 className="text-sm font-semibold text-white">Account Profile</h2>

@@ -1,5 +1,6 @@
 import { LogOut, Menu, Mic, MicOff, Radio, Volume2 } from "lucide-react";
 
+import { ThemeToggle } from "./ThemeToggle";
 import { stopSpeaking } from "../lib/voice";
 import { useAppStore } from "../store/useAppStore";
 import type { Device, HealthData, NavRoute, User } from "../types/api";
@@ -117,6 +118,8 @@ export function Topbar({
             {currentDevice ? currentDevice.deviceName : "Register Device"}
           </span>
         </button>
+
+        <ThemeToggle compact />
 
         <div className="hidden h-4 w-px bg-white/[0.08] sm:block" />
 

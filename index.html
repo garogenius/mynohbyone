@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en" data-theme="dark" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,6 +8,22 @@
       content="Nohby ONE — Local-first personal AI operating assistant by Nohby Technologies Limited."
     />
     <title>Nohby ONE — Personal AI Operating Assistant</title>
+    <script>
+      (function () {
+        try {
+          var pref = localStorage.getItem("nohbyone.theme") || "dark";
+          var resolved =
+            pref === "system"
+              ? window.matchMedia("(prefers-color-scheme: light)").matches
+                ? "light"
+                : "dark"
+              : pref;
+          document.documentElement.setAttribute("data-theme", resolved);
+          document.documentElement.classList.toggle("dark", resolved === "dark");
+          document.documentElement.classList.toggle("light", resolved === "light");
+        } catch (e) {}
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -15,7 +31,7 @@
       rel="stylesheet"
     />
   </head>
-  <body class="bg-[#0B0C0E] text-[#F2F0EB] antialiased selection:bg-[#D6C6A5]/25 selection:text-white">
+  <body class="antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
