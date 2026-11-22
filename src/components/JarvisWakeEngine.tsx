@@ -109,6 +109,7 @@ export function JarvisWakeEngine() {
   const overlayDebounceTimerRef = useRef<number | null>(null);
   const overlayCurrentQuestionRef = useRef<string>("");
   const overlayCurrentAnswerRef = useRef<string>("");
+  const overlayAnswerLockedRef = useRef<boolean>(false);
   const overlayRestartTimerRef = useRef<number | null>(null);
 
   const enabled = phase === "ready" && Boolean(voiceSettings?.wakeWordEnabled);
@@ -463,6 +464,7 @@ export function JarvisWakeEngine() {
         }
 
         overlayCurrentAnswerRef.current = answerText;
+        overlayAnswerLockedRef.current = true;
         meetingSyncRef.current.answer = answerText;
         meetingSyncRef.current.question = cleanQ;
 
@@ -471,11 +473,11 @@ export function JarvisWakeEngine() {
           aEl.scrollTop = 0;
         }
         if (badgeEl) {
-          badgeEl.textContent = "✓ READY TO SPEAK";
+          badgeEl.textContent = "🔒 ANSWER READY (LOCKED)";
           badgeEl.style.color = "#10B981";
         }
         if (statusBadge) {
-          statusBadge.textContent = "● ANSWER READY";
+          statusBadge.textContent = "🔒 ANSWER LOCKED";
           statusBadge.style.color = "#10B981";
         }
 
@@ -519,6 +521,7 @@ export function JarvisWakeEngine() {
 
     const doc = overlayWindowRef.current.document;
     const qEl = doc.getElementById("nohby-stealth-question");
+    const aEl = doc.getElementById("nohby-stealth-answer");
     const badgeEl = doc.getElementById("meeting-badge");
     const statusBadge = doc.getElementById("overlay-status-badge");
     const subEl = doc.getElementById("nohby-overlay-sub");
@@ -531,6 +534,33 @@ export function JarvisWakeEngine() {
         if (!clean) return;
 
         if (activeOverlayTabRef.current === "meeting") {
+          // If answer is locked, candidate is reading aloud: only check for explicit unlock phrases
+          if (overlayAnswerLockedRef.current) {
+            const low = clean.toLowerCase();
+            if (
+              low.includes("next question") ||
+              low.includes("new question") ||
+              low.includes("clear answer") ||
+              low.includes("clear question")
+            ) {
+              overlayAnswerLockedRef.current = false;
+              overlayCurrentQuestionRef.current = "";
+              overlayCurrentAnswerRef.current = "";
+              if (qEl) qEl.textContent = "Listening to interviewer / speaker... speak now";
+              if (aEl) aEl.textContent = "Your first-person response will generate automatically here.";
+              if (badgeEl) {
+                badgeEl.textContent = "● LISTENING FOR NEXT QUESTION";
+                badgeEl.style.color = "#10B981";
+              }
+              if (statusBadge) {
+                statusBadge.textContent = "● LIVE LISTENING";
+                statusBadge.style.color = "#10B981";
+              }
+            }
+            // Candidate is reading the answer or speaking: DO NOT overwrite answer or question!
+            return;
+          }
+
           if (qEl) qEl.textContent = clean;
           overlayCurrentQuestionRef.current = clean;
           if (badgeEl && !overlayGeneratingRef.current) {
@@ -565,6 +595,32 @@ export function JarvisWakeEngine() {
         if (!clean) return;
 
         if (activeOverlayTabRef.current === "meeting") {
+          // If answer is locked, do not trigger new answers while candidate is speaking
+          if (overlayAnswerLockedRef.current) {
+            const low = clean.toLowerCase();
+            if (
+              low.includes("next question") ||
+              low.includes("new question") ||
+              low.includes("clear answer") ||
+              low.includes("clear question")
+            ) {
+              overlayAnswerLockedRef.current = false;
+              overlayCurrentQuestionRef.current = "";
+              overlayCurrentAnswerRef.current = "";
+              if (qEl) qEl.textContent = "Listening to interviewer / speaker... speak now";
+              if (aEl) aEl.textContent = "Your first-person response will generate automatically here.";
+              if (badgeEl) {
+                badgeEl.textContent = "● LISTENING FOR NEXT QUESTION";
+                badgeEl.style.color = "#10B981";
+              }
+              if (statusBadge) {
+                statusBadge.textContent = "● LIVE LISTENING";
+                statusBadge.style.color = "#10B981";
+              }
+            }
+            return;
+          }
+
           if (qEl) qEl.textContent = clean;
           overlayCurrentQuestionRef.current = clean;
           const words = clean.split(/\s+/).length;
@@ -1128,9 +1184,9 @@ export function JarvisWakeEngine() {
           </div>
           <div class="a-text" id="nohby-stealth-answer">${initialA}</div>
           <div class="meeting-actions">
-            <button id="btn-whisper" class="btn-action">🔊 Whisper Answer</button>
-            <button id="btn-copy-answer" class="btn-action">📋 Copy Answer</button>
-            <button id="btn-clear-qa" class="btn-action">🔄 Clear / Next</button>
+            <button id="btn-next-question" class="btn-action" style="border-color: rgba(16, 185, 129, 0.5); color: #10B981; font-weight: 700;">🔄 Next Question</button>
+            <button id="btn-whisper" class="btn-action">🔊 Whisper</button>
+            <button id="btn-copy-answer" class="btn-action">📋 Copy</button>
             <button id="btn-toggle-mic" class="btn-action">🎙️ Pause Mic</button>
           </div>
         </div>
@@ -1226,9 +1282,10 @@ export function JarvisWakeEngine() {
         }
       });
 
-      // Setup clear / next
-      const clearBtn = pipWin.document.getElementById("btn-clear-qa");
-      clearBtn?.addEventListener("click", () => {
+      // Setup Next Question / Unlock
+      const nextBtn = pipWin.document.getElementById("btn-next-question");
+      nextBtn?.addEventListener("click", () => {
+        overlayAnswerLockedRef.current = false;
         overlayCurrentQuestionRef.current = "";
         overlayCurrentAnswerRef.current = "";
         meetingSyncRef.current.question = "";
@@ -1236,12 +1293,17 @@ export function JarvisWakeEngine() {
         const qEl = pipWin?.document.getElementById("nohby-stealth-question");
         const aEl = pipWin?.document.getElementById("nohby-stealth-answer");
         const badgeEl = pipWin?.document.getElementById("meeting-badge");
+        const statusBadge = pipWin?.document.getElementById("overlay-status-badge");
         if (qEl) qEl.textContent = "Listening to interviewer / speaker... speak now";
         if (aEl)
           aEl.textContent = "Your first-person response will generate automatically here.";
         if (badgeEl) {
-          badgeEl.textContent = "● LISTENING";
+          badgeEl.textContent = "● LISTENING FOR NEXT QUESTION";
           badgeEl.style.color = "#10B981";
+        }
+        if (statusBadge) {
+          statusBadge.textContent = "● LIVE LISTENING";
+          statusBadge.style.color = "#10B981";
         }
       });
 

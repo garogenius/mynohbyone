@@ -13,12 +13,14 @@ import {
   Mic,
   MicOff,
   Minimize2,
+  Monitor,
   PanelLeftClose,
   PanelLeftOpen,
   PictureInPicture2,
   Play,
   Plus,
   Radio,
+  RotateCw,
   Save,
   Send,
   Shield,
@@ -60,7 +62,7 @@ interface SavedAudioClip {
   mimeType: string;
   durationSec: number;
   createdAt: string;
-  kind: "live_recording" | "neural_brief";
+  kind: "live_recording" | "neural_brief" | "video_recording";
 }
 
 const CALENDAR_STORAGE_KEY = "nohbyone.meetings.calendarSchedule";
@@ -196,6 +198,8 @@ export function MeetingsScreen() {
   const [calAutoJoin, setCalAutoJoin] = useState(true);
 
   const [waveLevels, setWaveLevels] = useState<number[]>(() => WAVE_BARS.map(() => 0.16));
+  const [recordingMode, setRecordingMode] = useState<"screen" | "audio">("screen");
+  const [syncingCalendar, setSyncingCalendar] = useState<boolean>(false);
 
   const voiceHandleRef = useRef<VoiceSessionHandle | null>(null);
   const stopMonitorRef = useRef<(() => void) | null>(null);
@@ -203,6 +207,7 @@ export function MeetingsScreen() {
   const interimCommitTimerRef = useRef<number | null>(null);
   const restartTimerRef = useRef<number | null>(null);
   const lastSentFinalRef = useRef<string>("");
+  const answerLockedRef = useRef<boolean>(false);
 
   const currentNotes = selected ? notesByMeeting[selected.id] ?? selected.summary ?? "" : "";
 
@@ -255,13 +260,60 @@ export function MeetingsScreen() {
 
   const startLiveRecording = useCallback(
     async (meetingObj: MeetingItem) => {
-      if (isRecordingAudio || typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      if (isRecordingAudio || typeof navigator === "undefined" || !navigator.mediaDevices) {
         return;
       }
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        let stream: MediaStream;
+        let isVideo = false;
+
+        if (recordingMode === "screen" && navigator.mediaDevices.getDisplayMedia) {
+          try {
+            const displayStream = await navigator.mediaDevices.getDisplayMedia({
+              video: { displaySurface: "browser" },
+              audio: true,
+            });
+            isVideo = true;
+
+            // Try mixing microphone audio with display audio
+            try {
+              const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+              const dest = audioCtx.createMediaStreamDestination();
+              if (displayStream.getAudioTracks().length > 0) {
+                const sysSource = audioCtx.createMediaStreamSource(displayStream);
+                sysSource.connect(dest);
+              }
+              if (micStream.getAudioTracks().length > 0) {
+                const micSource = audioCtx.createMediaStreamSource(micStream);
+                micSource.connect(dest);
+              }
+              stream = new MediaStream([
+                ...displayStream.getVideoTracks(),
+                ...dest.stream.getAudioTracks(),
+              ]);
+            } catch {
+              stream = displayStream;
+            }
+          } catch {
+            // User cancelled screen picker, fall back to mic
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          }
+        } else {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
+
         recordedChunksRef.current = [];
-        const recorder = new MediaRecorder(stream);
+        const preferredMime = isVideo
+          ? (MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+              ? "video/webm;codecs=vp9"
+              : "video/webm")
+          : "audio/webm";
+
+        const recorder = new MediaRecorder(
+          stream,
+          MediaRecorder.isTypeSupported(preferredMime) ? { mimeType: preferredMime } : undefined
+        );
         mediaRecorderRef.current = recorder;
         const startedTime = Date.now();
         setRecordingSeconds(0);
@@ -279,7 +331,7 @@ export function MeetingsScreen() {
 
         recorder.onstop = () => {
           stream.getTracks().forEach((t) => t.stop());
-          const mimeType = recorder.mimeType || "audio/webm";
+          const mimeType = isVideo ? "video/webm" : recorder.mimeType || "audio/webm";
           const blob = new Blob(recordedChunksRef.current, { type: mimeType });
           if (blob.size > 0) {
             const url = URL.createObjectURL(blob);
@@ -287,24 +339,27 @@ export function MeetingsScreen() {
             const clip: SavedAudioClip = {
               id: `rec-${Date.now()}`,
               meetingId: meetingObj.id,
-              title: `${meetingObj.title} — Session Recording`,
+              title: `${meetingObj.title} — ${isVideo ? "Screen & Audio Recording" : "Session Recording"}`,
               url,
               mimeType,
               durationSec: dur,
               createdAt: new Date().toISOString(),
-              kind: "live_recording",
+              kind: isVideo ? "video_recording" : "live_recording",
             };
             setSavedAudioClips((prev) => [clip, ...prev]);
-            showToast("success", "Meeting audio recording saved.");
+            showToast(
+              "success",
+              isVideo ? "Session screen & audio recording saved." : "Meeting audio recording saved."
+            );
           }
         };
 
         recorder.start(1000);
       } catch {
-        showToast("error", "Microphone access is required to record session audio.");
+        showToast("error", "Permission is required to record session.");
       }
     },
-    [isRecordingAudio, showToast]
+    [isRecordingAudio, recordingMode, showToast]
   );
 
   const loadMeetings = useCallback(async () => {
@@ -341,6 +396,9 @@ export function MeetingsScreen() {
           speaker,
           content: clean,
         });
+        if (res.data.transcript?.aiHint) {
+          answerLockedRef.current = true;
+        }
         setSelected((prev) => {
           if (!prev || prev.id !== meetingId) return prev;
           const existing = prev.transcripts || [];
@@ -364,6 +422,19 @@ export function MeetingsScreen() {
       voiceHandleRef.current = startLocalVoiceRecognition({
         language: voiceSettings?.inputLanguage || "en-US",
         onInterim: (fullText: string) => {
+          if (answerLockedRef.current) {
+            const low = fullText.toLowerCase();
+            if (
+              low.includes("next question") ||
+              low.includes("clear") ||
+              low.includes("new question")
+            ) {
+              answerLockedRef.current = false;
+              lastSentFinalRef.current = fullText;
+              setLiveCaption("");
+            }
+            return;
+          }
           const prevSent = lastSentFinalRef.current;
           const pendingDelta = fullText.startsWith(prevSent)
             ? fullText.slice(prevSent.length).trim()
@@ -386,6 +457,19 @@ export function MeetingsScreen() {
           if (interimCommitTimerRef.current) {
             window.clearTimeout(interimCommitTimerRef.current);
             interimCommitTimerRef.current = null;
+          }
+          if (answerLockedRef.current) {
+            const low = fullText.toLowerCase();
+            if (
+              low.includes("next question") ||
+              low.includes("clear") ||
+              low.includes("new question")
+            ) {
+              answerLockedRef.current = false;
+              lastSentFinalRef.current = fullText;
+              setLiveCaption("");
+            }
+            return;
           }
           const prevSent = lastSentFinalRef.current;
           const delta = fullText.startsWith(prevSent)
@@ -415,6 +499,58 @@ export function MeetingsScreen() {
     },
     [sendTranscriptSegment, showToast, stopAudioCapture, voiceSettings?.inputLanguage]
   );
+
+  const fetchConnectedCalendarMeetings = useCallback(async () => {
+    setSyncingCalendar(true);
+    try {
+      const intRes = await apiClient.listIntegrations().catch(() => null);
+      const integrations = intRes?.data?.integrations || [];
+      const calConn = integrations.find((i) =>
+        ["google_calendar", "calendar", "outlook", "icloud_calendar"].includes(
+          i.provider.toLowerCase()
+        ) && i.status === "connected"
+      );
+
+      if (calConn || calendarConnected) {
+        const targetProvider = calConn ? calConn.provider : "google_calendar";
+        const res = await apiClient.executeIntegrationAction(targetProvider, {
+          action: "list_events",
+        });
+        const events = (res.data?.evidence?.events as any[]) || [];
+        if (events.length > 0) {
+          setScheduledMeetings((prev) => {
+            const map = new Map<string, ScheduledCalendarMeeting>();
+            prev.forEach((m) => map.set(m.id, m));
+            events.forEach((ev) => {
+              map.set(ev.id, {
+                id: ev.id,
+                title: ev.title,
+                scheduledAt: ev.scheduledAt,
+                meetingUrl: ev.meetingUrl || "",
+                provider: (ev.provider as any) || "Google Calendar",
+                autoJoinAndRecord: ev.autoJoinAndRecord ?? true,
+              });
+            });
+            const merged = Array.from(map.values()).sort(
+              (a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
+            );
+            localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(merged));
+            return merged;
+          });
+          setCalendarConnected(true);
+          localStorage.setItem("nohbyone.meetings.calendarConnected", "true");
+        }
+      }
+    } catch {
+      // Offline fallback
+    } finally {
+      setSyncingCalendar(false);
+    }
+  }, [calendarConnected]);
+
+  useEffect(() => {
+    fetchConnectedCalendarMeetings();
+  }, [fetchConnectedCalendarMeetings]);
 
   const activateListeningOnMeeting = useCallback(
     (meetingObj: MeetingItem, alsoRecordAudio = false) => {
@@ -1211,29 +1347,50 @@ export function MeetingsScreen() {
                   </div>
                 </div>
 
-                {/* 2. Audio Record Toggle */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    isRecordingAudio ? stopLiveRecording() : startLiveRecording(selected)
-                  }
-                  className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition ${
-                    isRecordingAudio
-                      ? "border-rose-500/45 bg-rose-500/15 text-rose-600 dark:text-rose-300"
-                      : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950 dark:border-white/[0.1] dark:bg-[#151C2C] dark:text-zinc-200 dark:hover:text-white"
-                  }`}
-                >
-                  <Radio
-                    className={`h-3 w-3 ${isRecordingAudio ? "animate-pulse text-rose-500 dark:text-rose-400" : "text-zinc-500 dark:text-zinc-400"}`}
-                  />
-                  <span>
-                    {isRecordingAudio
-                      ? `${Math.floor(recordingSeconds / 60)}:${String(
-                          recordingSeconds % 60
-                        ).padStart(2, "0")}`
-                      : "Record"}
-                  </span>
-                </button>
+                {/* 2. Audio & Screen Record Toggle */}
+                <div className="flex items-center rounded-lg border border-white/[0.1] bg-[#151C2C] p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setRecordingMode(recordingMode === "screen" ? "audio" : "screen")}
+                    title={`Mode: ${recordingMode === "screen" ? "Screen & Audio" : "Audio Only"}. Click to switch.`}
+                    disabled={isRecordingAudio}
+                    className="flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-zinc-300 hover:text-white disabled:opacity-50"
+                  >
+                    {recordingMode === "screen" ? (
+                      <>
+                        <Monitor className="h-3 w-3 text-[#00D4FF]" />
+                        <span className="hidden sm:inline">Screen</span>
+                      </>
+                    ) : (
+                      <>
+                        <Headphones className="h-3 w-3 text-emerald-400" />
+                        <span className="hidden sm:inline">Audio</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      isRecordingAudio ? stopLiveRecording() : startLiveRecording(selected)
+                    }
+                    className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition ${
+                      isRecordingAudio
+                        ? "bg-rose-500 text-white shadow-sm"
+                        : "bg-white/10 text-white hover:bg-white/15"
+                    }`}
+                  >
+                    <Radio
+                      className={`h-3 w-3 ${isRecordingAudio ? "animate-pulse text-white" : "text-rose-400"}`}
+                    />
+                    <span>
+                      {isRecordingAudio
+                        ? `${Math.floor(recordingSeconds / 60)}:${String(
+                            recordingSeconds % 60
+                          ).padStart(2, "0")}`
+                        : "Record"}
+                    </span>
+                  </button>
+                </div>
 
                 {/* 3. Stealth Card Toggle (Off by default — only opens modal when enabled) */}
                 <button
@@ -1596,7 +1753,15 @@ export function MeetingsScreen() {
                             {new Date(clip.createdAt).toLocaleTimeString()}
                           </p>
                         </div>
-                        <audio controls src={clip.url} className="h-8 max-w-[240px]" />
+                        {clip.kind === "video_recording" || clip.mimeType?.startsWith("video/") ? (
+                          <video
+                            controls
+                            src={clip.url}
+                            className="max-h-36 max-w-[280px] rounded-lg bg-black/60 object-contain shadow-inner"
+                          />
+                        ) : (
+                          <audio controls src={clip.url} className="h-8 max-w-[240px]" />
+                        )}
                         <div className="flex items-center gap-1.5">
                           <a
                             href={clip.url}
@@ -1709,7 +1874,20 @@ export function MeetingsScreen() {
                   </div>
 
                   <div className="rounded-xl border border-white/[0.08] bg-[#131926] p-4">
-                    <h3 className="text-xs font-semibold text-white">Upcoming Scheduled Meetings</h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-semibold text-white">Upcoming Scheduled Meetings</h3>
+                      <button
+                        type="button"
+                        disabled={syncingCalendar}
+                        onClick={fetchConnectedCalendarMeetings}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.1] bg-[#182032] px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:text-white disabled:opacity-50"
+                      >
+                        <RotateCw
+                          className={`h-3 w-3 ${syncingCalendar ? "animate-spin text-[#00D4FF]" : ""}`}
+                        />
+                        <span>{syncingCalendar ? "Syncing..." : "Sync Calendar"}</span>
+                      </button>
+                    </div>
                     <div className="mt-3 space-y-2">
                       {scheduledMeetings.length === 0 ? (
                         <p className="py-8 text-center text-xs text-zinc-500">
@@ -1859,38 +2037,58 @@ export function MeetingsScreen() {
               {/* First-Person Suggested Response */}
               <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-white/[0.12] bg-[#131B2C] px-4 py-3">
                 <div className="flex shrink-0 items-center justify-between">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-                    Your Answer (First Person)
-                  </p>
-                  {latestSegment?.aiHint && (
-                    <div className="flex items-center gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard
-                            .writeText(cleanFirstPersonAnswer(latestSegment.aiHint))
-                            .then(() => showToast("info", "Copied."))
-                            .catch(() => null);
-                        }}
-                        className="inline-flex items-center gap-1 text-[11px] text-zinc-300 hover:text-white"
-                      >
-                        <Copy className="h-3 w-3" /> Copy
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          stopSpeaking();
-                          speakText(cleanFirstPersonAnswer(latestSegment.aiHint), {
-                            language: voiceSettings?.inputLanguage || "en-US",
-                            voiceType: voiceSettings?.voiceType || "female",
-                          });
-                        }}
-                        className="inline-flex items-center gap-1 text-[11px] text-zinc-300 hover:text-white"
-                      >
-                        <Volume2 className="h-3.5 w-3.5" /> Speak
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                      Your Answer (First Person)
+                    </p>
+                    {answerLockedRef.current && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2 py-0.5 text-[9px] font-medium text-emerald-300">
+                        🔒 Locked (Read Freely)
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        answerLockedRef.current = false;
+                        setLiveCaption("");
+                        showToast("info", "Answer unlocked. Listening for next question.");
+                      }}
+                      className="inline-flex items-center gap-1 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 hover:bg-emerald-500/20"
+                    >
+                      <RotateCw className="h-2.5 w-2.5" /> Next Question
+                    </button>
+                    {latestSegment?.aiHint && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard
+                              .writeText(cleanFirstPersonAnswer(latestSegment.aiHint))
+                              .then(() => showToast("info", "Copied."))
+                              .catch(() => null);
+                          }}
+                          className="inline-flex items-center gap-1 text-[11px] text-zinc-300 hover:text-white"
+                        >
+                          <Copy className="h-3 w-3" /> Copy
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            stopSpeaking();
+                            speakText(cleanFirstPersonAnswer(latestSegment.aiHint), {
+                              language: voiceSettings?.inputLanguage || "en-US",
+                              voiceType: voiceSettings?.voiceType || "female",
+                            });
+                          }}
+                          className="inline-flex items-center gap-1 text-[11px] text-zinc-300 hover:text-white"
+                        >
+                          <Volume2 className="h-3.5 w-3.5" /> Speak
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <div className="mt-1.5 flex-1 overflow-y-auto pr-1 text-[15px] leading-relaxed text-white">
                   {latestSegment?.aiHint

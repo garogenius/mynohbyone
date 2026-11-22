@@ -36,8 +36,16 @@ interface PluginApprovalCardProps {
 
 export function PluginApprovalCard({ action, onExecuted }: PluginApprovalCardProps) {
   const { showToast } = useAppStore();
-  const [status, setStatus] = useState<"pending" | "executing" | "delivered" | "rejected" | "error">("pending");
-  const [evidence, setEvidence] = useState<Record<string, unknown> | null>(null);
+  const isDirect = action.type === "plugin_direct_dispatched" || Boolean(action.executed);
+  const [status, setStatus] = useState<"pending" | "executing" | "delivered" | "rejected" | "error">(
+    isDirect ? "delivered" : "pending"
+  );
+  const [evidence, setEvidence] = useState<Record<string, unknown> | null>(() => {
+    if (action.evidence && typeof action.evidence === "object") {
+      return action.evidence as Record<string, unknown>;
+    }
+    return null;
+  });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const provider = (action.provider || (action.tool ? action.tool.split(".")[0] : "whatsapp")).toLowerCase();
@@ -153,7 +161,7 @@ export function PluginApprovalCard({ action, onExecuted }: PluginApprovalCardPro
               {status === "delivered" && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.2 text-[9px] font-medium text-emerald-300">
                   <CheckCircle2 className="h-2.5 w-2.5" />
-                  Dispatched
+                  {isDirect ? "Dispatched Directly" : "Dispatched"}
                 </span>
               )}
               {status === "rejected" && (
