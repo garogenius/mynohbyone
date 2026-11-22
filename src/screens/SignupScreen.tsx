@@ -55,17 +55,34 @@ export function SignupScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#0B0C0E] text-[#F4F1EA]">
-      {/* Compact top navigation */}
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/[0.07] px-5 sm:px-8">
-        <BrandMark variant="logo" size="sm" />
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#08142E]">
+      {/* Full-bleed looping HD background video */}
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        preload="auto"
+        poster="/nohby-studio-2.jpg"
+        className="pointer-events-none fixed inset-0 h-full w-full object-cover object-center opacity-80"
+      >
+        <source src="/nohby-signup-bg.mp4" type="video/mp4" />
+      </video>
+
+      {/* NohbyOne Cobalt Blue & Deep Navy atmospheric color overlay */}
+      <div className="pointer-events-none fixed inset-0 bg-gradient-to-tr from-[#08142E]/90 via-[#003E9E]/45 to-[#08142E]/85" />
+      <div className="pointer-events-none fixed inset-0 bg-[#08142E]/30 backdrop-blur-[2px]" />
+
+      {/* Compact top navigation over video */}
+      <header className="editorial-dark-panel relative z-10 flex h-14 shrink-0 items-center justify-between border-b border-white/10 px-5 sm:px-8">
+        <BrandMark variant="logo" size="sm" forceDark />
 
         <div className="flex items-center gap-2.5 text-xs">
           <ThemeToggle compact />
           <button
             type="button"
             onClick={onGoToLogin}
-            className="rounded-lg border border-white/[0.12] bg-[#131519] px-3 py-1.5 font-medium text-[#F4F1EA] transition hover:border-white/[0.24] hover:bg-[#1A1D23]"
+            className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 font-medium text-white backdrop-blur-md transition hover:bg-white/20"
           >
             Sign In
           </button>
@@ -73,12 +90,12 @@ export function SignupScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
       </header>
 
       {/* Single-viewport compact centered card (no scrolling on desktop/laptop) */}
-      <main className="flex flex-1 items-center justify-center px-4 py-4">
+      <main className="relative z-10 flex flex-1 items-center justify-center px-4 py-4">
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-          className="w-full max-w-[375px] rounded-xl border border-white/[0.09] bg-[#131519] p-5 shadow-2xl sm:p-6"
+          initial={{ opacity: 0, y: 12, scale: 0.99 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          className="w-full max-w-[375px] rounded-xl border border-white/[0.12] bg-[#131519] p-5 shadow-[0_24px_60px_-15px_rgba(0,0,0,0.65)] backdrop-blur-xl sm:p-6"
         >
           <div className="text-center">
             <h1 className="font-display text-lg font-semibold tracking-tight text-[#F4F1EA]">
@@ -161,7 +178,11 @@ export function SignupScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
                     className="absolute top-1/2 right-1.5 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-[#6E717A] transition hover:text-[#F4F1EA]"
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
-                    {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    {showPassword ? (
+                      <EyeOff className="h-3.5 w-3.5" />
+                    ) : (
+                      <Eye className="h-3.5 w-3.5" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -197,7 +218,7 @@ export function SignupScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
                       strengthScore >= level
                         ? strengthScore === 4
                           ? "bg-emerald-400"
-                          : "bg-[#D6C6A5]"
+                          : "bg-[#0066FF]"
                         : "bg-white/[0.08]"
                     }`}
                   />
@@ -241,7 +262,7 @@ export function SignupScreen({ onGoToLogin }: { onGoToLogin: () => void }) {
         </motion.div>
       </main>
 
-      <footer className="flex shrink-0 items-center justify-between border-t border-white/[0.06] px-5 py-3 text-[11px] text-[#6E717A] sm:px-8">
+      <footer className="editorial-dark-panel relative z-10 flex shrink-0 items-center justify-between border-t border-white/10 px-5 py-3 text-[11px] text-white/70 sm:px-8">
         <span>© {new Date().getFullYear()} Nohby Technologies Limited</span>
         <span>Local-first AI OS</span>
       </footer>
