@@ -381,7 +381,14 @@ export const apiClient = {
     return json as ApiSuccessResponse<{ transcription: TranscriptionResult }>;
   },
 
-  synthesizeSpeech(payload: { text: string; voice?: string; rate?: number; language?: string }) {
+  synthesizeSpeech(payload: {
+    text: string;
+    voice?: string;
+    voiceType?: string;
+    pitch?: number;
+    rate?: number;
+    language?: string;
+  }) {
     return request<{ speech: SpeechSynthesisResult }>("/voice/speech", {
       method: "POST",
       body: JSON.stringify(payload),

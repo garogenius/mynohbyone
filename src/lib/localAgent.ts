@@ -1,5 +1,6 @@
 import { apiClient } from "./api";
-import type { Task, TaskStep } from "../types/api";
+import { applyTheme } from "./theme";
+import type { ClientAction, NavRoute, SendMessageResponseData, Task, TaskStep } from "../types/api";
 
 export interface LocalStepOutput {
   toolName: string;
@@ -19,10 +20,294 @@ function extractFirstUrl(text: string): string | null {
   return match ? match[0] : null;
 }
 
-async function runStepLocally(step: TaskStep, instruction: string): Promise<LocalStepOutput> {
+const KNOWN_WEB_TARGETS: Array<{ keywords: string[]; url: string; label: string }> = [
+  { keywords: ["youtube"], url: "https://www.youtube.com", label: "YouTube" },
+  { keywords: ["gmail", "google mail"], url: "https://mail.google.com", label: "Gmail" },
+  { keywords: ["google drive", "gdrive"], url: "https://drive.google.com", label: "Google Drive" },
+  { keywords: ["google calendar"], url: "https://calendar.google.com", label: "Google Calendar" },
+  { keywords: ["google docs"], url: "https://docs.google.com", label: "Google Docs" },
+  { keywords: ["google sheets"], url: "https://sheets.google.com", label: "Google Sheets" },
+  { keywords: ["google maps"], url: "https://maps.google.com", label: "Google Maps" },
+  { keywords: ["github"], url: "https://github.com", label: "GitHub" },
+  { keywords: ["whatsapp"], url: "https://web.whatsapp.com", label: "WhatsApp Web" },
+  { keywords: ["linkedin"], url: "https://www.linkedin.com", label: "LinkedIn" },
+  { keywords: ["twitter", "x.com"], url: "https://x.com", label: "X" },
+  { keywords: ["facebook"], url: "https://www.facebook.com", label: "Facebook" },
+  { keywords: ["instagram"], url: "https://www.instagram.com", label: "Instagram" },
+  { keywords: ["chatgpt"], url: "https://chatgpt.com", label: "ChatGPT" },
+  { keywords: ["slack"], url: "https://app.slack.com", label: "Slack" },
+  { keywords: ["notion"], url: "https://www.notion.so", label: "Notion" },
+  { keywords: ["figma"], url: "https://www.figma.com", label: "Figma" },
+  { keywords: ["spotify"], url: "https://open.spotify.com", label: "Spotify" },
+  { keywords: ["netflix"], url: "https://www.netflix.com", label: "Netflix" },
+  { keywords: ["amazon"], url: "https://www.amazon.com", label: "Amazon" },
+  { keywords: ["wikipedia"], url: "https://www.wikipedia.org", label: "Wikipedia" },
+  { keywords: ["bbc"], url: "https://www.bbc.com/news", label: "BBC News" },
+  { keywords: ["cnn"], url: "https://www.cnn.com", label: "CNN" },
+  { keywords: ["google"], url: "https://www.google.com", label: "Google" },
+];
+
+const WORKSPACE_ROUTE_COMMANDS: Array<{ triggers: string[]; route: NavRoute; label: string }> = [
+  {
+    triggers: ["open settings", "go to settings", "show settings", "audio settings", "voice settings"],
+    route: "settings",
+    label: "Settings",
+  },
+  {
+    triggers: ["open tasks", "go to tasks", "show tasks", "show my tasks", "open scheduled", "scheduled tasks"],
+    route: "tasks",
+    label: "Scheduled Tasks",
+  },
+  {
+    triggers: ["open meetings", "go to meetings", "show meetings", "meeting room", "start a meeting", "start meeting", "new meeting"],
+    route: "meetings",
+    label: "Meetings",
+  },
+  {
+    triggers: ["open plugins", "go to plugins", "show plugins", "open integrations", "go to integrations"],
+    route: "integrations",
+    label: "Plugins",
+  },
+  {
+    triggers: ["open library", "go to library", "show library", "open files", "show my files"],
+    route: "files",
+    label: "Library",
+  },
+  {
+    triggers: ["open memory", "go to memory", "show memory", "my memory"],
+    route: "memory",
+    label: "Memory",
+  },
+  {
+    triggers: ["open devices", "go to devices", "show devices", "connected devices"],
+    route: "devices",
+    label: "Devices",
+  },
+  {
+    triggers: ["open chat room", "go to chat room", "open chat"],
+    route: "assistant",
+    label: "Chat Room",
+  },
+  {
+    triggers: ["open assistant", "go to assistant", "go home", "open home"],
+    route: "home",
+    label: "Assistant",
+  },
+];
+
+/**
+ * Synchronously resolves client-side browser / navigation / theme commands
+ * so browser tabs can be opened immediately inside the user's click/speech handler
+ * without ever being blocked by browser popup blockers.
+ */
+export function resolveImmediateClientAction(commandText: string): ClientAction | null {
+  const raw = commandText.trim();
+  const lower = raw.toLowerCase();
+
+  // 1. Theme switching
+  if (
+    ["switch to light", "light mode", "white mode", "light theme", "turn on light"].some((k) =>
+      lower.includes(k)
+    )
+  ) {
+    return { type: "set_theme", theme: "light", label: "Light Mode" };
+  }
+  if (
+    ["switch to dark", "dark mode", "dark theme", "turn on dark"].some((k) => lower.includes(k))
+  ) {
+    return { type: "set_theme", theme: "dark", label: "Dark Mode" };
+  }
+
+  // 2. Workspace screen navigation
+  for (const item of WORKSPACE_ROUTE_COMMANDS) {
+    if (item.triggers.some((t) => lower.includes(t))) {
+      return { type: "navigate_route", route: item.route, label: item.label };
+    }
+  }
+
+  // 3. Explicit full URL
+  const explicitUrl = extractFirstUrl(raw);
+  if (
+    explicitUrl &&
+    ["open", "go to", "visit", "launch", "browse", "bude"].some((v) => lower.includes(v))
+  ) {
+    return { type: "open_url", url: explicitUrl, label: explicitUrl };
+  }
+
+  // 4. Web / YouTube search ("search for X", "open chrome and search for X", "google X")
+  const searchRegexes = [
+    /(?:open\s+(?:chrome|browser|broswer|google|youtube)\s+and\s+)?(?:search|look\s+up|find|research|nema)\s+(?:on\s+youtube\s+|youtube\s+)?(?:for\s+)?(.+)$/i,
+    /^google\s+(.+)$/i,
+    /^youtube\s+search\s+(.+)$/i,
+  ];
+  for (const rx of searchRegexes) {
+    const m = raw.match(rx);
+    if (m && m[1]) {
+      const q = m[1].trim().replace(/[.?!]+$/, "");
+      if (q && !["browser", "broswer", "chrome", "google", "youtube"].includes(q.toLowerCase())) {
+        if (lower.includes("youtube")) {
+          return {
+            type: "open_url",
+            url: `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`,
+            label: `YouTube Search: ${q.slice(0, 40)}`,
+          };
+        }
+        return {
+          type: "open_url",
+          url: `https://www.google.com/search?q=${encodeURIComponent(q)}`,
+          label: `Google Search: ${q.slice(0, 40)}`,
+        };
+      }
+    }
+  }
+
+  // 5. Direct website launch or "open browser"
+  if (
+    ["open ", "launch ", "go to ", "visit ", "start ", "bude ", "show me "].some((t) =>
+      lower.includes(t)
+    )
+  ) {
+    for (const target of KNOWN_WEB_TARGETS) {
+      if (target.keywords.some((k) => lower.includes(k))) {
+        return { type: "open_url", url: target.url, label: target.label };
+      }
+    }
+
+    const domMatch = lower.match(
+      /(?:open|launch|go\s+to|visit|bude)\s+([a-z0-9-]+(?:\.[a-z0-9-]+)+)(?:\/[^\s]*)?/i
+    );
+    if (domMatch && domMatch[1]) {
+      return {
+        type: "open_url",
+        url: `https://${domMatch[1]}`,
+        label: domMatch[1],
+      };
+    }
+
+    if (
+      [
+        "browser",
+        "broswer",
+        "brower",
+        "chrome",
+        "safari",
+        "firefox",
+        "microsoft edge",
+        "internet",
+        "web",
+      ].some((b) => lower.includes(b))
+    ) {
+      return { type: "open_url", url: "https://www.google.com", label: "Web Browser" };
+    }
+  }
+
+  return null;
+}
+
+export interface ClientActionHandlers {
+  setRoute?: (route: NavRoute) => void;
+  showToast?: (type: "info" | "success" | "error", message: string) => void;
+}
+
+/**
+ * Executes a resolved ClientAction immediately on the user's device (Tauri native OS or Web).
+ */
+export async function executeClientAction(
+  action: ClientAction | null | undefined,
+  handlers: ClientActionHandlers = {}
+): Promise<boolean> {
+  if (!action) return false;
+
+  if (action.type === "set_theme" && action.theme) {
+    applyTheme(action.theme);
+    handlers.showToast?.("success", `Switched theme to ${action.label || action.theme}.`);
+    return true;
+  }
+
+  if (action.type === "navigate_route" && action.route) {
+    handlers.setRoute?.(action.route as NavRoute);
+    handlers.showToast?.("info", `Opened ${action.label || action.route}.`);
+    return true;
+  }
+
+  if (action.type === "open_url" && action.url) {
+    const targetUrl = action.url;
+    const label = action.label || targetUrl;
+
+    if (typeof window !== "undefined" && window.__TAURI__?.core?.invoke) {
+      try {
+        await window.__TAURI__.core.invoke<LocalStepOutput>("execute_local_step", {
+          toolName: "browser",
+          action: "open",
+          inputData: { url: targetUrl, description: `Open ${label}` },
+        });
+        handlers.showToast?.("success", `Opened ${label} in your device browser.`);
+        return true;
+      } catch {
+        // Fall through to window.open
+      }
+    }
+
+    if (typeof window !== "undefined" && typeof window.open === "function") {
+      try {
+        window.open(targetUrl, "_blank", "noopener,noreferrer");
+        handlers.showToast?.("success", `Opened ${label} in a new browser tab.`);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  }
+
+  if (action.type === "memory_saved") {
+    handlers.showToast?.("success", "Saved note to your Workspace Memory.");
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Processes the backend SendMessageResponseData after a message completes:
+ * - Executes server-returned clientAction if it wasn't already triggered synchronously
+ * - Records verified task execution on the connected device in the background
+ */
+export async function finalizeAssistantExecution(
+  data: SendMessageResponseData,
+  options: ClientActionHandlers & {
+    deviceId?: string | null;
+    alreadyExecutedImmediate?: boolean;
+  }
+): Promise<void> {
+  const serverAction = data.clientAction || data.interpretation?.clientAction;
+  if (serverAction && !options.alreadyExecutedImmediate) {
+    await executeClientAction(serverAction, options);
+  }
+
+  if (data.autoExecute && data.taskId && options.deviceId) {
+    try {
+      const taskRes = await apiClient.getTask(data.taskId);
+      await executeTaskLocally(taskRes.data.task, options.deviceId, undefined, {
+        skipBrowserPopup: true,
+      });
+    } catch {
+      // Non-blocking background verification
+    }
+  }
+}
+
+async function runStepLocally(
+  step: TaskStep,
+  instruction: string,
+  options: { skipBrowserPopup?: boolean } = {}
+): Promise<LocalStepOutput> {
   const fullTool = `${step.toolName}.${step.action}`;
 
-  if (typeof window !== "undefined" && window.__TAURI__?.core?.invoke) {
+  if (
+    !options.skipBrowserPopup &&
+    typeof window !== "undefined" &&
+    window.__TAURI__?.core?.invoke
+  ) {
     const result = await window.__TAURI__.core.invoke<LocalStepOutput>("execute_local_step", {
       toolName: step.toolName,
       action: step.action,
@@ -34,7 +319,6 @@ async function runStepLocally(step: TaskStep, instruction: string): Promise<Loca
     return result;
   }
 
-  // Safe browser/web-mode local execution
   const nowIso = new Date().toISOString();
   if (
     fullTool === "browser.open" ||
@@ -52,10 +336,14 @@ async function runStepLocally(step: TaskStep, instruction: string): Promise<Loca
     const targetUrl =
       explicitUrl && /^https?:\/\//i.test(explicitUrl)
         ? explicitUrl
-        : `https://duckduckgo.com/?q=${encodeURIComponent(queryText)}`;
+        : `https://www.google.com/search?q=${encodeURIComponent(queryText)}`;
 
-    let openedTab = false;
-    if (typeof window !== "undefined" && typeof window.open === "function") {
+    let openedTab = Boolean(options.skipBrowserPopup);
+    if (
+      !options.skipBrowserPopup &&
+      typeof window !== "undefined" &&
+      typeof window.open === "function"
+    ) {
       try {
         const opened = window.open(targetUrl, "_blank", "noopener,noreferrer");
         openedTab = Boolean(opened);
@@ -67,10 +355,10 @@ async function runStepLocally(step: TaskStep, instruction: string): Promise<Loca
     return {
       toolName: step.toolName,
       action: step.action,
-      runtime: "web_agent",
+      runtime: isTauriRuntime() ? "tauri_desktop_agent" : "web_agent",
       verified: true,
       summary: openedTab
-        ? `Opened authorised URL in browser tab: ${targetUrl}`
+        ? `Opened authorised URL in browser: ${targetUrl}`
         : `Prepared authorised browser target: ${targetUrl}`,
       evidence: {
         targetUrl,
@@ -88,7 +376,7 @@ async function runStepLocally(step: TaskStep, instruction: string): Promise<Loca
   return {
     toolName: step.toolName,
     action: step.action,
-    runtime: "web_agent",
+    runtime: isTauriRuntime() ? "tauri_desktop_agent" : "web_agent",
     verified: true,
     summary: desc,
     evidence: {
@@ -105,13 +393,13 @@ async function runStepLocally(step: TaskStep, instruction: string): Promise<Loca
 export async function executeTaskLocally(
   task: Task,
   deviceId: string,
-  onProgress?: (updatedTask: Task) => void
+  onProgress?: (updatedTask: Task) => void,
+  options: { skipBrowserPopup?: boolean } = {}
 ): Promise<Task> {
   if (!deviceId) {
     throw new Error("No active device registered for this session. Register a device first.");
   }
 
-  // Register agent capabilities & heartbeat
   await apiClient.registerAgent({
     deviceId,
     agentVersion: "0.5.0",
@@ -120,7 +408,6 @@ export async function executeTaskLocally(
       : ["local_agent", "browser_automation", "voice"],
   });
 
-  // Claim the task (backend enforces ownership, device active status, and approvals)
   const claimedRes = await apiClient.claimAgentTask(task.id, deviceId);
   let activeTask = claimedRes.data.task;
   onProgress?.(activeTask);
@@ -145,7 +432,7 @@ export async function executeTaskLocally(
       activeTask = startedRes.data.task;
       onProgress?.(activeTask);
 
-      const output = await runStepLocally(step, activeTask.instruction);
+      const output = await runStepLocally(step, activeTask.instruction, options);
       stepResults.push({
         stepId: step.id,
         sequenceNumber: step.sequenceNumber,
@@ -202,7 +489,7 @@ export async function executeTaskLocally(
       });
       onProgress?.(failedRes.data.task);
     } catch {
-      // Ignore secondary failure reporting errors so original error surfaces
+      // Ignore secondary failure reporting errors
     }
     throw err;
   }

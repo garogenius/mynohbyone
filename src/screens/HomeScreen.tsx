@@ -17,6 +17,11 @@ import {
 
 import { ApiError, apiClient } from "../lib/api";
 import { cleanDisplayText } from "../lib/formatText";
+import {
+  executeClientAction,
+  finalizeAssistantExecution,
+  resolveImmediateClientAction,
+} from "../lib/localAgent";
 import { getSelectedOrbStyle, type OrbStyleOption } from "../lib/orbStyle";
 import {
   isSpeechRecognitionSupported,
@@ -206,6 +211,17 @@ export function HomeScreen() {
       if (!trimmed || sending) return;
 
       setSending(true);
+
+      // 1. Synchronously trigger local device action (browser open / search / route / theme)
+      const immediateAction = resolveImmediateClientAction(trimmed);
+      let executedImmediate = false;
+      if (immediateAction) {
+        executedImmediate = await executeClientAction(immediateAction, {
+          setRoute,
+          showToast,
+        });
+      }
+
       try {
         let targetConvId = conversationId;
         if (!targetConvId) {
@@ -221,6 +237,13 @@ export function HomeScreen() {
           content: trimmed,
           inputType,
           deviceId: currentDeviceId,
+        });
+
+        await finalizeAssistantExecution(res.data, {
+          deviceId: currentDeviceId,
+          alreadyExecutedImmediate: executedImmediate,
+          setRoute,
+          showToast,
         });
 
         setRecentMessages((prev) => [
@@ -251,7 +274,7 @@ export function HomeScreen() {
         setSending(false);
       }
     },
-    [conversationId, currentDeviceId, sending, showToast, voiceSettings]
+    [conversationId, currentDeviceId, sending, setRoute, showToast, voiceSettings]
   );
 
   const interimTimerRef = useRef<number | null>(null);

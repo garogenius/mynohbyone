@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronRight, Radio, X } from "lucide-react";
+import { ChevronRight, PictureInPicture2, Radio, X } from "lucide-react";
 
 import { apiClient } from "../lib/api";
+import {
+  executeClientAction,
+  finalizeAssistantExecution,
+  resolveImmediateClientAction,
+} from "../lib/localAgent";
 import { getSelectedOrbStyle, type OrbStyleOption } from "../lib/orbStyle";
 import {
   extractWakeWordCommand,
@@ -13,6 +18,17 @@ import {
 } from "../lib/voice";
 import { useAppStore } from "../store/useAppStore";
 import type { Message } from "../types/api";
+
+interface DocumentPictureInPicture {
+  requestWindow: (options?: { width?: number; height?: number }) => Promise<Window>;
+  window: Window | null;
+}
+
+declare global {
+  interface Window {
+    documentPictureInPicture?: DocumentPictureInPicture;
+  }
+}
 
 function playJarvisChime() {
   try {
@@ -49,6 +65,7 @@ export function JarvisWakeEngine() {
     loadVoiceSettings,
     updateVoiceSettings,
     setIsSpeaking,
+    setRoute,
     showToast,
   } = useAppStore();
 
@@ -58,6 +75,7 @@ export function JarvisWakeEngine() {
   const [orbStyle, setOrbStyle] = useState<OrbStyleOption>(() => getSelectedOrbStyle());
   const [speechDetected, setSpeechDetected] = useState(false);
   const [manualMicActive, setManualMicActive] = useState(false);
+  const [desktopPinned, setDesktopPinned] = useState(false);
 
   const handleRef = useRef<VoiceSessionHandle | null>(null);
   const restartTimerRef = useRef<number | null>(null);
@@ -68,6 +86,7 @@ export function JarvisWakeEngine() {
   const busyRef = useRef<boolean>(false);
   const lastProcessedRef = useRef<string>("");
   const convIdRef = useRef<string | null>(null);
+  const overlayWindowRef = useRef<Window | null>(null);
 
   const enabled = phase === "ready" && Boolean(voiceSettings?.wakeWordEnabled);
   const wakePhrase = voiceSettings?.wakeWordPhrase || "Hey Nohby";
@@ -138,7 +157,6 @@ export function JarvisWakeEngine() {
 
     setLastHeard(wakePhrase);
 
-    // Immediately show greeting exchange on Assistant screen bubbles
     const nowIso = new Date().toISOString();
     const syntheticUser: Message = {
       id: `jarvis-wake-u-${Date.now()}`,
@@ -215,6 +233,16 @@ export function JarvisWakeEngine() {
       setLastHeard(clean);
       emitJarvisState("thinking");
 
+      // 1. Synchronously trigger local device action (browser open / search / route / theme)
+      const immediateAction = resolveImmediateClientAction(clean);
+      let executedImmediate = false;
+      if (immediateAction) {
+        executedImmediate = await executeClientAction(immediateAction, {
+          setRoute,
+          showToast,
+        });
+      }
+
       try {
         if (!convIdRef.current) {
           const list = await apiClient.listConversations({ limit: 1 }).catch(() => null);
@@ -235,6 +263,13 @@ export function JarvisWakeEngine() {
           deviceId: currentDeviceId,
         });
 
+        await finalizeAssistantExecution(res.data, {
+          deviceId: currentDeviceId,
+          alreadyExecutedImmediate: executedImmediate,
+          setRoute,
+          showToast,
+        });
+
         const reply = res.data.assistantMessage.content;
         window.dispatchEvent(
           new CustomEvent("nohby-jarvis-reply", {
@@ -245,7 +280,6 @@ export function JarvisWakeEngine() {
           })
         );
 
-        // Send background desktop notification if user is in another tab/window
         if (
           typeof document !== "undefined" &&
           document.hidden &&
@@ -272,7 +306,6 @@ export function JarvisWakeEngine() {
           onEnd: () => {
             setIsSpeaking(false);
             busyRef.current = false;
-            // Stay awake for 18s after answering so user can ask a follow-up naturally
             scheduleAwakeWindow(18000);
           },
         });
@@ -281,7 +314,16 @@ export function JarvisWakeEngine() {
         emitJarvisState("standby");
       }
     },
-    [currentDeviceId, emitJarvisState, lang, scheduleAwakeWindow, setIsSpeaking, voiceSettings]
+    [
+      currentDeviceId,
+      emitJarvisState,
+      lang,
+      scheduleAwakeWindow,
+      setIsSpeaking,
+      setRoute,
+      showToast,
+      voiceSettings,
+    ]
   );
 
   const handleUtteranceChunk = useCallback(
@@ -289,7 +331,6 @@ export function JarvisWakeEngine() {
       const delta = deltaText.trim();
       if (!delta || busyRef.current) return;
 
-      // Ignore self-echo of the assistant's own greeting phrase
       const lowerDelta = delta.toLowerCase();
       if (
         lowerDelta.includes("i'm listening") ||
@@ -313,7 +354,6 @@ export function JarvisWakeEngine() {
         return;
       }
 
-      // If inside active awake window after saying "Hey Nohby", accept command directly
       if (Date.now() < awakeUntilRef.current) {
         awakeUntilRef.current = 0;
         processCommand(delta);
@@ -321,6 +361,202 @@ export function JarvisWakeEngine() {
     },
     [greetAndOpenListeningWindow, processCommand, wakePhrase]
   );
+
+  // Sync Always-On-Top OS Desktop Overlay Window (Document Picture-in-Picture or Companion Popup)
+  const syncOverlayDom = useCallback(() => {
+    const win = overlayWindowRef.current;
+    if (!win || win.closed) return;
+    const doc = win.document;
+    const orbImg = doc.getElementById("nohby-overlay-orb") as HTMLImageElement | null;
+    const statusEl = doc.getElementById("nohby-overlay-status");
+    const subEl = doc.getElementById("nohby-overlay-sub");
+    const isAnim = status !== "standby" || speechDetected;
+    const origin = window.location.origin;
+
+    if (orbImg) {
+      const srcPath = isAnim ? orbStyle.gif : orbStyle.still;
+      const fullSrc = srcPath.startsWith("http") ? srcPath : `${origin}${srcPath}`;
+      if (orbImg.src !== fullSrc) orbImg.src = fullSrc;
+    }
+    if (statusEl) {
+      statusEl.textContent =
+        status === "speaking"
+          ? "NohbyAI Speaking"
+          : status === "thinking"
+            ? "Thinking..."
+            : status === "awake" || speechDetected
+              ? "Listening — speak now"
+              : `Say "${wakePhrase}"`;
+    }
+    if (subEl) {
+      subEl.textContent = lastHeard || "Tap orb or speak wake phrase anywhere";
+    }
+  }, [lastHeard, orbStyle.gif, orbStyle.still, speechDetected, status, wakePhrase]);
+
+  useEffect(() => {
+    syncOverlayDom();
+  }, [syncOverlayDom]);
+
+  const toggleDeviceDesktopOverlay = async () => {
+    // 1. Native Tauri Desktop App Always-On-Top background mode
+    if (typeof window !== "undefined" && window.__TAURI__?.core?.invoke) {
+      try {
+        const next = !desktopPinned;
+        await window.__TAURI__.core.invoke<boolean>("set_stealth_mode", { enabled: next });
+        setDesktopPinned(next);
+        showToast(
+          "success",
+          next
+            ? "NohbyAI pinned on top of your device desktop background."
+            : "Unpinned from device desktop background."
+        );
+        return;
+      } catch {
+        // Fall through to web PiP
+      }
+    }
+
+    // 2. Close existing floating OS overlay if already open
+    if (overlayWindowRef.current && !overlayWindowRef.current.closed) {
+      overlayWindowRef.current.close();
+      overlayWindowRef.current = null;
+      setDesktopPinned(false);
+      return;
+    }
+
+    try {
+      let pipWin: Window | null = null;
+      if (window.documentPictureInPicture?.requestWindow) {
+        pipWin = await window.documentPictureInPicture.requestWindow({
+          width: 340,
+          height: 86,
+        });
+      } else {
+        pipWin = window.open(
+          "",
+          "NohbyJarvisDesktopWidget",
+          "width=350,height=105,menubar=no,toolbar=no,location=no,status=no,resizable=no"
+        );
+      }
+
+      if (!pipWin) {
+        showToast("error", "Allow popups to pin NohbyAI onto your device background.");
+        return;
+      }
+
+      overlayWindowRef.current = pipWin;
+      setDesktopPinned(true);
+
+      const origin = window.location.origin;
+      const initialOrb = `${origin}${orbStyle.still}`;
+      pipWin.document.open();
+      pipWin.document.write(`<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>NohbyAI — Device Background Assistant</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0B111E;
+      color: #F8FAFC;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 100vh;
+      padding: 10px 14px;
+      overflow: hidden;
+      user-select: none;
+    }
+    .pill {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      cursor: pointer;
+    }
+    .orb-wrap {
+      width: 46px;
+      height: 46px;
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1.5px solid rgba(0, 212, 255, 0.65);
+      box-shadow: 0 0 18px rgba(0, 212, 255, 0.4);
+      flex-shrink: 0;
+    }
+    .orb-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.25);
+    }
+    .meta {
+      min-width: 0;
+      flex: 1;
+    }
+    .title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #00D4FF;
+      box-shadow: 0 0 10px #00D4FF;
+      display: inline-block;
+    }
+    .sub {
+      font-size: 11px;
+      color: #94A3B8;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="pill" id="nohby-overlay-trigger" title="Click to talk to NohbyAI">
+    <div class="orb-wrap">
+      <img id="nohby-overlay-orb" src="${initialOrb}" alt="NohbyAI" />
+    </div>
+    <div class="meta">
+      <div class="title">
+        <span class="dot"></span>
+        <span id="nohby-overlay-status">Say "${wakePhrase}"</span>
+      </div>
+      <div class="sub" id="nohby-overlay-sub">Floating on device background — click or speak</div>
+    </div>
+  </div>
+</body>
+</html>`);
+      pipWin.document.close();
+
+      const triggerEl = pipWin.document.getElementById("nohby-overlay-trigger");
+      triggerEl?.addEventListener("click", () => {
+        greetAndOpenListeningWindow();
+      });
+
+      pipWin.addEventListener("pagehide", () => {
+        overlayWindowRef.current = null;
+        setDesktopPinned(false);
+      });
+
+      syncOverlayDom();
+      showToast(
+        "success",
+        "NohbyAI is now floating on your device desktop background above other apps."
+      );
+    } catch {
+      showToast("error", "Could not open floating desktop overlay window.");
+    }
+  };
 
   useEffect(() => {
     if (!enabled || manualMicActive) {
@@ -338,7 +574,6 @@ export function JarvisWakeEngine() {
       return;
     }
 
-    // Request non-blocking notification permission for background replies
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission().catch(() => {});
     }
@@ -373,7 +608,6 @@ export function JarvisWakeEngine() {
             if (interimCommitTimerRef.current) {
               window.clearTimeout(interimCommitTimerRef.current);
             }
-            // If Chrome STT pauses for 850ms without emitting isFinal, commit immediately
             interimCommitTimerRef.current = window.setTimeout(() => {
               if (unmounted || busyRef.current) return;
               lastProcessedRef.current = text;
@@ -534,6 +768,24 @@ export function JarvisWakeEngine() {
 
       <button
         type="button"
+        onClick={toggleDeviceDesktopOverlay}
+        className={`rounded-full p-1 transition ${
+          desktopPinned
+            ? "bg-[#00D4FF]/20 text-[#00D4FF]"
+            : "text-zinc-400 hover:bg-black/[0.06] hover:text-[#00D4FF] dark:hover:bg-white/[0.08]"
+        }`}
+        title={
+          desktopPinned
+            ? "Unpin from device desktop background"
+            : "Pin floating widget onto device desktop background (Always on top)"
+        }
+        aria-label="Pin widget onto device desktop background"
+      >
+        <PictureInPicture2 className="h-3.5 w-3.5" />
+      </button>
+
+      <button
+        type="button"
         onClick={() => setCollapsed(true)}
         className="rounded-full p-1 text-zinc-400 transition hover:bg-black/[0.06] hover:text-white dark:hover:bg-white/[0.08]"
         title="Collapse to icon only"
@@ -546,6 +798,9 @@ export function JarvisWakeEngine() {
         type="button"
         onClick={() => {
           stopSpeaking();
+          if (overlayWindowRef.current && !overlayWindowRef.current.closed) {
+            overlayWindowRef.current.close();
+          }
           updateVoiceSettings({ wakeWordEnabled: false }).catch(() => {});
         }}
         className="rounded-full p-1 text-zinc-400 transition hover:bg-rose-500/15 hover:text-rose-500"

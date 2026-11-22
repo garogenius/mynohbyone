@@ -1,3 +1,4 @@
+import { apiClient } from "./api";
 import { cleanDisplayText } from "./formatText";
 
 export interface SpeechRecognitionResultEvent {
@@ -322,14 +323,19 @@ function pickBestSpeechVoice(language: string, voiceType?: string): SpeechSynthe
 }
 
 let activeUtterance: SpeechSynthesisUtterance | null = null;
+let activeAudio: HTMLAudioElement | null = null;
 let activeSpeechTimer: number | null = null;
+let activeSpeechGeneration = 0;
+
+const neuralAudioCache = new Map<string, string>();
+const MAX_NEURAL_CACHE = 48;
 
 export function isCurrentlySpeaking(): boolean {
-  return Boolean(activeUtterance);
+  return Boolean(activeUtterance || activeAudio);
 }
 
-export function speakText(
-  text: string,
+function speakWithBrowserFallback(
+  spokenText: string,
   options: {
     rate?: number;
     pitch?: number;
@@ -337,16 +343,12 @@ export function speakText(
     language?: string;
     onStart?: () => void;
     onEnd?: () => void;
-  } = {}
+  },
+  finishOnce: () => void
 ): void {
   if (!isSpeechSynthesisSupported()) {
-    options.onEnd?.();
+    finishOnce();
     return;
-  }
-
-  if (activeSpeechTimer) {
-    window.clearTimeout(activeSpeechTimer);
-    activeSpeechTimer = null;
   }
 
   try {
@@ -356,19 +358,6 @@ export function speakText(
     // Ignore synth reset errors
   }
 
-  let finished = false;
-  const finishOnce = () => {
-    if (finished) return;
-    finished = true;
-    if (activeSpeechTimer) {
-      window.clearTimeout(activeSpeechTimer);
-      activeSpeechTimer = null;
-    }
-    activeUtterance = null;
-    options.onEnd?.();
-  };
-
-  const spokenText = cleanDisplayText(text);
   const preset = VOICE_PERSONA_PRESETS.find((p) => p.id === options.voiceType);
   const utterance = new SpeechSynthesisUtterance(spokenText);
   activeUtterance = utterance;
@@ -386,8 +375,7 @@ export function speakText(
   utterance.onend = () => finishOnce();
   utterance.onerror = () => finishOnce();
 
-  // Safety watchdog in case browser TTS is muted or drops onend event
-  const maxDurationMs = Math.max(3500, Math.min(24000, spokenText.length * 85));
+  const maxDurationMs = Math.max(3500, Math.min(26000, spokenText.length * 85));
   activeSpeechTimer = window.setTimeout(finishOnce, maxDurationMs);
 
   try {
@@ -397,10 +385,124 @@ export function speakText(
   }
 }
 
+export function speakText(
+  text: string,
+  options: {
+    rate?: number;
+    pitch?: number;
+    voiceType?: string;
+    language?: string;
+    onStart?: () => void;
+    onEnd?: () => void;
+  } = {}
+): void {
+  const spokenText = cleanDisplayText(text);
+  if (!spokenText) {
+    options.onEnd?.();
+    return;
+  }
+
+  stopSpeaking();
+  const gen = ++activeSpeechGeneration;
+
+  let finished = false;
+  const finishOnce = () => {
+    if (finished || gen !== activeSpeechGeneration) return;
+    finished = true;
+    if (activeSpeechTimer) {
+      window.clearTimeout(activeSpeechTimer);
+      activeSpeechTimer = null;
+    }
+    activeUtterance = null;
+    activeAudio = null;
+    options.onEnd?.();
+  };
+
+  const voiceType = options.voiceType || "female";
+  const language = options.language || "en-US";
+  const preset = VOICE_PERSONA_PRESETS.find((p) => p.id === voiceType);
+  const rate = options.rate ?? preset?.rate ?? 1.0;
+  const pitch = options.pitch ?? preset?.pitch ?? 1.0;
+  const cacheKey = `${language}|${voiceType}|${rate.toFixed(2)}|${spokenText.slice(0, 320)}`;
+
+  const playDataUrl = async (dataUrl: string): Promise<boolean> => {
+    if (gen !== activeSpeechGeneration || typeof Audio === "undefined") return false;
+    try {
+      const audio = new Audio(dataUrl);
+      activeAudio = audio;
+      audio.onplay = () => {
+        if (gen === activeSpeechGeneration) options.onStart?.();
+      };
+      audio.onended = () => finishOnce();
+      audio.onerror = () => finishOnce();
+
+      const maxDurationMs = Math.max(4500, Math.min(32000, spokenText.length * 95));
+      activeSpeechTimer = window.setTimeout(finishOnce, maxDurationMs);
+      await audio.play();
+      return true;
+    } catch {
+      activeAudio = null;
+      return false;
+    }
+  };
+
+  // Signal immediate visual speaking state while fetching or playing cached neural audio
+  options.onStart?.();
+
+  const cachedUrl = neuralAudioCache.get(cacheKey);
+  if (cachedUrl) {
+    void playDataUrl(cachedUrl).then((ok) => {
+      if (!ok && gen === activeSpeechGeneration) {
+        speakWithBrowserFallback(spokenText, options, finishOnce);
+      }
+    });
+    return;
+  }
+
+  void apiClient
+    .synthesizeSpeech({
+      text: spokenText,
+      voiceType,
+      pitch,
+      rate,
+      language,
+    })
+    .then(async (res) => {
+      if (gen !== activeSpeechGeneration) return;
+      const speech = res.data.speech;
+      if (speech.strategy === "cloud_audio" && speech.audioBase64) {
+        const mime = speech.mimeType || "audio/mpeg";
+        const dataUrl = `data:${mime};base64,${speech.audioBase64}`;
+        neuralAudioCache.set(cacheKey, dataUrl);
+        if (neuralAudioCache.size > MAX_NEURAL_CACHE) {
+          const oldestKey = neuralAudioCache.keys().next().value;
+          if (oldestKey) neuralAudioCache.delete(oldestKey);
+        }
+        const played = await playDataUrl(dataUrl);
+        if (played) return;
+      }
+      speakWithBrowserFallback(spokenText, options, finishOnce);
+    })
+    .catch(() => {
+      if (gen !== activeSpeechGeneration) return;
+      speakWithBrowserFallback(spokenText, options, finishOnce);
+    });
+}
+
 export function stopSpeaking(): void {
+  activeSpeechGeneration++;
   if (activeSpeechTimer) {
     window.clearTimeout(activeSpeechTimer);
     activeSpeechTimer = null;
+  }
+  if (activeAudio) {
+    try {
+      activeAudio.pause();
+      activeAudio.currentTime = 0;
+    } catch {
+      // Ignore
+    }
+    activeAudio = null;
   }
   activeUtterance = null;
   if (isSpeechSynthesisSupported()) {

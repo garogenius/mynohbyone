@@ -82,12 +82,22 @@ export interface ProposedStep {
   requiresApproval: boolean;
 }
 
+export interface ClientAction {
+  type: "open_url" | "navigate_route" | "set_theme" | "memory_saved" | string;
+  url?: string;
+  route?: string;
+  theme?: "light" | "dark" | "system";
+  label?: string;
+  content?: string;
+}
+
 export interface InterpretationResult {
   intent: string;
   requiresExecution: boolean;
   riskLevel: "low" | "medium" | "high" | string;
   missingInformation: string[];
   proposedPlan: ProposedStep[];
+  clientAction?: ClientAction | null;
 }
 
 export interface Conversation {
@@ -127,6 +137,9 @@ export interface SendMessageResponseData {
   assistantMessage: Message;
   executionRequired: boolean;
   interpretation: InterpretationResult;
+  clientAction?: ClientAction | null;
+  autoExecute?: boolean;
+  taskId?: string | null;
 }
 
 export type VoicePersonaId =
@@ -169,6 +182,8 @@ export interface SpeechSynthesisResult {
   mimeType?: string;
   audioBase64?: string;
   voice: string;
+  voiceType?: string;
+  pitch?: number;
   rate: number;
   language: string;
 }

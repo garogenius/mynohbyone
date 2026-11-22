@@ -38,6 +38,11 @@ import {
 import { RealtimeClient } from "../lib/realtime";
 import { cleanDisplayText } from "../lib/formatText";
 import {
+  executeClientAction,
+  finalizeAssistantExecution,
+  resolveImmediateClientAction,
+} from "../lib/localAgent";
+import {
   isSpeechRecognitionSupported,
   speakText,
   startLocalVoiceRecognition,
@@ -49,12 +54,12 @@ import type { Conversation, Message } from "../types/api";
 
 const STARTER_PROMPTS = [
   {
-    title: "Draft a message",
-    prompt: "Write a concise, professional LinkedIn update announcing Nohby ONE.",
+    title: "Open browser & research",
+    prompt: "Open browser and search for the latest AI operating system architecture trends.",
   },
   {
-    title: "Summarize & explain",
-    prompt: "Explain how local-first AI agents protect user privacy in 4 bullet points.",
+    title: "Draft a message",
+    prompt: "Write a concise, professional LinkedIn update announcing Nohby ONE.",
   },
   {
     title: "Plan my day",
@@ -91,6 +96,7 @@ export function AssistantScreen() {
     currentDeviceId,
     voiceSettings,
     loadVoiceSettings,
+    setRoute,
     showToast,
   } = useAppStore();
 
@@ -274,6 +280,16 @@ export function AssistantScreen() {
       setStreamingText("");
       if (!textOverride) setComposer("");
 
+      // 1. Synchronously trigger local device action (browser open / search / route / theme)
+      const immediateAction = resolveImmediateClientAction(content);
+      let executedImmediate = false;
+      if (immediateAction) {
+        executedImmediate = await executeClientAction(immediateAction, {
+          setRoute,
+          showToast,
+        });
+      }
+
       // Optimistic user bubble
       const tempUserId = `temp-${Date.now()}`;
       const optimisticUser: Message = {
@@ -317,6 +333,13 @@ export function AssistantScreen() {
           deviceId: currentDeviceId,
         });
 
+        await finalizeAssistantExecution(res.data, {
+          deviceId: currentDeviceId,
+          alreadyExecutedImmediate: executedImmediate,
+          setRoute,
+          showToast,
+        });
+
         setStreamingText("");
         setMessages((prev) => [
           ...prev.filter((m) => m.id !== tempUserId),
@@ -348,7 +371,17 @@ export function AssistantScreen() {
         setSending(false);
       }
     },
-    [autoSpeak, composer, currentDeviceId, selectedProjectId, sending, showToast, updateWorkspaceMeta, voiceSettings]
+    [
+      autoSpeak,
+      composer,
+      currentDeviceId,
+      selectedProjectId,
+      sending,
+      setRoute,
+      showToast,
+      updateWorkspaceMeta,
+      voiceSettings,
+    ]
   );
 
   const toggleVoiceMic = () => {
