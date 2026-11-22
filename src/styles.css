@@ -399,6 +399,7 @@
 
 /* Complete Light Mode surface & text overrides for obsidian-navy dark classes */
 [data-theme="light"] .bg-\[\#0B101B\],
+[data-theme="light"] .bg-\[\#0B101B\]\/95,
 [data-theme="light"] .bg-\[\#080C14\] {
   background-color: #ffffff !important;
 }
@@ -410,12 +411,20 @@
 }
 
 [data-theme="light"] .bg-\[\#141B2D\],
+[data-theme="light"] .bg-\[\#141B2D\]\/70,
+[data-theme="light"] .bg-\[\#141B2D\]\/75,
 [data-theme="light"] .bg-\[\#141B2D\]\/80,
 [data-theme="light"] .bg-\[\#151B2B\]\/90,
 [data-theme="light"] .bg-\[\#161E30\],
+[data-theme="light"] .bg-\[\#172038\],
 [data-theme="light"] .bg-\[\#0C121E\],
 [data-theme="light"] .bg-\[\#101A2E\] {
   background-color: #f3f6fb !important;
+}
+
+[data-theme="light"] .hover\:bg-\[\#172038\]:hover,
+[data-theme="light"] .hover\:bg-\[\#161E30\]:hover {
+  background-color: #e8f0fe !important;
 }
 
 [data-theme="light"] .nohby-bubble-ai,
@@ -430,13 +439,19 @@
 
 [data-theme="light"] .border-\[\#00D4FF\]\/35,
 [data-theme="light"] .border-\[\#00D4FF\]\/40,
-[data-theme="light"] .border-\[\#00D4FF\]\/50 {
+[data-theme="light"] .border-\[\#00D4FF\]\/45,
+[data-theme="light"] .border-\[\#00D4FF\]\/50,
+[data-theme="light"] .border-\[\#00D4FF\]\/55,
+[data-theme="light"] .border-\[\#00D4FF\]\/60 {
   border-color: rgba(0, 119, 204, 0.35) !important;
 }
 
 [data-theme="light"] .bg-\[\#00D4FF\]\/10,
-[data-theme="light"] .bg-\[\#00D4FF\]\/15 {
+[data-theme="light"] .bg-\[\#00D4FF\]\/12,
+[data-theme="light"] .bg-\[\#00D4FF\]\/15,
+[data-theme="light"] .bg-\[\#00D4FF\]\/20 {
   background-color: rgba(0, 119, 204, 0.1) !important;
 }
+
 
 
