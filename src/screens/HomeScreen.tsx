@@ -359,7 +359,11 @@ export function HomeScreen() {
         </div>
 
         {/* Live Conversation Exchange Bubbles (Compact) */}
-        <div className="mx-auto mb-2.5 grid w-full max-w-2xl gap-2.5 sm:grid-cols-2">
+        <div
+          className={`mx-auto mb-2.5 grid w-full gap-2.5 ${
+            interimTranscript || latestUserMsg ? "max-w-2xl sm:grid-cols-2" : "max-w-md grid-cols-1"
+          }`}
+        >
           <div className="flex flex-col items-start">
             <span className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-[#00D4FF]/35 bg-[#101A2E] px-2 py-0.5 text-[10px] font-medium text-zinc-200">
               NohbyAI
@@ -380,22 +384,20 @@ export function HomeScreen() {
             </div>
           </div>
 
-          <div className="flex flex-col items-end justify-end">
-            <span className="mb-1 rounded-full border border-white/[0.12] bg-[#161E30] px-2 py-0.5 text-[10px] font-medium text-zinc-300">
-              You
-            </span>
-            <div className="w-full rounded-xl rounded-tr-sm border border-white/[0.1] bg-[#151B2B]/90 px-3 py-2 text-[11px] leading-relaxed text-zinc-200">
-              {interimTranscript ? (
-                <p className="line-clamp-2 italic text-[#00D4FF]">{interimTranscript}</p>
-              ) : latestUserMsg ? (
-                <p className="line-clamp-2">{latestUserMsg.content}</p>
-              ) : (
-                <p className="line-clamp-2 text-zinc-400">
-                  Press &ldquo;On&rdquo; to speak or click &ldquo;Input Text&rdquo; below.
-                </p>
-              )}
+          {(interimTranscript || latestUserMsg) && (
+            <div className="flex flex-col items-end justify-end">
+              <span className="mb-1 rounded-full border border-white/[0.12] bg-[#161E30] px-2 py-0.5 text-[10px] font-medium text-zinc-300">
+                You
+              </span>
+              <div className="w-full rounded-xl rounded-tr-sm border border-white/[0.1] bg-[#151B2B]/90 px-3 py-2 text-[11px] leading-relaxed text-zinc-200">
+                {interimTranscript ? (
+                  <p className="line-clamp-2 italic text-[#00D4FF]">{interimTranscript}</p>
+                ) : (
+                  <p className="line-clamp-2">{latestUserMsg?.content}</p>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Optional Inline Text Input */}
