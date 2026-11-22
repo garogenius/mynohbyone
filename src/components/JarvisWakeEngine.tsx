@@ -275,7 +275,7 @@ export function JarvisWakeEngine() {
         <img
           src={isActive ? "/vioce-wave.gif" : "/vioce-wave-image.jpg"}
           alt="NohbyAI Jarvis Mode"
-          className="h-full w-full object-cover"
+          className="h-full w-full scale-[1.34] object-cover"
         />
       </div>
       <div className="min-w-0">

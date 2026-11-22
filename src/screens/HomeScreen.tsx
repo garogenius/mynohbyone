@@ -281,24 +281,24 @@ export function HomeScreen() {
             type="button"
             onClick={toggleVoiceMic}
             aria-label={voiceActive ? "Stop voice listening" : "Start voice listening"}
-            className={`group relative flex h-44 w-44 items-center justify-center rounded-full transition duration-300 xl:h-52 xl:w-52 ${
+            className={`group relative flex h-44 w-44 items-center justify-center overflow-hidden rounded-full transition duration-300 xl:h-52 xl:w-52 ${
               isOrbMoving
-                ? "scale-105 shadow-[0_0_65px_rgba(0,212,255,0.5)]"
-                : "hover:scale-[1.02] shadow-[0_0_30px_rgba(0,102,255,0.2)]"
+                ? "scale-105 shadow-[0_0_65px_rgba(0,212,255,0.55)]"
+                : "hover:scale-[1.02] shadow-[0_0_32px_rgba(0,102,255,0.28)]"
             }`}
           >
             <img
               src={isOrbMoving ? "/vioce-wave.gif" : "/vioce-wave-image.jpg"}
               alt="Nohby ONE Voice Wave"
-              className={`h-full w-full rounded-full object-cover transition duration-300 ${
-                isOrbMoving ? "opacity-100" : "opacity-90"
+              className={`h-full w-full scale-[1.34] rounded-full object-cover transition duration-300 ${
+                isOrbMoving ? "opacity-100" : "opacity-95"
               }`}
             />
             <span
               className={`pointer-events-none absolute inset-0 rounded-full border transition ${
                 isOrbMoving
                   ? "border-[#00D4FF]/75 ring-4 ring-[#00D4FF]/20"
-                  : "border-white/15 group-hover:border-[#00D4FF]/40"
+                  : "border-[#00D4FF]/30 group-hover:border-[#00D4FF]/55"
               }`}
             />
           </button>
