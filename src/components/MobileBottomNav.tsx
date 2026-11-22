@@ -8,7 +8,7 @@ const MOBILE_TABS: {
   icon: React.ComponentType<{ className?: string }>;
 }[] = [
   { id: "home", label: "Home", icon: Home },
-  { id: "assistant", label: "Assistant", icon: MessageSquare },
+  { id: "assistant", label: "Chat", icon: MessageSquare },
   { id: "tasks", label: "Tasks", icon: ListChecks },
   { id: "devices", label: "Devices", icon: Laptop },
   { id: "settings", label: "Settings", icon: Settings },

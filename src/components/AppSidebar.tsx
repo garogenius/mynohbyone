@@ -5,6 +5,7 @@ import {
   EyeOff,
   Laptop,
   ListChecks,
+  MessageSquare,
   Mic,
   Plug,
   Settings,
@@ -24,6 +25,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: "home", label: "Active Session", icon: Mic },
+  { id: "assistant", label: "Chat Room", icon: MessageSquare },
   { id: "tasks", label: "Tasks", icon: ListChecks },
   { id: "meetings", label: "Meetings", icon: EyeOff },
   { id: "integrations", label: "Integrations", icon: Plug },

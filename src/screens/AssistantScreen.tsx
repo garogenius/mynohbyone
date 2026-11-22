@@ -1,50 +1,54 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  AlertCircle,
-  ArrowLeft,
   Check,
   Copy,
   History,
-  LayoutDashboard,
   Loader2,
+  MessageSquare,
   MessageSquarePlus,
   Mic,
   MicOff,
   Search,
   Send,
-  ShieldAlert,
+  Sparkles,
   Square,
   Trash2,
   Volume2,
   VolumeX,
-  Wifi,
-  WifiOff,
   X,
 } from "lucide-react";
 
-import { BrandMark } from "../components/BrandMark";
-import { ConfirmationDialog, LoadingState } from "../components/StateViews";
-import { ThemeToggle } from "../components/ThemeToggle";
+import { ConfirmationDialog } from "../components/StateViews";
 import { ApiError, apiClient } from "../lib/api";
 import { RealtimeClient } from "../lib/realtime";
 import {
-  extractWakeWordCommand,
   isSpeechRecognitionSupported,
   speakText,
   startLocalVoiceRecognition,
-  startMicLevelMonitor,
   stopSpeaking,
   type VoiceSessionHandle,
 } from "../lib/voice";
 import { useAppStore } from "../store/useAppStore";
-import type { Conversation, InterpretationResult, Message } from "../types/api";
+import type { Conversation, Message } from "../types/api";
 
 const STARTER_PROMPTS = [
-  "Open Chrome and search for the best cloud hosting providers",
-  "Prepare a LinkedIn announcement for Nohby ONE",
-  "Find available time on my calendar for a team sync tomorrow",
-  "Summarise the key security principles of local-first execution",
+  {
+    title: "Draft a message",
+    prompt: "Write a concise, professional LinkedIn update announcing Nohby ONE.",
+  },
+  {
+    title: "Summarize & explain",
+    prompt: "Explain how local-first AI agents protect user privacy in 4 bullet points.",
+  },
+  {
+    title: "Plan my day",
+    prompt: "Help me structure a focused 3-hour deep work session for software engineering.",
+  },
+  {
+    title: "Ask in Hausa",
+    prompt: "Sannu Nohby, ka bayyana min yadda zan yi amfani da kai wajen aiki na yau da kullum.",
+  },
 ];
 
 function formatTime(iso: string): string {
@@ -55,16 +59,23 @@ function formatTime(iso: string): string {
   }
 }
 
+function formatTimeAgo(iso: string | null | undefined): string {
+  if (!iso) return "Just now";
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.max(0, Math.floor(diffMs / 60000));
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
 export function AssistantScreen() {
   const {
     user,
     currentDeviceId,
     voiceSettings,
-    micActive,
-    isSpeaking,
-    setRoute,
-    setMicActive,
-    setIsSpeaking,
+    loadVoiceSettings,
     showToast,
   } = useAppStore();
 
@@ -77,219 +88,165 @@ export function AssistantScreen() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const [streamingText, setStreamingText] = useState("");
-  const [latestInterpretation, setLatestInterpretation] = useState<InterpretationResult | null>(null);
-  const [wsStatus, setWsStatus] = useState<"connecting" | "connected" | "disconnected">("disconnected");
+  const [wsConnected, setWsConnected] = useState(false);
+
   const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Conversation | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+  const [autoSpeak, setAutoSpeak] = useState(false);
 
-  // Voice capture state
-  const [liveTranscript, setLiveTranscript] = useState("");
-  const [audioLevels, setAudioLevels] = useState<number[]>(Array(12).fill(0.15));
-  const lastInputWasVoiceRef = useRef(false);
+  // Voice capture
+  const [voiceActive, setVoiceActive] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState("");
   const voiceHandleRef = useRef<VoiceSessionHandle | null>(null);
-  const stopMonitorRef = useRef<(() => void) | null>(null);
 
   const realtimeRef = useRef<RealtimeClient | null>(null);
   const activeIdRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   activeIdRef.current = activeId;
 
-  const stopVoiceCapture = useCallback(
-    (cancel = false) => {
-      if (voiceHandleRef.current) {
-        if (cancel) voiceHandleRef.current.cancel();
-        else voiceHandleRef.current.stop();
-        voiceHandleRef.current = null;
-      }
-      if (stopMonitorRef.current) {
-        stopMonitorRef.current();
-        stopMonitorRef.current = null;
-      }
-      setMicActive(false);
-      setAudioLevels(Array(12).fill(0.15));
-      if (cancel) {
-        setLiveTranscript("");
-      }
-    },
-    [setMicActive]
-  );
+  useEffect(() => {
+    if (!voiceSettings) {
+      loadVoiceSettings();
+    } else {
+      setAutoSpeak(Boolean(voiceSettings.autoSpeakResponses));
+    }
+  }, [loadVoiceSettings, voiceSettings]);
+
+  const scrollToBottom = useCallback(() => {
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    });
+  }, []);
 
   useEffect(() => {
-    return () => {
-      stopVoiceCapture(true);
-      stopSpeaking();
-      setIsSpeaking(false);
-    };
-  }, [stopVoiceCapture, setIsSpeaking]);
+    scrollToBottom();
+  }, [messages, streamingText, scrollToBottom]);
 
-  const speakAssistantReply = useCallback(
-    (msgId: string, content: string) => {
-      if (speakingMessageId === msgId && isSpeaking) {
-        stopSpeaking();
-        setIsSpeaking(false);
-        setSpeakingMessageId(null);
-        return;
-      }
+  // Auto-resize textarea
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
+  }, [composer]);
 
-      setSpeakingMessageId(msgId);
-      speakText(content, {
-        rate: voiceSettings?.ttsRate ?? 1.0,
-        language: voiceSettings?.inputLanguage ?? "en-US",
-        onStart: () => setIsSpeaking(true),
-        onEnd: () => {
-          setIsSpeaking(false);
-          setSpeakingMessageId(null);
-        },
-      });
-    },
-    [speakingMessageId, isSpeaking, voiceSettings, setIsSpeaking]
-  );
-
-  const loadConversations = useCallback(
-    async (query?: string) => {
-      try {
-        const res = await apiClient.listConversations({ limit: 50, search: query || undefined });
-        setConversations(res.data.conversations);
-        if (!activeIdRef.current && res.data.conversations.length > 0) {
-          setActiveId(res.data.conversations[0].id);
+  const loadConversations = useCallback(async (selectFirstIfNone = true) => {
+    try {
+      const res = await apiClient.listConversations({ limit: 50 });
+      setConversations(res.data.conversations);
+      if (selectFirstIfNone && !activeIdRef.current && res.data.conversations.length > 0) {
+        const first = res.data.conversations[0];
+        setActiveId(first.id);
+        setLoadingMessages(true);
+        const detail = await apiClient.getConversation(first.id).catch(() => null);
+        if (detail) {
+          setMessages(detail.data.messages);
         }
-      } catch (err) {
-        const msg = err instanceof ApiError ? err.message : "Failed to load conversations.";
-        showToast("error", msg);
-      } finally {
-        setLoadingList(false);
-      }
-    },
-    [showToast]
-  );
-
-  const loadConversationMessages = useCallback(
-    async (conversationId: string) => {
-      setLoadingMessages(true);
-      setLatestInterpretation(null);
-      setStreamingText("");
-      try {
-        const res = await apiClient.getConversation(conversationId);
-        setMessages(res.data.messages);
-      } catch (err) {
-        const msg = err instanceof ApiError ? err.message : "Failed to load messages.";
-        showToast("error", msg);
-      } finally {
         setLoadingMessages(false);
       }
-    },
-    [showToast]
-  );
+    } catch {
+      // ignore transient error
+    } finally {
+      setLoadingList(false);
+    }
+  }, []);
 
   useEffect(() => {
-    loadConversations();
+    loadConversations(true);
   }, [loadConversations]);
 
-  useEffect(() => {
-    if (activeId) {
-      loadConversationMessages(activeId);
-    } else {
-      setMessages([]);
-    }
-  }, [activeId, loadConversationMessages]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingText]);
-
+  // Realtime WebSocket for live token streaming
   useEffect(() => {
     const client = new RealtimeClient({
-      onStatusChange: (status) => setWsStatus(status),
-      onMessageDelta: ({ conversationId, delta }) => {
-        if (conversationId === activeIdRef.current) {
-          setStreamingText((prev) => prev + delta);
+      onStatusChange: (status) => setWsConnected(status === "connected"),
+      onMessageDelta: (payload) => {
+        if (payload.conversationId === activeIdRef.current && payload.delta) {
+          setStreamingText((prev) => prev + payload.delta);
         }
       },
-      onMessageCompleted: ({ conversationId, conversationTitle, message, interpretation }) => {
-        if (conversationId === activeIdRef.current) {
+      onMessageCompleted: (payload) => {
+        if (payload.conversationId === activeIdRef.current) {
           setStreamingText("");
-          setSending(false);
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === message.id)) return prev;
-            return [...prev, message];
-          });
-          if (interpretation) {
-            setLatestInterpretation(interpretation);
-          }
-          if (lastInputWasVoiceRef.current && voiceSettings?.autoSpeakResponses) {
-            speakAssistantReply(message.id, message.content);
-          }
-          lastInputWasVoiceRef.current = false;
         }
-        if (conversationTitle) {
-          setConversations((prev) =>
-            prev.map((c) =>
-              c.id === conversationId ? { ...c, title: conversationTitle } : c
-            )
-          );
-        }
-      },
-      onError: ({ message }) => {
-        setSending(false);
-        setStreamingText("");
-        showToast("error", message);
       },
     });
-
     realtimeRef.current = client;
     client.connect();
 
     return () => {
       client.disconnect();
-      realtimeRef.current = null;
+      voiceHandleRef.current?.cancel();
+      stopSpeaking();
     };
-  }, [showToast, voiceSettings?.autoSpeakResponses, speakAssistantReply]);
+  }, []);
 
-  const handleCreateConversation = async () => {
+  const handleSelectConversation = async (id: string) => {
+    setActiveId(id);
+    setStreamingText("");
+    setMobileHistoryOpen(false);
+    setLoadingMessages(true);
     try {
-      const res = await apiClient.createConversation({ mode: "general" });
-      const created = res.data.conversation;
-      setConversations((prev) => [created, ...prev]);
-      setActiveId(created.id);
-      setMessages([]);
-      setLatestInterpretation(null);
-      setMobileHistoryOpen(false);
+      const detail = await apiClient.getConversation(id);
+      setMessages(detail.data.messages);
     } catch (err) {
-      showToast("error", err instanceof ApiError ? err.message : "Unable to create conversation.");
+      showToast("error", err instanceof ApiError ? err.message : "Failed to load conversation.");
+    } finally {
+      setLoadingMessages(false);
     }
   };
 
-  const handleSend = async (overrideText?: string, inputType: "text" | "voice" = "text") => {
-    const text = (overrideText ?? composer).trim();
-    if (!text || sending) return;
-
-    lastInputWasVoiceRef.current = inputType === "voice";
-    setSending(true);
-    setComposer("");
-    setLiveTranscript("");
+  const handleNewChat = async () => {
+    stopSpeaking();
+    setSpeakingMessageId(null);
     setStreamingText("");
-    setLatestInterpretation(null);
+    setActiveId(null);
+    setMessages([]);
+    setMobileHistoryOpen(false);
+    textareaRef.current?.focus();
+  };
 
-    let targetId = activeId;
+  const handleDeleteConversation = async (conv: Conversation) => {
     try {
-      if (!targetId) {
-        const createdRes = await apiClient.createConversation({ mode: "general" });
-        const created = createdRes.data.conversation;
-        targetId = created.id;
-        activeIdRef.current = created.id;
-        setActiveId(created.id);
-        setConversations((prev) => [created, ...prev]);
+      await apiClient.deleteConversation(conv.id);
+      const remaining = conversations.filter((c) => c.id !== conv.id);
+      setConversations(remaining);
+      if (activeId === conv.id) {
+        if (remaining.length > 0) {
+          handleSelectConversation(remaining[0].id);
+        } else {
+          setActiveId(null);
+          setMessages([]);
+        }
       }
+      showToast("info", "Chat deleted.");
+    } catch (err) {
+      showToast("error", err instanceof ApiError ? err.message : "Failed to delete chat.");
+    } finally {
+      setPendingDelete(null);
+    }
+  };
 
-      const optimisticUserMsg: Message = {
-        id: `temp-${Date.now()}`,
-        conversationId: targetId,
-        userId: "",
+  const handleSend = useCallback(
+    async (textOverride?: string, inputType: "text" | "voice" = "text") => {
+      const content = (textOverride ?? composer).trim();
+      if (!content || sending) return;
+
+      setSending(true);
+      setStreamingText("");
+      if (!textOverride) setComposer("");
+
+      // Optimistic user bubble
+      const tempUserId = `temp-${Date.now()}`;
+      const optimisticUser: Message = {
+        id: tempUserId,
+        conversationId: activeIdRef.current || "pending",
+        userId: user?.id || "",
         role: "user",
-        content: text,
+        content,
         inputType,
         attachments: [],
         modelProvider: null,
@@ -297,366 +254,347 @@ export function AssistantScreen() {
         tokenUsage: {},
         createdAt: new Date().toISOString(),
       };
-      setMessages((prev) => [...prev, optimisticUserMsg]);
+      setMessages((prev) => [...prev, optimisticUser]);
 
-      if (realtimeRef.current?.isConnected()) {
-        const sent = realtimeRef.current.sendConversationMessage(targetId, text, inputType);
-        if (sent) return;
+      try {
+        let targetId = activeIdRef.current;
+        if (!targetId) {
+          const created = await apiClient.createConversation({
+            title: content.slice(0, 52),
+            mode: "assistant",
+          });
+          targetId = created.data.conversation.id;
+          setActiveId(targetId);
+          activeIdRef.current = targetId;
+          setConversations((prev) => [created.data.conversation, ...prev]);
+        }
+
+        const res = await apiClient.sendMessage(targetId, {
+          content,
+          inputType,
+          deviceId: currentDeviceId,
+        });
+
+        setStreamingText("");
+        setMessages((prev) => [
+          ...prev.filter((m) => m.id !== tempUserId),
+          res.data.userMessage,
+          res.data.assistantMessage,
+        ]);
+
+        // Refresh sidebar list order/title
+        apiClient
+          .listConversations({ limit: 50 })
+          .then((listRes) => setConversations(listRes.data.conversations))
+          .catch(() => null);
+
+        if ((inputType === "voice" || autoSpeak) && res.data.assistantMessage.content) {
+          const msgId = res.data.assistantMessage.id;
+          speakText(res.data.assistantMessage.content.slice(0, 320), {
+            language: voiceSettings?.inputLanguage || "en-US",
+            voiceType: voiceSettings?.voiceType || "female",
+            pitch: voiceSettings?.ttsPitch,
+            rate: voiceSettings?.ttsRate ?? 1.0,
+            onStart: () => setSpeakingMessageId(msgId),
+            onEnd: () => setSpeakingMessageId(null),
+          });
+        }
+      } catch (err) {
+        setMessages((prev) => prev.filter((m) => m.id !== tempUserId));
+        showToast("error", err instanceof ApiError ? err.message : "Failed to send message.");
+      } finally {
+        setSending(false);
       }
+    },
+    [autoSpeak, composer, currentDeviceId, sending, showToast, voiceSettings]
+  );
 
-      const res = await apiClient.sendMessage(targetId, {
-        content: text,
-        inputType,
-        deviceId: currentDeviceId,
-      });
-
-      setMessages((prev) => [
-        ...prev.filter((m) => m.id !== optimisticUserMsg.id),
-        res.data.userMessage,
-        res.data.assistantMessage,
-      ]);
-      setLatestInterpretation(res.data.interpretation);
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.id === targetId ? { ...c, title: res.data.conversationTitle } : c
-        )
-      );
-      if (inputType === "voice" && voiceSettings?.autoSpeakResponses) {
-        speakAssistantReply(res.data.assistantMessage.id, res.data.assistantMessage.content);
-      }
-      setSending(false);
-    } catch (err) {
-      setSending(false);
-      setStreamingText("");
-      showToast("error", err instanceof ApiError ? err.message : "Failed to send message.");
-    }
-  };
-
-  const handleToggleVoice = async () => {
-    if (micActive) {
-      stopVoiceCapture(false);
-      return;
-    }
-
-    if (voiceSettings && !voiceSettings.voiceEnabled) {
-      showToast("info", "Voice interaction is disabled in Settings.");
+  const toggleVoiceMic = () => {
+    if (voiceActive) {
+      voiceHandleRef.current?.stop();
+      voiceHandleRef.current = null;
+      setVoiceActive(false);
+      setInterimTranscript("");
       return;
     }
 
     if (!isSpeechRecognitionSupported()) {
-      showToast(
-        "error",
-        "Local browser speech recognition is unavailable in this environment. Use Chrome, Edge, or the Tauri desktop app."
-      );
+      showToast("info", "Browser voice recognition unavailable — type your message below.");
       return;
     }
 
-    stopSpeaking();
-    setIsSpeaking(false);
-    setLiveTranscript("");
-
-    try {
-      const stopMonitor = await startMicLevelMonitor((levels) => setAudioLevels(levels));
-      stopMonitorRef.current = stopMonitor;
-    } catch {
-      showToast("error", "Microphone permission was denied.");
-      return;
-    }
-
-    setMicActive(true);
-    const handle = startLocalVoiceRecognition({
+    setVoiceActive(true);
+    setInterimTranscript("");
+    voiceHandleRef.current = startLocalVoiceRecognition({
       language: voiceSettings?.inputLanguage || "en-US",
-      onInterim: (text) => setLiveTranscript(text),
-      onFinal: (text) => setLiveTranscript(text),
-      onError: (err) => {
-        showToast("error", `Voice capture error: ${err}`);
-        stopVoiceCapture(true);
+      onInterim: (text) => setInterimTranscript(text),
+      onFinal: (text) => {
+        if (text.trim()) {
+          setInterimTranscript("");
+          voiceHandleRef.current?.stop();
+          voiceHandleRef.current = null;
+          setVoiceActive(false);
+          handleSend(text.trim(), "voice");
+        }
       },
-      onEnd: () => {
-        stopVoiceCapture(false);
+      onError: (msg) => {
+        showToast("error", `Voice error: ${msg}`);
+        setVoiceActive(false);
       },
+      onEnd: () => setVoiceActive(false),
     });
-
-    if (!handle) {
-      stopVoiceCapture(true);
-      return;
-    }
-    voiceHandleRef.current = handle;
   };
 
-  const handleSendVoiceTranscript = () => {
-    const raw = liveTranscript.trim();
-    if (!raw) return;
-
-    stopVoiceCapture(false);
-
-    if (voiceSettings?.wakeWordEnabled) {
-      const parsed = extractWakeWordCommand(raw, voiceSettings.wakeWordPhrase);
-      if (!parsed.matched) {
-        showToast(
-          "info",
-          `Wake word "${voiceSettings.wakeWordPhrase}" was not detected. Say the wake phrase or disable the filter in Settings.`
-        );
-        return;
-      }
-      if (!parsed.command) {
-        showToast("info", "Wake word detected, but no command followed.");
-        return;
-      }
-      handleSend(parsed.command, "voice");
-      return;
-    }
-
-    handleSend(raw, "voice");
+  const handleStopAudio = () => {
+    voiceHandleRef.current?.cancel();
+    voiceHandleRef.current = null;
+    stopSpeaking();
+    setVoiceActive(false);
+    setSpeakingMessageId(null);
+    setInterimTranscript("");
   };
 
-  const handleDeleteConversation = async () => {
-    if (!pendingDelete) return;
-    const toDelete = pendingDelete;
+  const handleCopy = async (msg: Message) => {
     try {
-      await apiClient.deleteConversation(toDelete.id);
-      const remaining = conversations.filter((c) => c.id !== toDelete.id);
-      setConversations(remaining);
-      if (activeId === toDelete.id) {
-        setActiveId(remaining[0]?.id || null);
-      }
-      showToast("info", "Conversation deleted.");
-    } catch (err) {
-      showToast("error", err instanceof ApiError ? err.message : "Delete failed.");
-    } finally {
-      setPendingDelete(null);
-    }
-  };
-
-  const handleCopy = async (id: string, content: string) => {
-    try {
-      await navigator.clipboard.writeText(content);
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 1500);
+      await navigator.clipboard.writeText(msg.content);
+      setCopiedId(msg.id);
+      setTimeout(() => setCopiedId((cur) => (cur === msg.id ? null : cur)), 1800);
     } catch {
-      // Clipboard unavailable
+      showToast("error", "Unable to copy message.");
     }
   };
 
-  const filteredConversations = search.trim()
-    ? conversations.filter((c) =>
-        c.title.toLowerCase().includes(search.trim().toLowerCase())
-      )
-    : conversations;
+  const handleSpeakMessage = (msg: Message) => {
+    if (speakingMessageId === msg.id) {
+      stopSpeaking();
+      setSpeakingMessageId(null);
+      return;
+    }
+    speakText(msg.content, {
+      language: voiceSettings?.inputLanguage || "en-US",
+      voiceType: voiceSettings?.voiceType || "female",
+      pitch: voiceSettings?.ttsPitch,
+      rate: voiceSettings?.ttsRate ?? 1.0,
+      onStart: () => setSpeakingMessageId(msg.id),
+      onEnd: () => setSpeakingMessageId(null),
+    });
+  };
 
-  const conversationListPanel = (
-    <div className="flex h-full flex-col border-r border-white/[0.08] bg-[#0D0F13]">
-      <div className="flex h-14 items-center justify-between border-b border-white/[0.06] px-4">
-        <BrandMark variant="logo" size="md" />
-        {mobileHistoryOpen && (
-          <button
-            type="button"
-            onClick={() => setMobileHistoryOpen(false)}
-            className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/[0.06] hover:text-white md:hidden"
-            aria-label="Close conversation list"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )}
-      </div>
+  const filteredConversations = conversations.filter((c) =>
+    c.title.toLowerCase().includes(search.trim().toLowerCase())
+  );
 
-      <div className="p-3 pb-2">
+  const activeConversation = conversations.find((c) => c.id === activeId) || null;
+
+  const renderHistoryRailContent = () => (
+    <>
+      {/* Chat Workspace History Card */}
+      <div className="nohby-frame flex min-h-0 flex-1 flex-col overflow-hidden p-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <History className="h-3.5 w-3.5 text-[#00D4FF]" />
+            <h3 className="font-display text-[12px] font-semibold text-white">Chat History</h3>
+          </div>
+          <span className="rounded-full border border-white/[0.1] bg-[#161E30] px-1.5 py-0.5 text-[9px] font-medium text-zinc-400">
+            {conversations.length}
+          </span>
+        </div>
+
         <button
           type="button"
-          onClick={handleCreateConversation}
-          className="btn-ivory flex h-9 w-full items-center justify-center gap-2 rounded-lg px-3 text-xs"
+          onClick={handleNewChat}
+          className="btn-ivory mt-2.5 flex h-8 w-full items-center justify-center gap-1.5 rounded-lg text-[11px] font-semibold"
         >
           <MessageSquarePlus className="h-3.5 w-3.5" />
           New Chat
         </button>
-      </div>
 
-      <div className="px-3 pb-2">
-        <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
+        {/* Compact Search */}
+        <div className="relative mt-2">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-zinc-500" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search chats..."
-            className="studio-input h-8 w-full rounded-lg pr-3 pl-8 text-xs"
+            placeholder="Search workspace chats..."
+            className="studio-input h-7 w-full rounded-lg pl-7 pr-2.5 text-[11px]"
           />
         </div>
-      </div>
 
-      <div className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-3">
-        {loadingList ? (
-          <div className="py-8 text-center text-xs text-zinc-500">Loading history...</div>
-        ) : filteredConversations.length === 0 ? (
-          <div className="px-3 py-8 text-center text-xs text-zinc-500">
-            No conversations yet.
-          </div>
-        ) : (
-          filteredConversations.map((conv) => {
-            const isSelected = conv.id === activeId;
-            return (
-              <div
-                key={conv.id}
-                className={`group flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 transition ${
-                  isSelected
-                    ? "bg-white/[0.08] text-white"
-                    : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200"
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveId(conv.id);
-                    setMobileHistoryOpen(false);
-                  }}
-                  className="min-w-0 flex-1 text-left"
+        {/* Thread List */}
+        <div className="mt-2.5 flex-1 space-y-1 overflow-y-auto pr-0.5">
+          {loadingList ? (
+            <div className="flex items-center justify-center py-8 text-[11px] text-zinc-400">
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin text-[#00D4FF]" />
+              Loading chats...
+            </div>
+          ) : filteredConversations.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-white/[0.1] px-2.5 py-5 text-center text-[10px] text-zinc-400">
+              {search ? "No matching chats" : "No chat history yet — start a conversation"}
+            </div>
+          ) : (
+            filteredConversations.map((conv) => {
+              const isSelected = conv.id === activeId;
+              return (
+                <div
+                  key={conv.id}
+                  onClick={() => handleSelectConversation(conv.id)}
+                  className={`group flex cursor-pointer items-center justify-between gap-1.5 rounded-lg border px-2.5 py-2 transition ${
+                    isSelected
+                      ? "border-[#00D4FF]/55 bg-[#00D4FF]/12 text-white"
+                      : "border-white/[0.06] bg-[#141B2D]/70 text-zinc-300 hover:border-[#00D4FF]/35 hover:text-white"
+                  }`}
                 >
-                  <p className="truncate text-xs font-medium">{conv.title}</p>
-                  {conv.lastMessagePreview && (
-                    <p className="mt-0.5 truncate text-[11px] text-zinc-500">
-                      {conv.lastMessagePreview}
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={`truncate text-[11px] font-medium ${
+                        isSelected ? "text-[#00D4FF]" : "text-white"
+                      }`}
+                    >
+                      {conv.title}
                     </p>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPendingDelete(conv)}
-                  aria-label="Delete conversation"
-                  className="shrink-0 rounded p-1 text-zinc-500 opacity-0 transition hover:bg-rose-500/15 hover:text-rose-400 group-hover:opacity-100"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            );
-          })
-        )}
+                    <p className="mt-0.5 text-[9px] text-zinc-400">
+                      {formatTimeAgo(conv.updatedAt || conv.createdAt)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPendingDelete(conv);
+                    }}
+                    aria-label={`Delete ${conv.title}`}
+                    className="shrink-0 rounded p-1 text-zinc-500 opacity-60 transition hover:bg-rose-500/15 hover:text-rose-400 hover:opacity-100"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
 
-      {/* Bottom standalone utility bar: Back to Dashboard + Theme Switch */}
-      <div className="border-t border-white/[0.06] p-3">
-        <div className="flex items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={() => setRoute("home")}
-            className="flex h-8 flex-1 items-center gap-2 rounded-lg border border-white/[0.1] bg-[#111318] px-2.5 text-xs font-medium text-zinc-200 transition hover:border-white/[0.2]"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            <span>Dashboard</span>
-          </button>
-          <ThemeToggle compact />
+      {/* Compact Workspace Status Card (Matches Active Session right rail balance) */}
+      <div className="nohby-frame p-3">
+        <div className="flex items-center justify-between">
+          <h3 className="font-display text-[11px] font-semibold text-white">Chat Workspace</h3>
+          <span className="inline-flex items-center gap-1 text-[9px] text-emerald-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            {wsConnected ? "Live" : "Ready"}
+          </span>
         </div>
-        {user && (
-          <p className="mt-2 truncate px-0.5 text-[11px] text-zinc-500">
-            {user.profile?.displayName || user.name}
-          </p>
-        )}
+
+        <div className="mt-2 space-y-1.5 text-[10px]">
+          <div className="flex items-center justify-between">
+            <span className="text-zinc-400">Engine:</span>
+            <span className="font-medium text-white">NohbyAI · Gemini</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-zinc-400">Auto-Speak:</span>
+            <button
+              type="button"
+              onClick={() => setAutoSpeak((v) => !v)}
+              className={`rounded-full px-2 py-0.5 text-[9px] font-semibold transition ${
+                autoSpeak
+                  ? "bg-[#00D4FF]/20 text-[#00D4FF]"
+                  : "border border-white/[0.12] bg-[#161E30] text-zinc-400 hover:text-white"
+              }`}
+            >
+              {autoSpeak ? "On" : "Off"}
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 
   return (
-    <div className="relative flex h-screen w-screen overflow-hidden bg-[#0A0B0E] text-zinc-100">
-      {/* Desktop & Tablet standalone sidebar */}
-      <div className="hidden w-64 shrink-0 md:block">{conversationListPanel}</div>
-
-      {/* Mobile slide-over conversation drawer */}
-      <AnimatePresence>
-        {mobileHistoryOpen && (
-          <div className="fixed inset-0 z-40 flex md:hidden">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setMobileHistoryOpen(false)}
-              className="fixed inset-0 bg-black/65"
-            />
-            <motion.div
-              initial={{ x: -280 }}
-              animate={{ x: 0 }}
-              exit={{ x: -280 }}
-              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              className="relative z-10 h-full w-72"
-            >
-              {conversationListPanel}
-            </motion.div>
+    <div className="grid w-full gap-3 lg:h-[calc(100vh-5.25rem)] lg:grid-cols-[minmax(0,1fr)_250px] xl:grid-cols-[minmax(0,1fr)_265px] lg:overflow-hidden">
+      {/* ============================================================
+          LEFT / CENTER: CHATGPT-STYLE CHAT ROOM STAGE
+          ============================================================ */}
+      <section className="nohby-stage flex min-h-[calc(100vh-8.5rem)] flex-col overflow-hidden lg:h-full lg:min-h-0">
+        {/* Stage Header */}
+        <div className="flex items-center justify-between gap-2 border-b border-white/[0.07] px-4 py-2.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#00D4FF]/40 bg-[#101A2E]">
+              <img src="/icon-white.png" alt="" className="h-3.5 w-3.5 object-contain" />
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 className="font-display truncate text-sm font-semibold text-white">
+                  {activeConversation ? activeConversation.title : "NohbyAI Chat Room"}
+                </h2>
+                {voiceActive && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[#00D4FF]/40 bg-[#00D4FF]/10 px-2 py-0.5 text-[10px] font-medium text-[#00D4FF]">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#00D4FF]" />
+                    Listening
+                  </span>
+                )}
+                {speakingMessageId && !voiceActive && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-violet-400/40 bg-violet-500/15 px-2 py-0.5 text-[10px] font-medium text-violet-300">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-400" />
+                    Speaking
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
 
-      {/* Main full-height standalone chat canvas */}
-      <div className="flex min-w-0 flex-1 flex-col bg-[#111318]">
-        {/* Minimalist floating header */}
-        <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-white/[0.06] px-4 sm:px-6">
-          <div className="flex min-w-0 items-center gap-2.5">
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleNewChat}
+              className="inline-flex h-7 items-center gap-1 rounded-lg border border-white/[0.1] bg-[#141B2D]/80 px-2.5 text-[11px] font-medium text-zinc-200 transition hover:border-[#00D4FF]/50 hover:text-white"
+            >
+              <MessageSquarePlus className="h-3.5 w-3.5 text-[#00D4FF]" />
+              <span className="hidden sm:inline">New Chat</span>
+            </button>
             <button
               type="button"
               onClick={() => setMobileHistoryOpen(true)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.08] bg-[#171A21] text-zinc-300 md:hidden"
-              aria-label="Open conversations"
+              className="inline-flex h-7 items-center gap-1 rounded-lg border border-white/[0.1] bg-[#141B2D]/80 px-2.5 text-[11px] font-medium text-zinc-200 transition hover:border-[#00D4FF]/50 lg:hidden"
             >
-              <History className="h-4 w-4" />
-            </button>
-            <h1 className="font-display truncate text-sm font-semibold text-white">
-              {conversations.find((c) => c.id === activeId)?.title || "Nohby ONE Assistant"}
-            </h1>
-          </div>
-
-          <div className="flex items-center gap-2 text-[11px]">
-            {voiceSettings?.wakeWordEnabled && (
-              <span className="hidden rounded-full border border-white/[0.1] bg-[#171A21] px-2.5 py-0.5 font-mono text-zinc-400 sm:inline">
-                Wake: &ldquo;{voiceSettings.wakeWordPhrase}&rdquo;
-              </span>
-            )}
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-medium ${
-                wsStatus === "connected"
-                  ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-500"
-                  : "border-white/[0.08] bg-white/[0.03] text-zinc-400"
-              }`}
-            >
-              {wsStatus === "connected" ? (
-                <Wifi className="h-3 w-3" />
-              ) : (
-                <WifiOff className="h-3 w-3" />
-              )}
-              <span className="hidden sm:inline">
-                {wsStatus === "connected" ? "Live" : "REST"}
-              </span>
-            </span>
-            <button
-              type="button"
-              onClick={() => setRoute("home")}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.1] bg-[#171A21] px-2.5 text-xs font-medium text-zinc-200 transition hover:border-white/[0.2]"
-            >
-              <LayoutDashboard className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Dashboard</span>
+              <History className="h-3.5 w-3.5 text-[#00D4FF]" />
+              History
             </button>
           </div>
-        </header>
+        </div>
 
-        {/* Messages stream */}
-        <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+        {/* Scrollable ChatGPT-Style Thread */}
+        <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-6">
           {loadingMessages ? (
-            <LoadingState message="Loading conversation..." />
+            <div className="flex h-full items-center justify-center text-xs text-zinc-400">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin text-[#00D4FF]" />
+              Loading conversation...
+            </div>
           ) : messages.length === 0 && !streamingText ? (
-            <div className="mx-auto flex h-full max-w-2xl flex-col items-center justify-center text-center">
-              <h3 className="text-base font-semibold text-white">
-                How can Nohby ONE help today?
+            <div className="mx-auto flex h-full max-w-2xl flex-col items-center justify-center py-6 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#00D4FF]/35 bg-[#101A2E] shadow-[0_0_24px_rgba(0,212,255,0.22)]">
+                <Sparkles className="h-5 w-5 text-[#00D4FF]" />
+              </div>
+              <h3 className="font-display mt-3.5 text-lg font-semibold text-white">
+                How can NohbyAI help you, {user?.profile?.displayName || user?.name?.split(" ")[0] || "there"}?
               </h3>
-              <p className="mt-1.5 max-w-md text-xs leading-relaxed text-zinc-400">
-                Type an instruction or click the microphone to speak naturally. Sensitive
-                operations always display an execution plan before anything runs.
+              <p className="mt-1 max-w-md text-xs text-zinc-400">
+                Ask anything, brainstorm, write code, or speak directly using voice mode. Your workspace history stays saved on the right.
               </p>
 
-              <div className="mt-6 grid w-full gap-2 sm:grid-cols-2">
-                {STARTER_PROMPTS.map((prompt) => (
+              <div className="mt-5 grid w-full gap-2 sm:grid-cols-2">
+                {STARTER_PROMPTS.map((item) => (
                   <button
-                    key={prompt}
+                    key={item.title}
                     type="button"
-                    onClick={() => handleSend(prompt, "text")}
-                    className="rounded-xl border border-white/[0.08] bg-[#171A21] p-3.5 text-left text-xs leading-relaxed text-zinc-300 transition hover:border-indigo-500/40 hover:text-white"
+                    onClick={() => handleSend(item.prompt, "text")}
+                    className="group rounded-xl border border-white/[0.08] bg-[#141B2D]/75 p-3 text-left transition hover:border-[#00D4FF]/50 hover:bg-[#172038]"
                   >
-                    {prompt}
+                    <p className="text-[11px] font-semibold text-white group-hover:text-[#00D4FF]">
+                      {item.title}
+                    </p>
+                    <p className="mt-0.5 line-clamp-2 text-[11px] text-zinc-400">
+                      {item.prompt}
+                    </p>
                   </button>
                 ))}
               </div>
@@ -665,257 +603,235 @@ export function AssistantScreen() {
             <div className="mx-auto max-w-3xl space-y-4">
               {messages.map((msg) => {
                 const isUser = msg.role === "user";
-                const speakingThis = speakingMessageId === msg.id && isSpeaking;
                 return (
                   <div
                     key={msg.id}
                     className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}
                   >
+                    <div className="mb-1 flex items-center gap-1.5">
+                      {!isUser && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-[#00D4FF]/35 bg-[#101A2E] px-2 py-0.5 text-[10px] font-medium text-zinc-200">
+                          NohbyAI
+                          <img src="/icon-white.png" alt="" className="h-3 w-3 rounded-full object-contain" />
+                        </span>
+                      )}
+                      {isUser && (
+                        <span className="rounded-full border border-white/[0.12] bg-[#161E30] px-2 py-0.5 text-[10px] font-medium text-zinc-300">
+                          You
+                        </span>
+                      )}
+                      <span className="text-[9px] text-zinc-500">{formatTime(msg.createdAt)}</span>
+                    </div>
+
                     <div
-                      className={`max-w-[90%] rounded-2xl px-4 py-3 text-sm leading-relaxed sm:max-w-[82%] ${
+                      className={`max-w-[90%] rounded-2xl px-4 py-2.5 text-[13px] leading-relaxed whitespace-pre-wrap sm:max-w-[82%] ${
                         isUser
-                          ? "bg-indigo-600 text-white"
-                          : "border border-white/[0.08] bg-[#171A21] text-zinc-200"
+                          ? "rounded-tr-sm border border-white/[0.1] bg-[#151B2B]/90 text-zinc-100"
+                          : "nohby-bubble-ai rounded-tl-sm text-zinc-100"
                       }`}
                     >
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                      {msg.content}
                     </div>
-                    <div className="mt-1 flex items-center gap-2 px-1 text-[11px] text-zinc-500">
-                      <span>
-                        {isUser
-                          ? msg.inputType === "voice"
-                            ? "You (Voice)"
-                            : "You"
-                          : msg.modelName || "Nohby ONE"}
-                      </span>
-                      <span>·</span>
-                      <span>{formatTime(msg.createdAt)}</span>
-                      {!isUser && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => speakAssistantReply(msg.id, msg.content)}
-                            title={speakingThis ? "Stop reading" : "Read aloud"}
-                            className="ml-1 inline-flex items-center text-zinc-500 hover:text-zinc-200"
-                          >
-                            {speakingThis ? (
-                              <VolumeX className="h-3.5 w-3.5 text-indigo-400" />
-                            ) : (
-                              <Volume2 className="h-3.5 w-3.5" />
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(msg.id, msg.content)}
-                            title="Copy response"
-                            className="inline-flex items-center text-zinc-500 hover:text-zinc-200"
-                          >
-                            {copiedId === msg.id ? (
-                              <Check className="h-3.5 w-3.5 text-emerald-400" />
-                            ) : (
-                              <Copy className="h-3.5 w-3.5" />
-                            )}
-                          </button>
-                        </>
-                      )}
-                    </div>
+
+                    {!isUser && (
+                      <div className="mt-1 flex items-center gap-1 pl-1">
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(msg)}
+                          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-zinc-400 transition hover:bg-white/[0.06] hover:text-white"
+                          title="Copy response"
+                        >
+                          {copiedId === msg.id ? (
+                            <>
+                              <Check className="h-3 w-3 text-emerald-400" />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3 w-3" />
+                              Copy
+                            </>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSpeakMessage(msg)}
+                          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-zinc-400 transition hover:bg-white/[0.06] hover:text-white"
+                          title={speakingMessageId === msg.id ? "Stop speaking" : "Read aloud"}
+                        >
+                          {speakingMessageId === msg.id ? (
+                            <>
+                              <VolumeX className="h-3 w-3 text-rose-400" />
+                              Stop
+                            </>
+                          ) : (
+                            <>
+                              <Volume2 className="h-3 w-3" />
+                              Speak
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
 
-              {streamingText && (
+              {/* Live Streaming or Thinking Bubble */}
+              {(sending || streamingText) && (
                 <div className="flex flex-col items-start">
-                  <div className="max-w-[90%] rounded-2xl border border-indigo-500/30 bg-[#171A21] px-4 py-3 text-sm leading-relaxed text-zinc-200 sm:max-w-[82%]">
-                    <p className="whitespace-pre-wrap">
-                      {streamingText}
-                      <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-indigo-400 align-middle" />
-                    </p>
+                  <span className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-[#00D4FF]/35 bg-[#101A2E] px-2 py-0.5 text-[10px] font-medium text-zinc-200">
+                    NohbyAI
+                    <img src="/icon-white.png" alt="" className="h-3 w-3 rounded-full object-contain" />
+                  </span>
+                  <div className="nohby-bubble-ai max-w-[85%] rounded-2xl rounded-tl-sm px-4 py-2.5 text-[13px] leading-relaxed whitespace-pre-wrap text-zinc-100">
+                    {streamingText ? (
+                      <>
+                        {streamingText}
+                        <span className="ml-1 inline-block h-3.5 w-1.5 animate-pulse bg-[#00D4FF] align-middle" />
+                      </>
+                    ) : (
+                      <span className="inline-flex items-center gap-2 text-xs text-[#00D4FF]">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        NohbyAI is thinking...
+                      </span>
+                    )}
                   </div>
                 </div>
               )}
-
-              {latestInterpretation?.requiresExecution &&
-                latestInterpretation.proposedPlan.length > 0 && (
-                  <div className="rounded-xl border border-white/[0.1] bg-[#0D0F13] p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 text-xs font-semibold text-white">
-                        <ShieldAlert className="h-4 w-4 text-indigo-400" />
-                        <span>Proposed Execution Plan (Not Yet Executed)</span>
-                      </div>
-                      <span
-                        className={`rounded-full px-2 py-0.5 font-mono text-[10px] uppercase ${
-                          latestInterpretation.riskLevel === "high"
-                            ? "bg-rose-500/15 text-rose-300"
-                            : latestInterpretation.riskLevel === "medium"
-                            ? "bg-amber-500/15 text-amber-300"
-                            : "bg-emerald-500/15 text-emerald-300"
-                        }`}
-                      >
-                        {latestInterpretation.riskLevel} risk
-                      </span>
-                    </div>
-
-                    <ol className="mt-3 space-y-2">
-                      {latestInterpretation.proposedPlan.map((step) => (
-                        <li
-                          key={step.step}
-                          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/[0.06] bg-[#111318] px-3 py-2 text-xs"
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <span className="font-mono text-zinc-500">{step.step}.</span>
-                            <code className="text-indigo-300">{step.tool}</code>
-                            <span className="text-zinc-300">{step.description}</span>
-                          </div>
-                          {step.requiresApproval && (
-                            <span className="inline-flex items-center gap-1 rounded bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-300">
-                              <AlertCircle className="h-3 w-3" />
-                              Approval Required
-                            </span>
-                          )}
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
-                )}
 
               <div ref={messagesEndRef} />
             </div>
           )}
         </div>
 
-        {/* Live Voice Capture Bar (Screen 06 integration) */}
-        <AnimatePresence>
-          {(micActive || liveTranscript) && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
-              transition={{ duration: 0.18 }}
-              className="border-t border-rose-500/25 bg-[#131117] px-4 py-3"
-            >
-              <div className="mx-auto flex max-w-3xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <div className="flex h-8 items-end gap-0.5 px-1" aria-hidden="true">
-                    {audioLevels.map((lvl, idx) => (
-                      <span
-                        key={idx}
-                        style={{ height: `${Math.round(lvl * 24)}px` }}
-                        className={`w-1 rounded-full transition-all duration-75 ${
-                          micActive ? "bg-rose-400" : "bg-zinc-600"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-medium text-rose-300">
-                      {micActive ? "Listening — Microphone Active" : "Captured Voice Transcript"}
-                    </p>
-                    <p className="truncate text-xs text-zinc-200">
-                      {liveTranscript ||
-                        (voiceSettings?.wakeWordEnabled
-                          ? `Say "${voiceSettings.wakeWordPhrase}" followed by your command...`
-                          : "Speak naturally...")}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex shrink-0 items-center gap-2">
-                  {liveTranscript.trim() && (
-                    <button
-                      type="button"
-                      onClick={handleSendVoiceTranscript}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500"
-                    >
-                      <Send className="h-3 w-3" />
-                      Send
-                    </button>
-                  )}
-                  {micActive && (
-                    <button
-                      type="button"
-                      onClick={() => stopVoiceCapture(false)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.12] bg-[#1C1F28] px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-white/[0.1]"
-                    >
-                      <Square className="h-3 w-3" />
-                      Stop
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => stopVoiceCapture(true)}
-                    className="rounded-lg border border-white/[0.1] px-2.5 py-1.5 text-xs text-zinc-400 hover:text-white"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </motion.div>
+        {/* ChatGPT-Style Bottom Prompt Composer */}
+        <div className="border-t border-white/[0.07] px-3 py-2.5 sm:px-5">
+          {interimTranscript && (
+            <div className="mx-auto mb-1.5 flex max-w-3xl items-center gap-2 rounded-lg border border-[#00D4FF]/30 bg-[#00D4FF]/10 px-3 py-1 text-[11px] text-[#00D4FF]">
+              <Mic className="h-3 w-3 animate-pulse" />
+              <span className="truncate italic">{interimTranscript}</span>
+            </div>
           )}
-        </AnimatePresence>
 
-        {/* Composer */}
-        <div className="border-t border-white/[0.08] bg-[#0D0F13] p-3 sm:p-4">
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              handleSend(undefined, "text");
+              handleSend();
             }}
-            className="mx-auto flex max-w-3xl items-end gap-2"
+            className="mx-auto flex max-w-3xl items-end gap-2 rounded-2xl border border-white/[0.12] bg-[#101624] p-1.5 pl-3.5 transition focus-within:border-[#00D4FF]/55"
           >
-            <button
-              type="button"
-              onClick={handleToggleVoice}
-              title={micActive ? "Stop listening" : "Start voice input"}
-              aria-label={micActive ? "Stop voice input" : "Start voice input"}
-              className={`flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border transition ${
-                micActive
-                  ? "border-rose-500/50 bg-rose-500/20 text-rose-300"
-                  : "border-white/[0.1] bg-[#111318] text-zinc-300 hover:border-white/[0.2] hover:text-white"
-              }`}
-            >
-              {micActive ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-            </button>
-
             <textarea
+              ref={textareaRef}
               rows={1}
               value={composer}
               onChange={(e) => setComposer(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  handleSend(undefined, "text");
+                  handleSend();
                 }
               }}
-              placeholder="Ask Nohby ONE or click the mic to speak..."
-              className="max-h-36 min-h-[42px] flex-1 resize-none rounded-xl border border-white/[0.1] bg-[#111318] px-3.5 py-2.5 text-sm text-white placeholder-zinc-500 outline-none transition focus:border-indigo-500"
+              placeholder="Message NohbyAI..."
+              className="max-h-36 flex-1 resize-none bg-transparent py-1.5 text-[13px] text-white placeholder-zinc-500 focus:outline-none"
             />
-            <button
-              type="submit"
-              disabled={sending || !composer.trim()}
-              aria-label="Send message"
-              className="btn-ivory flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl"
-            >
-              {sending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </button>
-          </form>
-        </div>
-      </div>
 
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={toggleVoiceMic}
+                title={voiceActive ? "Stop voice input" : "Voice input"}
+                className={`flex h-8 w-8 items-center justify-center rounded-xl transition ${
+                  voiceActive
+                    ? "bg-[#00D4FF] text-[#08142E] shadow-[0_0_12px_rgba(0,212,255,0.5)]"
+                    : "border border-white/[0.1] bg-[#161E30] text-zinc-300 hover:border-[#00D4FF]/50 hover:text-white"
+                }`}
+              >
+                {voiceActive ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+              </button>
+
+              {(voiceActive || speakingMessageId) && (
+                <button
+                  type="button"
+                  onClick={handleStopAudio}
+                  title="Stop audio"
+                  className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-500/20 text-rose-400 transition hover:bg-rose-500/30"
+                >
+                  <Square className="h-3 w-3 fill-current" />
+                </button>
+              )}
+
+              <button
+                type="submit"
+                disabled={sending || !composer.trim()}
+                title="Send message"
+                className="btn-ivory flex h-8 items-center justify-center gap-1 rounded-xl px-3 text-xs font-semibold disabled:opacity-45"
+              >
+                {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                <span className="hidden sm:inline">Send</span>
+              </button>
+            </div>
+          </form>
+
+          <p className="mt-1.5 text-center text-[10px] text-zinc-500">
+            <MessageSquare className="mr-1 inline h-2.5 w-2.5 text-[#00D4FF]" />
+            NohbyAI Chat Room · Enter to send, Shift+Enter for new line
+          </p>
+        </div>
+      </section>
+
+      {/* ============================================================
+          RIGHT COLUMN: SMALL-MEDIUM CHAT HISTORY WORKSPACE (250px-265px)
+          Matches Active Session's right rail size & aesthetic exactly
+          ============================================================ */}
+      <aside className="hidden flex-col gap-2.5 lg:flex lg:h-full lg:overflow-hidden">
+        {renderHistoryRailContent()}
+      </aside>
+
+      {/* Mobile / Tablet Slide-Over History Drawer */}
+      <AnimatePresence>
+        {mobileHistoryOpen && (
+          <div className="fixed inset-0 z-50 flex justify-end lg:hidden">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMobileHistoryOpen(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+            <motion.div
+              initial={{ x: 280 }}
+              animate={{ x: 0 }}
+              exit={{ x: 280 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="relative z-10 flex h-full w-72 flex-col gap-2.5 bg-[#0B101B] p-3 shadow-2xl"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-display text-xs font-semibold text-white">Workspace History</span>
+                <button
+                  type="button"
+                  onClick={() => setMobileHistoryOpen(false)}
+                  className="rounded-lg p-1 text-zinc-400 hover:bg-white/[0.06] hover:text-white"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              {renderHistoryRailContent()}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Chat Confirmation */}
       <ConfirmationDialog
-        open={pendingDelete !== null}
-        title="Delete conversation?"
-        description={
-          pendingDelete
-            ? `Permanently delete "${pendingDelete.title}" and all of its messages?`
-            : ""
-        }
+        open={Boolean(pendingDelete)}
+        title="Delete Chat Thread"
+        description={`Permanently delete "${pendingDelete?.title || "this chat"}" and its messages?`}
         confirmLabel="Delete"
         destructive
-        onConfirm={handleDeleteConversation}
+        onConfirm={() => {
+          if (pendingDelete) handleDeleteConversation(pendingDelete);
+        }}
         onCancel={() => setPendingDelete(null)}
       />
     </div>

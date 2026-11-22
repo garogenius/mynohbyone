@@ -8,6 +8,7 @@ import { JarvisWakeEngine } from "./components/JarvisWakeEngine";
 import { MobileBottomNav } from "./components/MobileBottomNav";
 import { ToastBanner } from "./components/StateViews";
 import { Topbar } from "./components/Topbar";
+import { AssistantScreen } from "./screens/AssistantScreen";
 import { AuthScreen } from "./screens/AuthScreen";
 import { DeviceOnboardingScreen } from "./screens/DeviceOnboardingScreen";
 import { DevicesScreen } from "./screens/DevicesScreen";
@@ -132,7 +133,8 @@ export function App() {
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
             >
-              {(activeRoute === "home" || activeRoute === "assistant") && <HomeScreen />}
+              {activeRoute === "home" && <HomeScreen />}
+              {activeRoute === "assistant" && <AssistantScreen />}
               {activeRoute === "tasks" && <TasksScreen />}
               {activeRoute === "meetings" && <MeetingsScreen />}
               {activeRoute === "integrations" && <IntegrationsScreen />}
