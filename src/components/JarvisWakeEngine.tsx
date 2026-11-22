@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Radio, X } from "lucide-react";
 
 import { apiClient } from "../lib/api";
+import { getSelectedOrbStyle } from "../lib/orbStyle";
 import {
   extractWakeWordCommand,
   isSpeechRecognitionSupported,
@@ -273,7 +274,7 @@ export function JarvisWakeEngine() {
     <div className="fixed bottom-16 right-4 z-40 flex items-center gap-2.5 rounded-full border border-[#00D4FF]/40 bg-[#0B101B]/95 py-1.5 pl-1.5 pr-3 shadow-[0_8px_30px_rgba(0,180,255,0.25)] backdrop-blur-md lg:bottom-4">
       <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full border border-[#00D4FF]/50">
         <img
-          src={isActive ? "/vioce-wave.gif" : "/vioce-wave-image.jpg"}
+          src={isActive ? getSelectedOrbStyle().gif : getSelectedOrbStyle().still}
           alt="NohbyAI Jarvis Mode"
           className="h-full w-full scale-[1.34] object-cover"
         />

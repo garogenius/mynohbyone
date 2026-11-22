@@ -17,6 +17,12 @@ import {
 } from "lucide-react";
 
 import { ApiError, apiClient } from "../lib/api";
+import {
+  ORB_STYLE_OPTIONS,
+  getSelectedOrbStyle,
+  setSelectedOrbStyle,
+  type OrbStyleOption,
+} from "../lib/orbStyle";
 import { applyTheme, getStoredTheme, type ThemePreference } from "../lib/theme";
 import {
   SUPPORTED_LANGUAGES,
@@ -80,6 +86,7 @@ export function SettingsScreen() {
   const [autoSpeakResponses, setAutoSpeakResponses] = useState(false);
   const [inputLanguage, setInputLanguage] = useState("en-US");
   const [themePref, setThemePref] = useState<ThemePreference>(() => getStoredTheme());
+  const [selectedOrb, setSelectedOrb] = useState<OrbStyleOption>(() => getSelectedOrbStyle());
 
   const handleSelectTheme = (pref: ThemePreference) => {
     setThemePref(pref);
@@ -407,6 +414,47 @@ export function SettingsScreen() {
               </button>
             );
           })}
+        </div>
+
+        {/* Voice Wave Orb Animation Picker (all 3 public GIFs) */}
+        <div className="mt-5 border-t border-white/[0.07] pt-4">
+          <h3 className="text-xs font-semibold text-white">Voice Wave Orb Style</h3>
+          <p className="mt-0.5 text-[11px] text-zinc-400">
+            Select which animated voice wave appears in Active Session and Jarvis Mode when listening or speaking.
+          </p>
+          <div className="mt-3 grid gap-2.5 sm:grid-cols-3">
+            {ORB_STYLE_OPTIONS.map((opt) => {
+              const active = selectedOrb.id === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => {
+                    const next = setSelectedOrbStyle(opt.id);
+                    setSelectedOrb(next);
+                    showToast("success", `Voice wave switched to ${next.label}.`);
+                  }}
+                  className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${
+                    active
+                      ? "nohby-nav-active text-white"
+                      : "border-white/[0.08] bg-[#0C121E] text-zinc-300 hover:border-[#00D4FF]/40"
+                  }`}
+                >
+                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full border border-[#00D4FF]/40">
+                    <img
+                      src={opt.gif}
+                      alt={opt.label}
+                      className="h-full w-full scale-[1.34] object-cover"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-semibold text-white">{opt.label}</p>
+                    <p className="truncate text-[10px] text-zinc-400">{opt.description}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </section>
 

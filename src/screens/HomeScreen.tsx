@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { ApiError, apiClient } from "../lib/api";
+import { getSelectedOrbStyle, type OrbStyleOption } from "../lib/orbStyle";
 import {
   isSpeechRecognitionSupported,
   speakText,
@@ -51,6 +52,7 @@ export function HomeScreen() {
   const [recentMessages, setRecentMessages] = useState<Message[]>([]);
 
   // Voice Control Dock state
+  const [orbStyle, setOrbStyle] = useState<OrbStyleOption>(() => getSelectedOrbStyle());
   const [voiceActive, setVoiceActive] = useState(false);
   const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
   const [jarvisState, setJarvisState] = useState<"standby" | "awake" | "thinking" | "speaking">("standby");
@@ -68,8 +70,9 @@ export function HomeScreen() {
     jarvisState === "thinking" ||
     jarvisState === "speaking";
 
-  // Sync live bubbles and orb animation with global JarvisWakeEngine
+  // Sync live bubbles and orb animation with global JarvisWakeEngine & orb style picker
   useEffect(() => {
+    const onOrbChange = () => setOrbStyle(getSelectedOrbStyle());
     const onJarvisState = (e: Event) => {
       const detail = (e as CustomEvent<{ state: "standby" | "awake" | "thinking" | "speaking" }>).detail;
       if (detail?.state) setJarvisState(detail.state);
@@ -80,9 +83,11 @@ export function HomeScreen() {
         setRecentMessages((prev) => [...prev.slice(-2), detail.userMessage, detail.assistantMessage]);
       }
     };
+    window.addEventListener("nohby-orb-style-change", onOrbChange);
     window.addEventListener("nohby-jarvis-state", onJarvisState);
     window.addEventListener("nohby-jarvis-reply", onJarvisReply);
     return () => {
+      window.removeEventListener("nohby-orb-style-change", onOrbChange);
       window.removeEventListener("nohby-jarvis-state", onJarvisState);
       window.removeEventListener("nohby-jarvis-reply", onJarvisReply);
     };
@@ -288,8 +293,8 @@ export function HomeScreen() {
             }`}
           >
             <img
-              src={isOrbMoving ? "/vioce-wave.gif" : "/vioce-wave-image.jpg"}
-              alt="Nohby ONE Voice Wave"
+              src={isOrbMoving ? orbStyle.gif : orbStyle.still}
+              alt={orbStyle.label}
               className={`h-full w-full scale-[1.34] rounded-full object-cover transition duration-300 ${
                 isOrbMoving ? "opacity-100" : "opacity-95"
               }`}
