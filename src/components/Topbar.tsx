@@ -8,7 +8,7 @@ import type { Approval, Device, HealthData, NavRoute, User } from "../types/api"
 import { ThemeToggle } from "./ThemeToggle";
 
 const ROUTE_TITLES: Record<NavRoute, string> = {
-  home: "Active Session",
+  home: "Assistant",
   assistant: "Chat Room",
   tasks: "Tasks",
   meetings: "Meetings",
