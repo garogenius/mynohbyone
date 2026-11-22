@@ -72,7 +72,8 @@ export function LoginScreen({
           transition={{ duration: 28, repeat: Infinity, ease: "easeInOut" }}
           className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-85"
         />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0B0C0E] via-[#0B0C0E]/35 to-[#0B0C0E]/65" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-[#08142E]/95 via-[#0046B8]/45 to-[#08142E]/80 mix-blend-multiply" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#08142E]/95 via-[#08142E]/35 to-[#0066FF]/20" />
 
         <div className="relative z-10 flex items-center justify-between p-8 xl:p-10">
           <div className="flex items-center gap-3">
@@ -130,7 +131,7 @@ export function LoginScreen({
             alt=""
             className="h-full w-full object-cover object-center opacity-75"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0B0C0E] via-[#0B0C0E]/45 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#08142E]/95 via-[#0046B8]/45 to-[#0066FF]/20" />
           <div className="absolute right-5 bottom-4 left-5 flex items-center justify-between">
             <BrandMark variant="logo" size="sm" forceDark />
             <ThemeToggle compact />
